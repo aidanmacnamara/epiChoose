@@ -21,15 +21,19 @@ load("r_data/roi.RData")
 # PREPARE BLUEPRINT DATA --------------------------------------------------
 
 # write the csv file for input
-blueprint_parsed = prep_blueprint(blueprint_data="data/blueprint_files.tsv", root="~/links/CB.HTS.Analysis/CTTV020/data/BLUEPRINT/", out_file="data/data_blueprint_parsed.csv")
+blueprint_parsed = prep_blueprint_chip(blueprint_data="data/blueprint_files.tsv", root="~/links/CB.HTS.Analysis/CTTV020/data/BLUEPRINT/", out_file="data/data_blueprint_parsed.csv")
 
 marks = c("H3K27ac","H3K4me3","H3K27me3")
 blueprint_input = "data/data_blueprint_parsed.csv"
 
 require(BiocParallel)
-blueprint_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(blueprint_input, roi, marks[x], "tmp/"), BPPARAM=MulticoreParam(workers=3))
+# blueprint_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(blueprint_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
+blueprint_chip = vector("list", length=length(marks))
+for(i in 1:length(blueprint_chip)) {
+  blueprint_chip[[i]] = make_auc_matrix(blueprint_input, roi, marks[i], "tmp/", quantile_norm=TRUE)
+}
 
-blueprint_rna = prep_blueprint_rna()
+blueprint_rna = prep_blueprint_rna(quantile_norm=TRUE)
 
 
 # PLOT --------------------------------------------------------------------
@@ -42,7 +46,7 @@ plot_pca(blueprint_chip[[3]]$res, blueprint_chip[[3]]$annot$`Cell type`, "Bluepr
 # COMBINE CHIP/RNA --------------------------------------------------------
 
 # filter genes
-blueprint_rna$res = blueprint_rna$res[,match(gene_list_all$hgnc_symbol, colnames(blueprint_rna$res))]
+blueprint_rna$res = blueprint_rna$res[,match(roi$gene, colnames(blueprint_rna$res))]
 
 # what donor / cell type combinations are in the rna data?
 rna_labels = paste(blueprint_rna$annot$Comment.donor.ID., blueprint_rna$annot$Characteristics.cell.type., sep="_")
@@ -71,7 +75,7 @@ blueprint_rna_cut_final = lapply(blueprint_rna, function(x) x[final_ix,])
 dim_1 = dim(blueprint_rna_cut_final$res)[1]
 dim_2 = dim(blueprint_rna_cut_final$res)[2]
 
-all_dat = data.frame(
+all_data = data.frame(
   rna_response = log(as.numeric(t(blueprint_rna_cut_final$res))),
   chip_k27ac = log(as.numeric(t(blueprint_chip_cut_final[[1]]$res))),
   chip_k4me3 = log(as.numeric(t(blueprint_chip_cut_final[[2]]$res))),
@@ -79,14 +83,14 @@ all_dat = data.frame(
   group = factor(rep(blueprint_chip_cut_final[[1]]$annot$Group, each=dim_2)),
   donor = factor(rep(blueprint_chip_cut_final[[1]]$annot$Donor, each=dim_2)),
   cell_type = factor(rep(blueprint_chip_cut_final[[1]]$annot$`Cell type`, each=dim_2)),
-  gene = factor(rep(gene_list_all$hgnc_symbol), dim_1)
+  gene = factor(rep(roi$gene, dim_1))
 )
 
-all_dat[all_dat==-Inf] = 0 # reconvert to 0
-dat = group_by(all_dat, donor, cell_type, group) %>% nest() # group by donor / cell type
-dat_1 = dat$data[[33]] # pick first donor / cell type
+all_data[all_data==-Inf] = 0 # reconvert to 0
+dat = group_by(all_data, donor, cell_type, group) %>% nest() # group by donor / cell type
+dat_2 = dat$data[[33]] # pick first donor / cell type
 png(filename="out.png", height=800, width=1200)
-ggpairs(dplyr::select(dat_1, rna_response, chip_k27ac, chip_k4me3, chip_k27me3)) + theme_thesis()
+ggpairs(dplyr::select(dat_2, rna_response, chip_k27ac, chip_k4me3, chip_k27me3)) + theme_thesis()
 dev.off()
 
 

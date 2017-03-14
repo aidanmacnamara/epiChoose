@@ -39,6 +39,12 @@ make_auc_matrix <- function(input_data, roi, mark, tmp_dir, quantile_norm=TRUE) 
     
     cmd = paste0("WiggleTools/wiggletools apply AUC ", tmp_bed, " ", dat$Bigwig[i])
     res = system(cmd, intern=TRUE)
+    
+    if(!length(res)) {
+      print(paste("Sample", i, "did not work with WiggleTools - no data returned, skipping ..."))
+      next
+    }
+
     res_idx = grep("fixedStep", res)
     
     # need to clean wiggletools output because of, for example:
@@ -48,9 +54,8 @@ make_auc_matrix <- function(input_data, roi, mark, tmp_dir, quantile_norm=TRUE) 
     res_coords = str_replace(res, "^(.*)\t(.*)\t(.*)\t(.*)$", "\\1_\\2_\\3")
     res_score = as.numeric(str_replace(res, "^(.*)\t(.*)\t(.*)\t(.*)$", "\\4"))
     res_match = match(res_coords, colnames(res_matrix))
-    res_score = res_score[!is.na(res_match)]
-    res_match = res_match[!is.na(res_match)]
-    res_matrix[i,res_match] = res_score
+    res_score = res_score[res_match]
+    res_matrix[i,] = res_score
     
   }
   
