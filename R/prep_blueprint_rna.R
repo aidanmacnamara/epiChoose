@@ -22,7 +22,6 @@ prep_blueprint_rna <- function(quantile_norm=TRUE) {
   # map genes
   mart_1 = useMart("ensembl", dataset="hsapiens_gene_ensembl")
   mapping <- getBM(attributes=c("ensembl_gene_id","hgnc_symbol"), filters='ensembl_gene_id', values=rownames(rna_dat_mat), mart=mart_1)
-  ensembl_to_hgnc = mapping$hgnc_symbol[match(rownames(rna_dat_mat), mapping$ensembl_gene_id)]
   rownames(rna_dat_mat) = mapping$hgnc_symbol[match(rownames(rna_dat_mat), mapping$ensembl_gene_id)]
   
   # normalise
