@@ -20,11 +20,11 @@ plot_pca <- function(dat, annot_1, annot_2, roi=NULL, which_pcs=c(1,2), out_file
     annot_2 = annot_2[-remove_rows]
   }
   
-  # remove na columns
-  dat = dat[,!apply(is.na(dat), 2, all)] # remove regions with no data
+  dat = dat[,!apply(dat, 2, function(x) sd(x)==0)] # remove regions with no variance
   dim(dat)
   
-  dat = dat[,!apply(dat, 2, function(x) sd(x)==0)] # remove regions with no variance
+  # remove na columns
+  dat = dat[,!apply(is.na(dat), 2, all)] # remove regions with no data
   dim(dat)
   
   if(is.null(roi)) {
@@ -42,10 +42,10 @@ plot_pca <- function(dat, annot_1, annot_2, roi=NULL, which_pcs=c(1,2), out_file
   pca_plot <- data.frame(x=pca_res$x[,pc_1], y=pca_res$x[,pc_2], annot_1, annot_2)
   
   png(filename=out_file, height=800, width=1200)
-  print(ggplot(pca_plot, aes(x=x, y=y, color=annot_2)) + geom_point(size=5, shape=17) + xlab(paste0("PC", pc_1, ": ", pca_res_summary$importance[2,pc_1]*100, "%")) + ylab(paste0("PC", pc_2, ": ", pca_res_summary$importance[2,pc_2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=5, force=0.5))
+  print(ggplot(pca_plot, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + xlab(paste0("PC", pc_1, ": ", pca_res_summary$importance[2,pc_1]*100, "%")) + ylab(paste0("PC", pc_2, ": ", pca_res_summary$importance[2,pc_2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5))
   dev.off()
   
-  return(pca_res_summary)
+  return(pca_res)
   
 }
 

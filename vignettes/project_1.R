@@ -53,19 +53,56 @@ gsk_rna = prep_gsk_rna(r_data_counts, r_metadata, gene_list, chip_labels, rna_la
 # INTEGRATION -------------------------------------------------------------
 
 # TODO merge blueprint and gsk here
-gsk_data = c(gsk_chip_filtered, list(gsk_rna))
-blueprint_data = c(blueprint_chip_cut_final, list(blueprint_rna_cut_final))
-all_data = 
+gsk_data = c(list(gsk_rna), gsk_chip_filtered)
+blueprint_data = c(list(blueprint_rna_cut_final), blueprint_chip_cut_final)
+all_data = vector("list", 4)
+for(i in 1:4) {
+  all_data[[i]]$res = rbind(gsk_data[[i]]$res, blueprint_data[[i]]$res)
+  # renormalize
+  all_data[[i]]$res = quantile_norm(all_data[[i]]$res)
+  all_data[[i]]$annot = bind_rows(gsk_data[[i]]$annot, blueprint_data[[i]]$annot)
+}
+
+group_labels = c(rep("GSK",16), rep("BLUEPRINT",34))
+single_labels = rownames(all_data[[2]]$res)
+
+# test plot
+plot_pca(all_data[[2]]$res, annot_1=group_labels, annot_2=rownames(all_data[[2]]$res), out_file="out.png")
+
+# total plot
+pca_data = prep_for_pca_plot(all_data, annot_1=group_labels, annot_2=single_labels, marks=c("rna","H3K27ac", "H3K4me3", "H3K27me3"))
+
+png(filename="out.png", height=800, width=3200)
+ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
+dev.off()
 
 
+# DATA SLICES -------------------------------------------------------------
 
-pca_data = prep_for_pca_plot
+# start off with all_data, but slice by gene list / samples of interest
+
+# 1. slice by relevant samples and whole genome
+
+sample_ix = c(5:16,23,42)
+all_data_sliced = all_data
+for(i in 1:length(all_data_sliced)) {
+  all_data_sliced[[i]]$res = all_data_sliced[[i]]$res[sample_ix,]
+  all_data_sliced[[i]]$annot = all_data_sliced[[i]]$annot[sample_ix,]
+}
+
+pca_data = prep_for_pca_plot(all_data_sliced, annot_1=group_labels[sample_ix], annot_2=single_labels[sample_ix], marks=c("rna","H3K27ac", "H3K4me3", "H3K27me3"))
+
+png(filename="out.png", height=800, width=3200)
+ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
+dev.off()
 
 
-# produce data frame
+# REDO THIS ---------------------------------------------------------------
+
 all_data = chip_rna_int(gsk_chip_filtered, gsk_rna, roi, marks, chip_labels, "GSK", log_data=FALSE)
 
 # explore
 dat = group_by(all_data, sample) %>% nest() # group by donor / cell type
 dat_plot = dat$data[[5]] # pick first donor / cell type
 ggpairs(dplyr::select_(dat_plot, .dots=names(dat_plot)[1:4])) + theme_thesis()
+
