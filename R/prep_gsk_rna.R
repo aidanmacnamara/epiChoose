@@ -4,17 +4,13 @@
 #' @details What's this?
 #' @return TO ADD
 
-plot_gsk_rna <- function(labels, gene_list, r_data, r_metadata) {
+prep_gsk_rna <- function(r_data_counts, r_metadata, gene_list, chip_labels, rna_labels, quantile_norm=TRUE) {
   
   require(limma)
+  require(SummarizedExperiment)
   
-  labels = gsk_chip[[1]]$annot$Label
-  gene_list = roi$gene
-  load("data/rna/E-MTAB-4101-atlasExperimentSummary.Rdata")
-  r_data = experimentSummary
-  r_metadata = read_tsv("data/rna/E-MTAB-4101.sdrf.txt")
-  
-  r_data_counts = assays(r_data[[1]])$counts
+  chip_labels = toupper(chip_labels) # make sure everything is in upper cases
+  rna_labels = toupper(rna_labels)
   
   # map genes
   mart_1 = useMart("ensembl", dataset="hsapiens_gene_ensembl")
@@ -46,6 +42,14 @@ plot_gsk_rna <- function(labels, gene_list, r_data, r_metadata) {
   r_data_counts = r_data_counts[,match(gene_list, colnames(r_data_counts))]
   
   # TOADD parse samples so epigenetics and rna match
+  # create na rows if sample is not present
+  match_ix = match(chip_labels, rna_labels)
+  ena_names = r_metadata$`Comment[ENA_RUN]`[match_ix]
+  ena_ix_data = match(ena_names, rownames(r_data_counts))
+  r_data_counts = r_data_counts[ena_ix_data,]
+  ena_ix_annot = match(ena_names, r_metadata$`Comment[ENA_RUN]`)
+  r_metadata_filt = r_metadata[ena_ix_annot,]
+  rownames(r_data_counts) = chip_labels
   
   return(list(res=r_data_counts, annot=r_metadata_filt))
 }
