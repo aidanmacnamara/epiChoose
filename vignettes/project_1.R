@@ -141,6 +141,23 @@ png(filename="out.png", height=800, width=3200)
 ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
 dev.off()
 
+# 7. slice by relevant samples and go terms
+
+genes = gene_list_go$hgnc_symbol[gene_list_go$go_id %in% c("GO:0045646","GO:0030218","GO:0060319","GO:0043249","GO:0048821")]
+
+feature_ix = match(genes, roi$gene)
+
+all_data_sliced = all_data
+for(i in 1:length(all_data_sliced)) {
+  all_data_sliced[[i]]$res = all_data_sliced[[i]]$res[sample_ix,feature_ix]
+}
+
+pca_data = prep_for_pca_plot(all_data_sliced, annot_1=group_labels[sample_ix], annot_2=single_labels[sample_ix], marks=c("rna","H3K27ac", "H3K4me3", "H3K27me3"))
+
+png(filename="out.png", height=800, width=3200)
+ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
+dev.off()
+
 
 # REDO THIS ---------------------------------------------------------------
 
