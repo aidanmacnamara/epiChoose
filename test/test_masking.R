@@ -7,10 +7,9 @@ require(SummarizedExperiment)
 load_all()
 
 
-# GENES -------------------------------------------------------------------
+# ALL DATA ----------------------------------------------------------------
 
-# all genes in the form of a granges object
-load("r_data/gene_list_all.RData")
+load("r_data/all_data.RData")
 
 
 # ROI ---------------------------------------------------------------------
@@ -19,55 +18,7 @@ load("r_data/gene_list_all.RData")
 load("r_data/roi.RData")
 
 
-# BLUEPRINT DATA ----------------------------------------------------------
-
-load("r_data/blueprint_chip_cut_final.RData")
-load("r_data/blueprint_rna_cut_final.RData")
-
-
-# GSK DATA ----------------------------------------------------------------
-
-marks = c("H3K27ac","H3K4me3","H3K27me3","CTCF")
-gsk_input = "data/data_gsk.csv"
-
-require(BiocParallel)
-gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=4))
-
-# confirm all chip matrices have the same sample order
-gsk_chip_filtered = prep_gsk_chip_filter(gsk_chip)
-
-# this will be input
- 
-gene_list = roi$gene
-load("data/rna/E-MTAB-4101-atlasExperimentSummary.Rdata")
-r_data = experimentSummary
-r_data_counts = assays(r_data[[1]])$counts
-r_metadata = read_tsv("data/rna/E-MTAB-4101.sdrf.txt")
-chip_labels = gsk_chip_filtered[[1]]$annot$Label #
-rna_labels = toupper(str_extract(r_metadata$`Source Name`, "[[:alnum:]]+_[[:alnum:]]+"))
-
-# expression data
-gsk_rna = prep_gsk_rna(r_data_counts, r_metadata, gene_list, chip_labels, rna_labels)
-
-
-# INTEGRATION -------------------------------------------------------------
-
-# TODO merge blueprint and gsk here
-gsk_data = c(list(gsk_rna), gsk_chip_filtered)
-blueprint_data = c(list(blueprint_rna_cut_final), blueprint_chip_cut_final)
-all_data = vector("list", 4)
-for(i in 1:4) {
-  all_data[[i]]$res = rbind(gsk_data[[i]]$res, blueprint_data[[i]]$res)
-  # renormalize as we are combining gsk and blueprint data
-  all_data[[i]]$res = quantile_norm(all_data[[i]]$res)
-  all_data[[i]]$annot = bind_rows(gsk_data[[i]]$annot, blueprint_data[[i]]$annot)
-}
-
-group_labels = c(rep("GSK",16), rep("BLUEPRINT",34))
-single_labels = rownames(all_data[[2]]$res)
-
-# test plot
-plot_pca(all_data[[2]]$res, annot_1=group_labels, annot_2=rownames(all_data[[2]]$res), out_file="out.png")
+# ANALYSIS ----------------------------------------------------------------
 
 # total plot
 pca_data = prep_for_pca_plot(all_data, annot_1=group_labels, annot_2=single_labels, marks=c("rna","H3K27ac", "H3K4me3", "H3K27me3"))

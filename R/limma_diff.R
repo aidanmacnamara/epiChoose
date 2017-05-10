@@ -1,4 +1,4 @@
-#' @title TO ADD
+#' @title What are the features that are separating 2 groups?
 #' @description TO ADD
 #' @description This is a new line ...
 #' @details What's this?
@@ -28,7 +28,8 @@ limma_diff <- function(dat, groups, thresh=5000) {
   ebayes_fits <- eBayes(fits)
   res <- topTableF(ebayes_fits, number=thresh)
   
-  return(as.numeric(rownames(res)))
+  # return(as.numeric(rownames(res)))
+  return(res)
   
 }
 

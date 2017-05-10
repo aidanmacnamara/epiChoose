@@ -1,4 +1,4 @@
-#' @title TO ADD
+#' @title Prepares the GSK RNA data so it is the same shape and format as the ChIP data
 #' @description TO ADD
 #' @description This is a new line ...
 #' @details What's this?

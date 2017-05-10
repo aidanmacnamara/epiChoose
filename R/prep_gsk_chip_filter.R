@@ -1,4 +1,4 @@
-#' @title TO ADD
+#' @title Returns the intersect of samples across all ChIP datasets contained in the list
 #' @description TO ADD
 #' @description This is a new line ...
 #' @details What's this?

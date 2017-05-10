@@ -1,4 +1,4 @@
-#' @title TO ADD
+#' @title Takes the set of all experiments and produces a data frame for multi-panel plotting
 #' @description TO ADD
 #' @description This is a new line ...
 #' @details What's this?

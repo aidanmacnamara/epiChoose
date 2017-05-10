@@ -1,4 +1,4 @@
-#' @title TO ADD
+#' @title Takes a matrix and label information and produces a PCA plots
 #' @description TO ADD
 #' @description This is a new line ...
 #' @details What's this?
