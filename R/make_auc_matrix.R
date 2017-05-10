@@ -1,8 +1,8 @@
-#' @title TO ADD
+#' @title Make an n*p AUC matrix for a given sample set and mark
 #' @description This function takes as input a .csv file with fields: Label, Mark, Bigwig
 #' @description This is a new line ...
 #' @details What's this?
-#' @param input_data TO ADD
+#' @param input_data The metadata for each sample. A .csv file that contains 'Label', 'Mark', and 'Bigwig' fields.
 #' @param root TO ADD
 #' @param roi Region of interest, a sorted Granges object that specifies the genomic regions to calculate AUC. It also need 'gene' in the metadata
 #' @param mark Which mark in \code{input_data} to use
