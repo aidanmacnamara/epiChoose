@@ -2,7 +2,7 @@
 % Please edit documentation in R/prep_gsk_chip_filter.R
 \name{prep_gsk_chip_filter}
 \alias{prep_gsk_chip_filter}
-\title{TO ADD}
+\title{Returns the intersect of samples across all ChIP datasets contained in the list}
 \usage{
 prep_gsk_chip_filter(gsk_chip)
 }

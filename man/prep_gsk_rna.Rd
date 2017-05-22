@@ -2,7 +2,7 @@
 % Please edit documentation in R/prep_gsk_rna.R
 \name{prep_gsk_rna}
 \alias{prep_gsk_rna}
-\title{TO ADD}
+\title{Prepares the GSK RNA data so it is the same shape and format as the ChIP data}
 \usage{
 prep_gsk_rna(r_data_counts, r_metadata, gene_list, chip_labels, rna_labels,
   quantile_norm = TRUE)

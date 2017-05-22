@@ -5,9 +5,10 @@
 #' @param all_data
 #' @return TO ADD
 
-prep_for_pca_plot <- function(all_data, annot_1, annot_2, marks, which_pcs=c(1,2), roi=NULL) {
+prep_for_plot <- function(all_data, annot_1, annot_2, marks, plot_type=c("pca","mds"), which_pcs=c(1,2), roi=NULL) {
   
   plot_data = data.frame()
+  plot_type = match.arg(plot_type)
   
   for(i in 1:length(all_data)) {
     
@@ -37,25 +38,43 @@ prep_for_pca_plot <- function(all_data, annot_1, annot_2, marks, which_pcs=c(1,2
     }
     dim(dat_cut)
     
-    pca_res <- prcomp(dat_cut, scale=TRUE, center=TRUE)
-    pca_res_summary <- summary(pca_res)
-    
-    pc_1 = which_pcs[1]
-    pc_2 = which_pcs[2]
     my_coords = matrix(NA, nrow=dim(dat)[1], ncol=2)
     
-    if(length(remove_rows)) {
-      my_coords[-remove_rows,1] = pca_res$x[,pc_1]
-      my_coords[-remove_rows,2] = pca_res$x[,pc_2]
-    } else {
-      my_coords[,1] = pca_res$x[,pc_1]
-      my_coords[,2] = pca_res$x[,pc_2]
+    if(plot_type=="pca") {
+      
+      pca_res <- prcomp(dat_cut, scale=TRUE, center=TRUE)
+      pca_res_summary <- summary(pca_res)
+      
+      pc_1 = which_pcs[1]
+      pc_2 = which_pcs[2]
+      
+      if(length(remove_rows)) {
+        my_coords[-remove_rows,1] = pca_res$x[,pc_1]
+        my_coords[-remove_rows,2] = pca_res$x[,pc_2]
+      } else {
+        my_coords[,1] = pca_res$x[,pc_1]
+        my_coords[,2] = pca_res$x[,pc_2]
+      }
+      
+      to_add = data.frame(my_coords, annot_1, annot_2, pca_res_summary$importance[2,pc_1]*100, pca_res_summary$importance[2,pc_2]*100, marks[i])
+      plot_data = rbind(plot_data, to_add)
     }
     
-    to_add = data.frame(my_coords, annot_1, annot_2, pca_res_summary$importance[2,pc_1]*100, pca_res_summary$importance[2,pc_2]*100, marks[i])
-    
-    plot_data = rbind(plot_data, to_add)
-    
+    if(plot_type=="mds") {
+      
+      d_1 = cor(t(dat_cut))
+      d_1 = 0.5 * (1-d_1)
+      mds_1 = cmdscale(d_1, eig=T)
+      
+      if(length(remove_rows)) {
+        my_coords[-remove_rows,] = mds_1$points
+      } else {
+        my_coords = mds_1$points
+      }
+      
+      to_add = data.frame(my_coords, annot_1, annot_2, NA, NA, marks[i])
+      plot_data = rbind(plot_data, to_add)
+    }
   }
   
   names(plot_data) = c("x", "y", "annot_1", "annot_2", paste0("pc_", which_pcs[1]), paste0("pc_", which_pcs[2]), "mark")

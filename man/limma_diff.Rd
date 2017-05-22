@@ -2,7 +2,7 @@
 % Please edit documentation in R/limma_diff.R
 \name{limma_diff}
 \alias{limma_diff}
-\title{TO ADD}
+\title{What are the features that are separating 2 groups?}
 \usage{
 limma_diff(dat, groups, thresh = 5000)
 }

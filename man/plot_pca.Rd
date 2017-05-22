@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_pca.R
 \name{plot_pca}
 \alias{plot_pca}
-\title{TO ADD}
+\title{Takes a matrix and label information and produces a PCA plots}
 \usage{
 plot_pca(dat, annot_1, annot_2, roi = NULL, which_pcs = c(1, 2), out_file)
 }

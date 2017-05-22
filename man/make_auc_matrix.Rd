@@ -2,7 +2,7 @@
 % Please edit documentation in R/make_auc_matrix.R
 \name{make_auc_matrix}
 \alias{make_auc_matrix}
-\title{TO ADD}
+\title{Make an n*p AUC matrix for a given sample set and mark}
 \usage{
 make_auc_matrix(input_data, roi, mark, tmp_dir, quantile_norm = TRUE)
 }

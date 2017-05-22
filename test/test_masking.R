@@ -27,7 +27,7 @@ group_labels = c(rep("GSK",16), rep("BLUEPRINT",34))
 single_labels = rownames(all_data[[2]]$res)
 
 # total plot
-pca_data = prep_for_pca_plot(all_data, annot_1=group_labels, annot_2=single_labels, marks=c("rna","H3K27ac", "H3K4me3", "H3K27me3"))
+pca_data = prep_for_plot(all_data, annot_1=group_labels, annot_2=single_labels, marks=c("rna","H3K27ac", "H3K4me3", "H3K27me3"), plot_type="pca")
 
 png(filename="out.png", height=800, width=3200)
 ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
@@ -55,7 +55,7 @@ for(i in 1:length(all_data_sliced)) {
   all_data_sliced[[i]]$res = all_data_sliced[[i]]$res[,-feature_ix]
 }
 
-pca_data = prep_for_pca_plot(all_data_sliced, annot_1=group_labels, annot_2=single_labels, marks=c("rna","H3K27ac", "H3K4me3", "H3K27me3"))
+pca_data = prep_for_plot(all_data_sliced, annot_1=group_labels, annot_2=single_labels, marks=c("rna","H3K27ac", "H3K4me3", "H3K27me3"))
 
 png(filename="out.png", height=800, width=3200)
 ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
