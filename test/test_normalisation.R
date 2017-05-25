@@ -47,16 +47,16 @@ for(i in 1:3) {
   all_data[[i]]$annot = bind_rows(gsk_chip[[i]]$annot, blueprint_chip[[i]]$annot, encode_chip[[i]]$annot)
 }
 
-group_labels = c(rep("GSK",16), rep("BLUEPRINT",34))
-single_labels = rownames(all_data[[2]]$res)
+group_labels = c(rep("GSK",21), rep("BLUEPRINT",201), rep("ENCODE",17))
+single_labels = rownames(all_data[[1]]$res)
 
 # test plot
-plot_pca(all_data[[2]]$res, annot_1=group_labels, annot_2=rownames(all_data[[2]]$res), out_file="out.png")
+plot_pca(all_data[[1]]$res, annot_1=group_labels, annot_2=single_labels, out_file="out.png")
 
-# total plot
-pca_data = prep_for_plot(all_data, annot_1=group_labels, annot_2=single_labels, marks=c("rna","H3K27ac", "H3K4me3", "H3K27me3"))
+# total plot wont work as data 
+pca_data = prep_for_plot(all_data_us[1], annot_1=group_labels, annot_2=single_labels, marks="H3K27ac", plot_type="mds")
 
-png(filename="out.png", height=800, width=3200)
-ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
+png(filename="out.png", height=2400, width=3000)
+ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + facet_wrap(~mark, nrow=1) + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5)
 dev.off()
 
