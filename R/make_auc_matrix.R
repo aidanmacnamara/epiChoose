@@ -53,7 +53,7 @@ make_auc_matrix <- function(input_data, roi, mark, tmp_dir, quantile_norm=TRUE) 
     # parse res
     res_coords = str_replace(res, "^(.*)\t(.*)\t(.*)\t(.*)$", "\\1_\\2_\\3")
     res_score = as.numeric(str_replace(res, "^(.*)\t(.*)\t(.*)\t(.*)$", "\\4"))
-    res_match = match(res_coords, colnames(res_matrix))
+    res_match = match(colnames(res_matrix), res_coords)
     res_score = res_score[res_match]
     res_matrix[i,] = res_score
     
