@@ -17,7 +17,7 @@ load("r_data/gene_list_all.RData")
 # ROI ---------------------------------------------------------------------
 
 # the regultory regions (2kb window around tsss)
-load("r_data/roi.RData")
+load("r_data/roi_ensembl_multicell.RData")
 
 
 # COMPARE UNNORMALISED ----------------------------------------------------
@@ -25,7 +25,7 @@ load("r_data/roi.RData")
 marks = c("H3K27ac","H3K4me3","H3K27me3")
 
 gsk_input = "data/data_gsk.csv"
-gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=4))
+gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
 gsk_chip_filtered = prep_gsk_chip_filter(gsk_chip)
 
 blueprint_parsed = prep_blueprint_chip(blueprint_data="data/blueprint_files.tsv", root="~/links/RD-Epigenetics-NetworkData/otar_020/BLUEPRINT/", out_file="data/data_blueprint_parsed.csv")
@@ -54,9 +54,9 @@ single_labels = rownames(all_data[[1]]$res)
 plot_pca(all_data[[1]]$res, annot_1=group_labels, annot_2=single_labels, out_file="out.png")
 
 # total plot wont work as data 
-pca_data = prep_for_plot(all_data_us[1], annot_1=group_labels, annot_2=single_labels, marks="H3K27ac", plot_type="mds")
+pca_data = prep_for_plot(all_data[1], annot_1=group_labels, annot_2=single_labels, marks="H3K27ac", plot_type="mds")
 
-png(filename="out.png", height=2400, width=3000)
-ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + facet_wrap(~mark, nrow=1) + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5)
+png(filename="out.png", height=800, width=1200)
+ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + facet_wrap(~mark, nrow=1) # + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5)
 dev.off()
 
