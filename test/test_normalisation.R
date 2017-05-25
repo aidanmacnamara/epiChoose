@@ -39,11 +39,11 @@ encode_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(encode_inpu
 # INTEGRATION -------------------------------------------------------------
 
 # merge data
-all_data = vector("list", 4)
+all_data = vector("list", 3)
 for(i in 1:3) {
   all_data[[i]]$res = rbind(gsk_chip[[i]]$res, blueprint_chip[[i]]$res, encode_chip[[i]]$res)
   # renormalize
-  # all_data[[i]]$res = quantile_norm(all_data[[i]]$res)
+  all_data[[i]]$res = quantile_norm(all_data[[i]]$res)
   all_data[[i]]$annot = bind_rows(gsk_chip[[i]]$annot, blueprint_chip[[i]]$annot, encode_chip[[i]]$annot)
 }
 
