@@ -53,16 +53,17 @@ gsk_chip_filtered = prep_gsk_chip_filter(gsk_chip)
 
 encode_input = "data/data_encode.csv"
 encode_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(encode_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
+encode_chip_filtered = prep_gsk_chip_filter(encode_chip)
 
 
 # COMBINE -----------------------------------------------------------------
 
 mask_data = vector("list", 3)
 for(i in 1:length(mask_data)) {
-  mask_data[[i]]$res = rbind(gsk_chip_filtered[[i]]$res, blueprint_chip_filtered[[i]]$res)
-  # renormalize as we are combining gsk and blueprint data
+  mask_data[[i]]$res = rbind(blueprint_chip_filtered[[i]]$res, gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res)
+  # renormalize as we are multiple sources
   mask_data[[i]]$res = quantile_norm(mask_data[[i]]$res)
-  mask_data[[i]]$annot = bind_rows(gsk_chip_filtered[[i]]$annot, blueprint_chip_filtered[[i]]$annot)
+  mask_data[[i]]$annot = bind_rows(blueprint_chip_filtered[[i]]$annot, gsk_chip_filtered[[i]]$annot, encode_chip_filtered[[i]]$annot)
 }
 
 names(mask_data) = marks
@@ -70,7 +71,7 @@ names(mask_data) = marks
 
 # ANALYSIS ----------------------------------------------------------------
 
-group_labels = c(rep("GSK",16), rep("BLUEPRINT",178))
+group_labels = c(rep("BLUEPRINT",76), rep("GSK",18), rep("ENCODE",18))
 single_labels = rownames(mask_data[[2]]$res)
 
 # total plot
