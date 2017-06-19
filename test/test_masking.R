@@ -78,7 +78,7 @@ single_labels = rownames(mask_data[[2]]$res)
 pca_data = prep_for_plot(mask_data, annot_1=group_labels, annot_2=single_labels, marks=names(mask_data), plot_type="mds")
 
 png(filename="out.png", height=800, width=3200)
-ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
+ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + facet_wrap(~mark, nrow=1, scales="free") # + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5)
 dev.off()
 
 # masking based on all data types
