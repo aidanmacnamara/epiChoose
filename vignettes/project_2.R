@@ -21,7 +21,7 @@ load("r_data/roi.RData")
 
 # GSK DATA ----------------------------------------------------------------
 
-marks = c("H3K27ac","H3K4me3","CTCF")
+marks = c("H3K27ac","H3K4me3","H3K27me3","CTCF")
 gsk_input = "data/data_gsk.csv"
 
 require(BiocParallel)
