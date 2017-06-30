@@ -10,7 +10,7 @@ dist_mat <- function(x, comp_ix=list(1:12, 13:14)) {
   
   all_dists = lapply(x, function(x) {
     x = x$res
-    x = cor(t(x))
+    x = cor(t(x), use="complete.obs")
     x = 0.5 * (1-x)
     x = cmdscale(x, eig=T)$points
   }
@@ -23,7 +23,14 @@ dist_mat <- function(x, comp_ix=list(1:12, 13:14)) {
     out_mat = matrix(NA, nrow=length(comp_ix[[2]]), ncol=length(comp_ix[[1]]))
     for(i in 1:dim(out_mat)[1]) {
       for(j in 1:dim(out_mat)[2]) {
-        out_mat[i,j] = sqrt((all_dists[[k]][comp_ix[[1]][j],1]-all_dists[[k]][comp_ix[[2]][i],1])^2 - (all_dists[[k]][comp_ix[[1]][j],2]-all_dists[[k]][comp_ix[[2]][i],2])^2)
+        out_mat[i,j] = sqrt(
+          (
+            all_dists[[k]][comp_ix[[1]][j],1] - all_dists[[k]][comp_ix[[2]][i],1]
+          )^2 +
+            (
+              all_dists[[k]][comp_ix[[1]][j],2] - all_dists[[k]][comp_ix[[2]][i],2]
+            )^2
+        )
       }
     }
     
