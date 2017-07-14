@@ -6,7 +6,7 @@
 #' @param comp_ix
 #' @return TO ADD
 
-dist_mat <- function(x, comp_ix) {
+dist_mat <- function(x, comp_ix, labels, plot_labels="", plot_res=TRUE, my_title="") {
   
   all_dists = lapply(x, function(x) {
     x = x$res
@@ -21,7 +21,7 @@ dist_mat <- function(x, comp_ix) {
   }
   )
   
-  out_all = data.frame()
+  res = data.frame()
   
   for(k in 1:length(x)) {
     
@@ -39,12 +39,25 @@ dist_mat <- function(x, comp_ix) {
       }
     }
     
-    out_all = rbind(out_all, out_mat)
+    res = rbind(res, out_mat)
     
   }
   
-  return(out_all)
+  names(res) = labels[comp_ix[[1]]]
+  rownames(res) = names(x)
+  
+  if(plot_res) {
+    res_melt = melt(t(res))
+    names(res_melt) = c("Cell", "Assay", "Distance")
+    label_ix = c()
+    for(i in 1:length(plot_labels)) {
+      label_ix = c(label_ix, grep(plot_labels[i], res_melt$Cell))      
+    }
+    res_melt$Cell[-label_ix] = NA
+    print(ggplot(res_melt, aes(x=Assay, y=Distance, color=Assay)) + theme_thesis(15) + geom_jitter(width=0.1, height=0, shape=17) + geom_text_repel(aes(label=Cell), fontface="bold", size=3, force=0.5) + ggtitle(my_title))
+  }
+  
+  return(res)
   
 }
-
 
