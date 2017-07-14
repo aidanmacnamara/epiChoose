@@ -6,13 +6,18 @@
 #' @param comp_ix
 #' @return TO ADD
 
-dist_mat <- function(x, comp_ix=list(1:12, 13:14)) {
+dist_mat <- function(x, comp_ix) {
   
   all_dists = lapply(x, function(x) {
     x = x$res
-    x = cor(t(x), use="complete.obs")
+    complete_ix = which(apply(x, 1, function(x) !all(is.na(x))))
+    y = matrix(NA, nrow=dim(x)[1], ncol=2)
+    rownames(y) = rownames(x)
+    x = cor(t(x[complete_ix,]), use="complete.obs")
     x = 0.5 * (1-x)
     x = cmdscale(x, eig=T)$points
+    y[complete_ix,] = x
+    return(y)
   }
   )
   
