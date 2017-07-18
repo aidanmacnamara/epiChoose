@@ -21,7 +21,7 @@ Data-driven selection of cell line models and epigenetic comparison across cell 
 
 		* mask_data (Aidan, local) - As above with Project 2 data added, size = 137 x 444967
 	
-	Current status
+	* Current status
 	
 		* Graeme (Tessella) - working with mask_data using a combination of PCA and PLS (?) to attempt to uncover an immortalisation signature
 		
