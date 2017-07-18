@@ -14,7 +14,7 @@ load_all()
 # look across all regulatory regions
 load("r_data/roi_ensembl_multicell.RData")
 
-marks = c("H3K27ac","H3K4me3","H3K27me3")
+marks = c("H3K27ac","H3K4me3","H3K27me3","ATAC")
 
 
 # BLUEPRINT DATA ----------------------------------------------------------
