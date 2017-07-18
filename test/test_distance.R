@@ -146,7 +146,7 @@ for(i in 1:length(blood_go)) {
 
 # LOOK AT COURCOT ---------------------------------------------------------
 
-courcot = read_tsv("courcot_table_1.txt")
+courcot = read_tsv("c:/Downloads/tmp/courcot_table_1.txt")
 
 genes_loc = gene_list_all[gene_list_all$hgnc_symbol %in% courcot$Gene]
 
