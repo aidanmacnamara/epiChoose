@@ -1,6 +1,16 @@
 # epiChoose
 Data-driven selection of cell line models and epigenetic comparison across cell types
 
+* 18/07/2017
+
+	* Working on ATAC data
+	
+	* Current matrix lists
+		
+		* As below, have added gsk_chip_filtered, all GSK data so far (with ATAC-seq added), size = 4 x 43 x 444967
+		
+	* Looking at MDS distances for Projects 1-3.
+
 * 12/07/2017
 
 	* Current matrix lists
