@@ -30,10 +30,10 @@ dist_mat <- function(x, comp_ix, labels, plot_labels="", plot_res=TRUE, my_title
       for(j in 1:dim(out_mat)[2]) {
         out_mat[i,j] = sqrt(
           (
-            all_dists[[k]][comp_ix[[1]][j],1] - all_dists[[k]][comp_ix[[2]][i],1]
+            all_dists[[k]][comp_ix[[1]][j],1] - median(all_dists[[k]][comp_ix[[2]][[i]],1], na.rm=TRUE)
           )^2 +
             (
-              all_dists[[k]][comp_ix[[1]][j],2] - all_dists[[k]][comp_ix[[2]][i],2]
+              all_dists[[k]][comp_ix[[1]][j],2] - median(all_dists[[k]][comp_ix[[2]][[i]],2], na.rm=TRUE)
             )^2
         )
       }

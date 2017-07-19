@@ -2,6 +2,7 @@
 
 load("r_data/mask_data.RData")
 load("r_data/all_data.RData")
+load("r_data/gsk_chip_filtered.RData")
 
 
 # PROJECT 1 RESULT --------------------------------------------------------
@@ -62,8 +63,8 @@ lung_go = c("GO:0000303","GO:0002314","GO:0002377","GO:0002467","GO:0006749","GO
 ensembl = useMart("ensembl", dataset="hsapiens_gene_ensembl")
 term_genes = getBM(attributes=c('hgnc_symbol','go'), filters='go', values=lung_go, mart=ensembl)
 
-load("z:/sandbox/epiChoose/r_data/roi_ensembl_multicell.RData")
-load("z:/sandbox/epiChoose/r_data/gene_list_all.RData")
+load("z:/sandbox/epiChoose/r_data/column_annotation/roi_ensembl_multicell.RData")
+load("z:/sandbox/epiChoose/r_data/column_annotation/gene_list_all.RData")
 
 lung_go = names(table(term_genes$go))[table(term_genes$go)>10] # only use those > 10 genes
 
@@ -88,7 +89,7 @@ for(i in 1:length(lung_go)) {
   }
   
   # png(paste0("c:/Downloads/tmp/", i, ".png"), height=400, width=600)
-  res = dist_mat(end_data, comp_ix=list(c(1:17,21), 18), labels=single_labels, plot_labels=c("BEAS2B","A549"), my_title=lung_go[i])
+  res = dist_mat(end_data, comp_ix=list(c(1:17,21), 18), labels=single_labels, plot_labels=c("BEAS2B","A549"), my_title=lung_go[i], plot_res=FALSE)
   # dev.off()
   
   ranks = c(
@@ -131,7 +132,7 @@ for(i in 1:length(blood_go)) {
   }
   
   png(paste0("c:/Downloads/tmp/", i, ".png"), height=400, width=600)
-  res = dist_mat(end_data, comp_ix=list(c(1:12,14:21), 13), labels=single_labels, plot_labels=c("F36P","HEL9217","K562","MEG01","UT7","KU812"), my_title=blood_go[i])
+  res = dist_mat(end_data, comp_ix=list(c(1:12,14:21), 13), labels=single_labels, plot_labels=c("F36P","HEL9217","K562","MEG01","UT7","KU812"), my_title=blood_go[i], plot_res=FALSE)
   dev.off()
   
   ranks = c(
@@ -163,6 +164,15 @@ for(j in 1:length(start_data)) {
 png(paste0("c:/Downloads/tmp/", i, ".png"), height=400, width=600)
 res = dist_mat(end_data, comp_ix=list(c(1:17,21), 18), labels=single_labels, plot_labels=c("BEAS2B","A549"), my_title="Courcot")
 dev.off()
+
+# does this correspond to expression differences?
+gene_summ = data.frame()
+ol = data.frame(findOverlaps(genes_loc, roi))
+for(i in 1:length(genes_loc)) {
+  gene_summ = rbind(gene_summ, data.frame(Score=mean(start_data[[1]]$res[14,ol[ol$queryHits==i, 'subjectHits']]), Gene = genes_loc$hgnc_symbol[i]))
+}
+
+qplot(courcot$`BEAS-2B`, log(gene_summ$Score[match(courcot$Gene, gene_summ$Gene)])) + theme_thesis() + xlab("Expression") + ylab("H3K27ac")
 
 
 # MONOCYTE MACROPHAGE MODELS ----------------------------------------------

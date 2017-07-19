@@ -2,7 +2,6 @@ Project 1:
 
 	- http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-4101/
 	- http://www.ebi.ac.uk/gxa/experiments/E-MTAB-4101?ref=aebrowse
-	- TODO (add missing cell-line)
 	
 Project 2:
 

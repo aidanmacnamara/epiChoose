@@ -45,7 +45,7 @@ for(i in 1:length(blueprint_chip_filtered)) {
 # GSK DATA ----------------------------------------------------------------
 
 gsk_input = "data/data_gsk.csv"
-gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
+gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=4))
 gsk_chip_filtered = prep_gsk_chip_filter(gsk_chip)
 
 
