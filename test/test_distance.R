@@ -222,9 +222,10 @@ for(i in 1:length(mono_go)) {
     end_data[[j]]$res = start_data[[j]]$res[,col_ix]
   }
   
-  png(paste0("c:/Downloads/tmp/", i, ".png"), height=400, width=600)
-  res = dist_mat(end_data, comp_ix=list(c(1:12,14:21), 13), labels=single_labels, plot_labels=c("F36P","HEL9217","K562","MEG01","UT7","KU812"), my_title=mono_go[i])
-  dev.off()
+  # png(paste0("c:/Downloads/tmp/", i, ".png"), height=400, width=600)
+  res = dist_mat(end_data, comp_ix=list(c(21:44), list(c(1:4,6,45))), labels=single_labels, plot_labels=c("THP-1","U937"), my_title=paste("Monocytes:", mono_go[i]))
+  res = dist_mat(end_data, comp_ix=list(c(21:44), list(c(5,7:20))), labels=single_labels, plot_labels=c("THP-1","U937"), my_title=paste("Macrophages:", mono_go[i]))
+  # dev.off()
   
 }
 
