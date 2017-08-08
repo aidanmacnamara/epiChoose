@@ -9,19 +9,19 @@ load_all()
 # GENES -------------------------------------------------------------------
 
 # all genes in the form of a granges object
-load("r_data/gene_list_all.RData")
+load("r_data/column_annotation/gene_list_all.RData")
 
 
 # ROI ---------------------------------------------------------------------
 
 # the regultory regions (2kb window around tsss)
-load("r_data/roi.RData")
+load("r_data/column_annotation/roi.RData")
 
 
 # PREPARE BLUEPRINT DATA --------------------------------------------------
 
 # write the csv file for input
-blueprint_parsed = prep_blueprint_chip(blueprint_data="data/blueprint_files.tsv", root="~/links/CB.HTS.Analysis/CTTV020/data/BLUEPRINT/", out_file="data/data_blueprint_parsed.csv")
+blueprint_parsed = prep_blueprint_chip(blueprint_data="data/blueprint_files.tsv", root="~/links/RD-Epigenetics-NetworkData/otar_020/BLUEPRINT/", out_file="data/blueprint_parsed.csv")
 
 marks = c("H3K27ac","H3K4me3","H3K27me3")
 blueprint_input = "data/data_blueprint_parsed.csv"
