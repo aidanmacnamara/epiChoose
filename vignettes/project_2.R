@@ -16,13 +16,13 @@ load("r_data/gene_list_all.RData")
 # ROI ---------------------------------------------------------------------
 
 # the regultory regions (2kb window around tsss)
-load("r_data/roi.RData")
+load("r_data/roi_ensembl_multicell.RData")
 
 
 # GSK DATA ----------------------------------------------------------------
 
 marks = c("H3K27ac","H3K4me3","H3K27me3","CTCF")
-gsk_input = "data/data_gsk.csv"
+gsk_input = "data/project_2.csv"
 
 require(BiocParallel)
 gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=4))
