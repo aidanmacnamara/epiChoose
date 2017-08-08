@@ -14,7 +14,7 @@ load_all()
 # look across all regulatory regions
 load("r_data/roi_ensembl_multicell.RData")
 
-marks = c("H3K27ac","H3K4me3","H3K27me3")
+marks = c("H3K27ac","H3K4me3","H3K27me3","ATAC")
 
 
 # BLUEPRINT DATA ----------------------------------------------------------
@@ -45,7 +45,7 @@ for(i in 1:length(blueprint_chip_filtered)) {
 # GSK DATA ----------------------------------------------------------------
 
 gsk_input = "data/data_gsk.csv"
-gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
+gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=4))
 gsk_chip_filtered = prep_gsk_chip_filter(gsk_chip)
 
 
