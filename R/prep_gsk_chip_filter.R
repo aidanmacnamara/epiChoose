@@ -14,6 +14,7 @@ prep_gsk_chip_filter <- function(gsk_chip) {
   
   for(i in 1:length(gsk_chip)) {
     gsk_chip_filtered[[i]]$res = gsk_chip[[i]]$res[all_ix[[i]],]
+    rownames(gsk_chip_filtered[[i]]$res) = all_labels
     gsk_chip_filtered[[i]]$annot = gsk_chip[[i]]$annot[all_ix[[i]],]
   }
   
