@@ -6,20 +6,36 @@
 #' @param comp_ix
 #' @return TO ADD
 
-dist_mat <- function(x, comp_ix, labels, plot_labels="", plot_res=TRUE, my_title="") {
+dist_mat <- function(x, comp_ix, labels, plot_labels="", plot_res=TRUE, my_title="", use_corr=FALSE) {
   
-  all_dists = lapply(x, function(x) {
+  
+  get_dists <- function(x) {
     x = x$res
     complete_ix = which(apply(x, 1, function(x) !all(is.na(x))))
-    y = matrix(NA, nrow=dim(x)[1], ncol=2)
+    
+    if(use_corr) {
+      y = matrix(NA, nrow=dim(x)[1], ncol=dim(x)[1])
+      colnames(y) = rownames(x)
+    } else {
+      y = matrix(NA, nrow=dim(x)[1], ncol=2)
+    }    
+    
     rownames(y) = rownames(x)
     x = cor(t(x[complete_ix,]), use="complete.obs")
-    x = 0.5 * (1-x)
-    x = cmdscale(x, eig=T)$points
-    y[complete_ix,] = x
+    
+    if(use_corr) {
+      y[complete_ix,complete_ix] = x
+    } else {
+      x = 0.5 * (1-x)
+      x = cmdscale(x, eig=T)$points
+      y[complete_ix,] = x
+    }
+    
     return(y)
+    
   }
-  )
+  
+  all_dists = lapply(x, get_dists)
   
   res = data.frame()
   
@@ -28,14 +44,13 @@ dist_mat <- function(x, comp_ix, labels, plot_labels="", plot_res=TRUE, my_title
     out_mat = matrix(NA, nrow=length(comp_ix[[2]]), ncol=length(comp_ix[[1]]))
     for(i in 1:dim(out_mat)[1]) {
       for(j in 1:dim(out_mat)[2]) {
-        out_mat[i,j] = sqrt(
-          (
-            all_dists[[k]][comp_ix[[1]][j],1] - median(all_dists[[k]][comp_ix[[2]][[i]],1], na.rm=TRUE)
-          )^2 +
-            (
-              all_dists[[k]][comp_ix[[1]][j],2] - median(all_dists[[k]][comp_ix[[2]][[i]],2], na.rm=TRUE)
-            )^2
-        )
+        
+        if(use_corr) {
+          out_mat[i,j] = 1 - all_dists[[k]][comp_ix[[1]][j],comp_ix[[2]][[i]]]
+        } else {
+          out_mat[i,j] = sqrt((all_dists[[k]][comp_ix[[1]][j],1] - median(all_dists[[k]][comp_ix[[2]][[i]],1], na.rm=TRUE))^2 + (all_dists[[k]][comp_ix[[1]][j],2] - median(all_dists[[k]][comp_ix[[2]][[i]],2], na.rm=TRUE))^2)
+        }
+        
       }
     }
     

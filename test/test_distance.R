@@ -13,7 +13,7 @@ sample_ix = 1:dim(start_data[[1]]$res)[1] # what samples
 
 # sample labels
 single_labels = rownames(start_data[[1]]$res)[sample_ix]
-group_labels = c(rep("BLUEPRINT",76), rep("GSK",12), rep("ENCODE",18), rep("GSK",31))
+group_labels = c(rep("GSK",43), rep("ENCODE",18))
 
 # slice matrices if necessary
 # for(i in 1:length(start_data)) {
@@ -35,11 +35,11 @@ res = dist_mat(start_data, comp_ix=list(77:88, 43), labels=single_labels, plot_l
 start_data = mask_data # choose which dataset
 
 # pick out the lung and blood samples
-sample_ix = c(77:88,43,107:113,89)
+sample_ix = c(1:17,42:44)
 
 # sample labels
 single_labels = rownames(start_data[[1]]$res)[sample_ix]
-group_labels = c(rep("GSK",12), rep("Blueprint",1), rep("GSK",7), rep("ENCODE",1))
+group_labels = c(rep("GSK",19), rep("ENCODE",1))
 
 # slice matrices if necessary
 for(i in 1:length(start_data)) {
@@ -53,12 +53,12 @@ png(filename="c:/Downloads/tmp/out.png", height=1200, width=3600)
 ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1, scales="free")
 dev.off()
 
-res = dist_mat(start_data, comp_ix=list(c(1:17,21), 18), labels=single_labels, plot_labels=c("BEAS2B","A549"))
+res = dist_mat(start_data, comp_ix=list(c(1:14,18:20), 15), labels=single_labels, plot_labels=c("BEAS2B","A549"), plot_res=TRUE, use_corr=TRUE)
 
 
 # LOOP THROUGH RELEVANT LUNG GO TERMS -------------------------------------
 
-lung_go = c("GO:0000303","GO:0002314","GO:0002377","GO:0002467","GO:0006749","GO:0006801","GO:0006802","GO:0006809","GO:0006915","GO:0007263","GO:0008219","GO:0010193","GO:0016064","GO:0019882","GO:0033355","GO:0034635","GO:0035713","GO:0036347","GO:0042571","GO:0042744","GO:0046210","GO:0050665","GO:0071731","GO:0072593","GO:1901370")
+lung_go = c("GO:0000303","GO:0002314","GO:0002377","GO:0002467","GO:0006749","GO:0006801","GO:0006802","GO:0006809","GO:0006915","GO:0007263","GO:0008219","GO:0010193","GO:0016064","GO:0019882","GO:0033355","GO:0034635","GO:0035713","GO:0036347","GO:0042571","GO:0042744","GO:0046210","GO:0050665","GO:0071731","GO:0072593","GO:1901370","GO:0045071")
 
 ensembl = useMart("ensembl", dataset="hsapiens_gene_ensembl")
 term_genes = getBM(attributes=c('hgnc_symbol','go'), filters='go', values=lung_go, mart=ensembl)
@@ -89,7 +89,7 @@ for(i in 1:length(lung_go)) {
   }
   
   # png(paste0("c:/Downloads/tmp/", i, ".png"), height=400, width=600)
-  res = dist_mat(end_data, comp_ix=list(c(1:17,21), 18), labels=single_labels, plot_labels=c("BEAS2B","A549"), my_title=lung_go[i], plot_res=FALSE)
+  res = dist_mat(end_data, comp_ix=list(c(1:14,18:20), 15), labels=single_labels, plot_labels=c("BEAS2B","A549"), my_title=lung_go[i], plot_res=TRUE, use_corr=TRUE)
   # dev.off()
   
   ranks = c(
