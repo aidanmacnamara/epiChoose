@@ -7,7 +7,7 @@ Bigwig,Cell,Mark,Source,Label
 /GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/ENCODE/encode_grch38/bigwig/DND-41_H3K27ac_ENCODE_Broad_bwa_samse_1_2_edited.bw,DND-41,H3K27ac,Broad,DND-41_Broad
 /GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/ENCODE/encode_grch38/bigwig/GM06990_CTCF_ENCODE_Uw_bwa_samse_1_2_edited.bw,GM06990,CTCF,Uw,GM06990_Uw
 /GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/ENCODE/encode_grch38/bigwig/GM12878_CTCF_ENCODE_Broad_bwa_samse_1_2_edited.bw,GM12878,CTCF,Broad,GM12878_Broad
-/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/ENCODE/encode_grch38/bigwig/GM12878_CTCfF_ENCODE_Uw_bwa_samse_1_2_edited.bw,GM12878,CTCF,Uw,GM12878_Uw
+/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/ENCODE/encode_grch38/bigwig/GM12878_CTCF_ENCODE_Uw_bwa_samse_1_2_edited.bw,GM12878,CTCF,Uw,GM12878_Uw
 /GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/ENCODE/encode_grch38/bigwig/GM12878_H3K27ac_ENCODE_Broad_bwa_samse_1_2_edited.bw,GM12878,H3K27ac,Broad,GM12878_Broad
 /GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/ENCODE/encode_grch38/bigwig/H1ESC_CTCF_ENCODE_Broad_bwa_samse_1_2_edited.bw,H1ESC,CTCF,Broad,H1ESC_Broad
 /GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/ENCODE/encode_grch38/bigwig/H1ESC_CTCF_ENCODE_Hudsonalpha_bwa_samse_1_2_edited.bw,H1ESC,CTCF,Hudsonalpha,H1ESC_Hudsonalpha
