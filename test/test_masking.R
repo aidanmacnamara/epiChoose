@@ -12,7 +12,7 @@ load_all()
 # ROI ---------------------------------------------------------------------
 
 # look across all regulatory regions
-load("r_data/column_annotation/roi_ensembl_multicell.RData")
+load("r_data/column_annotation/roi.RData")
 
 marks = c("H3K27ac","H3K4me3","H3K27me3","ATAC","CTCF")
 
@@ -46,19 +46,19 @@ for(i in 1:length(blueprint_chip_filtered)) {
 
 gsk_input = "data/data_gsk.csv"
 gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=4))
-gsk_chip_filtered = prep_gsk_chip_filter(gsk_chip)
+gsk_chip_filtered = prep_across_datatypes(gsk_chip)
 
 
 # ENCODE DATA -------------------------------------------------------------
 
 encode_input = "data/data_encode.csv"
 encode_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(encode_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
-encode_chip_filtered = prep_gsk_chip_filter(encode_chip)
+encode_chip_filtered = prep_across_datatypes(encode_chip)
 
 
 # COMBINE -----------------------------------------------------------------
 
-mask_data = vector("list", 3)
+mask_data = vector("list", 5)
 for(i in 1:length(mask_data)) {
   mask_data[[i]]$res = rbind(blueprint_chip_filtered[[i]]$res, gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res)
   # renormalize as we are multiple sources
