@@ -4,7 +4,7 @@
 #' @details What's this?
 #' @return TO ADD
 
-prep_gsk_chip_filter <- function(gsk_chip) {
+prep_across_datatypes <- function(gsk_chip) {
  
   # what are the common labels
   all_labels = sort(unique(unlist(lapply(gsk_chip, function(x) x$annot$Label))))

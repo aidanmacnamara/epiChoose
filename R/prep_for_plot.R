@@ -24,6 +24,10 @@ prep_for_plot <- function(all_data, annot_1, annot_2, marks, plot_type=c("pca","
     print(paste("Data", i, "has", length(remove_rows), "rows removed."))
     dim(dat_na_rm)
     
+    if(names(all_data)[i]=="RNA") {
+      dat_na_rm[is.na(dat_na_rm)] = 0
+    }
+    
     dat_na_rm = dat_na_rm[,!apply(dat_na_rm, 2, function(x) sd(x)==0)] # remove regions with no variance
     dim(dat_na_rm)
     

@@ -1,6 +1,6 @@
 # start off with mask_data
 
-load("r_data/mask_data.RData")
+load("r_data/mask_data_no_bp_with_atac.RData")
 load("r_data/all_data.RData")
 load("r_data/gsk_chip_filtered.RData")
 
@@ -13,7 +13,7 @@ sample_ix = 1:dim(start_data[[1]]$res)[1] # what samples
 
 # sample labels
 single_labels = rownames(start_data[[1]]$res)[sample_ix]
-group_labels = c(rep("GSK",43), rep("ENCODE",18))
+group_labels = c(rep("GSK",43), rep("ENCODE",31))
 
 # slice matrices if necessary
 # for(i in 1:length(start_data)) {
@@ -23,7 +23,7 @@ group_labels = c(rep("GSK",43), rep("ENCODE",18))
 
 pca_data = prep_for_plot(start_data, annot_1=group_labels, annot_2=single_labels, marks=names(start_data), plot_type="mds")
 
-png(filename="c:/Downloads/tmp/out.png", height=1200, width=3600)
+png(filename="c:/Downloads/tmp/out.png", height=1200, width=6000)
 ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1, scales="free")
 dev.off()
 
