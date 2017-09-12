@@ -5,8 +5,11 @@
 #' @param dat
 #' @return TO ADD
 
-convert_reg_matrix <- function(dat, gene_list) {
+convert_reg_matrix <- function(dat, gene_list, reg_window=0) {
 
+  start(gene_list) = start(gene_list) - reg_window
+  end(gene_list) = end(gene_list) + reg_window
+  
   my_ol = findOverlaps(gene_list, roi)
   dat_out = matrix(NA, nrow=dim(dat)[1], ncol=length(gene_list))
   colnames(dat_out) = gene_list$hgnc_symbol
