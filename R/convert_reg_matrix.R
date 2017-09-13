@@ -5,8 +5,10 @@
 #' @param dat
 #' @return TO ADD
 
-convert_reg_matrix <- function(dat, gene_list, reg_window=0) {
-
+convert_reg_matrix <- function(dat, roi, gene_list, reg_window=0, summ_method=c("mean","max")) {
+  
+  summ_method = match.arg(summ_method)
+  
   start(gene_list) = start(gene_list) - reg_window
   end(gene_list) = end(gene_list) + reg_window
   
@@ -16,8 +18,15 @@ convert_reg_matrix <- function(dat, gene_list, reg_window=0) {
   rownames(dat_out) = rownames(dat)
   
   for(i in 1:dim(dat_out)[2]) {
-    dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, mean, na.rm=TRUE)
+    if(summ_method=="mean") {
+      dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, mean, na.rm=TRUE)
+    }
+    if(summ_method=="max") {
+      dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, max, na.rm=TRUE)
+    }
   }
+  
+  dat_out[is.infinite(dat_out)] = NA
   
   return(dat_out)
   

@@ -55,7 +55,7 @@ p3_rna = read_tsv("z:/sandbox/epiChoose/data/rna/E-MTAB-4729-query-results.fpkms
 
 rna = tbl_df(merge(p1_rna, p3_rna, all=TRUE))
 
-rna_add = prep_rna(rna, roi$gene, single_labels, c("F36P_BR1_Baseline","HEL9217_BR1_Baseline","K562_BR1_Baseline","KU812_BR1_Baseline","MEG01_BR1_Baseline","UT7_BR1_Baseline","A549_BR1_Baseline","BEAS2B_BR1_Baseline","NHBE_BR1_Baseline"))
+rna_add = prep_rna(rna, gene_list_all$hgnc_symbol, single_labels, c("F36P_BR1_Baseline","HEL9217_BR1_Baseline","K562_BR1_Baseline","KU812_BR1_Baseline","MEG01_BR1_Baseline","UT7_BR1_Baseline","A549_BR1_Baseline","BEAS2B_BR1_Baseline","NHBE_BR1_Baseline"))
 
 start_data[[6]] = rna_add
 names(start_data)[6] = "RNA"
@@ -63,7 +63,7 @@ names(start_data)[6] = "RNA"
 # shrink regulatory matrices to gene matrices
 for(i in 1:length(start_data[1:5])) {
   print(paste("Processing data type", names(start_data)[i]))
-  start_data[[i]]$res = convert_reg_matrix(start_data[[i]]$res, gene_list_all, reg_window=2000)
+  start_data[[i]]$res = convert_reg_matrix(start_data[[i]]$res, roi, gene_list_all, reg_window=2000, summ_method="max")
 }
 
 plot(log(start_data[[1]]$res[1,]), log(start_data[[6]]$res[1,]))
@@ -72,7 +72,7 @@ plot(log(start_data[[1]]$res[1,]), log(start_data[[6]]$res[1,]))
 
 pca_data = prep_for_plot(start_data, annot_1=group_labels, annot_2=single_labels, marks=names(start_data), plot_type="mds")
 
-png(filename="c:/Downloads/tmp/out.png", height=1200, width=6000)
+png(filename="tmp/out.png", height=1200, width=6000)
 ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1, scales="free")
 dev.off()
 
@@ -81,7 +81,7 @@ res = dist_mat(start_data, comp_ix=list(c(1:14,18:20), 15), labels=single_labels
 
 # LOOP THROUGH RELEVANT LUNG GO TERMS -------------------------------------
 
-lung_go = c("GO:0000303","GO:0002314","GO:0002377","GO:0002467","GO:0006749","GO:0006801","GO:0006802","GO:0006809","GO:0006915","GO:0007263","GO:0008219","GO:0010193","GO:0016064","GO:0019882","GO:0033355","GO:0034635","GO:0035713","GO:0036347","GO:0042571","GO:0042744","GO:0046210","GO:0050665","GO:0071731","GO:0072593","GO:1901370","GO:0045071")
+lung_go = c("GO:0000303","GO:0002314","GO:0002377","GO:0002467","GO:0006749","GO:0006801","GO:0006802","GO:0006809","GO:0006915","GO:0007263","GO:0008219","GO:0010193","GO:0016064","GO:0019882","GO:0033355","GO:0034635","GO:0035713","GO:0036347","GO:0042571","GO:0042744","GO:0046210","GO:0050665","GO:0071731","GO:0072593","GO:1901370","GO:0045071","GO:0051607")
 
 ensembl = useMart("ensembl", dataset="hsapiens_gene_ensembl")
 term_genes = getBM(attributes=c("hgnc_symbol","go_id"), filters="go", values=lung_go, mart=ensembl)
@@ -91,8 +91,11 @@ load("z:/sandbox/epiChoose/r_data/column_annotation/roi_ensembl_multicell.RData"
 load("z:/sandbox/epiChoose/r_data/column_annotation/gene_list_all.RData")
 
 lung_go = names(table(term_genes$go))[table(term_genes$go)>10] # only use those > 10 genes
+r_squared = rep(NA, length(lung_go))
 
 for(i in 1:length(lung_go)) {
+  
+  if(i==10) next
   
   # get the genes
   genes = filter(term_genes, go_id==lung_go[i]) %>% dplyr::select(hgnc_symbol) %>% unlist()
@@ -110,15 +113,17 @@ for(i in 1:length(lung_go)) {
     end_data[[j]]$res = start_data[[j]]$res[,col_ix]
   }
   
-  # png(paste0("c:/Downloads/tmp/plot_1_", i, ".png"), height=575, width=1271)
-  res = dist_mat(end_data, comp_ix=list(c(1:14,18:21), 15), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), my_title=lung_go[i], plot_res=TRUE, use_corr=FALSE)
-  # dev.off()
+  png(paste0("tmp/plot_", i, "_1_max.png"), height=575, width=1271)
+  res = dist_mat(end_data, comp_ix=list(c(1:14,18:21), 15), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), my_title=lung_go[i], plot_res=TRUE, use_corr=TRUE, font_size=30)
+  dev.off()
   
   x = end_data[[6]]$res[c(1,3,15),]
   x = cbind(x, rownames(x))
   y = melt(x)
   names(y) = c("Cell Line", "Gene", "FPKM")
+  png(paste0("tmp/plot_", i, "_2_max.png"), height=448, width=1014)
   print(ggplot(y, aes(x=Gene, y=FPKM)) + geom_bar(aes(fill=`Cell Line`), position="dodge", stat="identity") + theme_thesis(10) + theme(axis.text.x=element_text(angle=45, hjust=1, size=10)))
+  dev.off()
   
   lm_input = data.frame(
     rna_response = as.numeric(t(end_data[[6]]$res[c(1,3,15),])),
@@ -131,13 +136,35 @@ for(i in 1:length(lung_go)) {
   )
   
   lm_res = lm(rna_response ~ k27ac + k4me3 + k27me3 + k27ac:k4me3:k27me3, data=lm_input)
-  print(summary(lm_res)$adj.r.squared)
+  r_squared[i] = summary(lm_res)$adj.r.squared
   
-  png(paste0("c:/Downloads/tmp/plot_3_", i, ".png"), height=632, width=1446)
-  ggpairs(dplyr::select(lm_input, rna_response, k27ac, k4me3, k27me3)) + theme_thesis(20)
+  png(paste0("tmp/plot_", i, "_3_max.png"), height=632, width=1446)
+  print(ggpairs(dplyr::select(lm_input, rna_response, k27ac, k4me3, k27me3)) + theme_thesis(20))
   dev.off()
   
 }
+
+
+# LOOK AT DIFFERENCES -----------------------------------------------------
+
+cut_data = start_data
+
+for(i in 1:length(cut_data)) {
+  cut_data[[i]]$res = cut_data[[i]]$res[c(1,3,15),]
+  cut_data[[i]]$annot = cut_data[[i]]$annot[c(1,3,15),]
+}
+
+
+j=6
+y = tbl_df(data.frame(log(t(cut_data[[j]]$res))))
+y$gene = rownames(y)
+
+y$thresh = as.logical(y$BEAS2B_BR1_Baseline>10 & y$A549_BR1_Baseline<3)
+y$thresh[is.na(y$thresh)] = FALSE
+y$label = NA
+y$label[y$thresh] = as.character(y$gene[y$thresh])
+
+ggplot(y, aes(x=BEAS2B_BR1_Baseline, y=A549_BR1_Baseline)) + geom_point() + theme_thesis() # + geom_text_repel(aes(label=label), fontface="bold")
 
 
 # LOOP THROUGH BLOOD GO TERMS ---------------------------------------------

@@ -6,7 +6,7 @@
 #' @param comp_ix
 #' @return TO ADD
 
-dist_mat <- function(x, comp_ix, labels, plot_labels="", plot_res=TRUE, my_title="", use_corr=FALSE) {
+dist_mat <- function(x, comp_ix, labels, plot_labels="", plot_res=TRUE, my_title="", use_corr=FALSE, font_size=15, label_size=4) {
   
   
   get_dists <- function(x) {
@@ -69,7 +69,7 @@ dist_mat <- function(x, comp_ix, labels, plot_labels="", plot_res=TRUE, my_title
       label_ix = c(label_ix, grep(plot_labels[i], res_melt$Cell))      
     }
     res_melt$Cell[-label_ix] = NA
-    print(ggplot(res_melt, aes(x=Assay, y=Distance, color=Assay)) + theme_thesis(15) + geom_jitter(width=0.1, height=0, shape=17) + geom_text_repel(aes(label=Cell), fontface="bold", size=3, force=0.5) + ggtitle(my_title))
+    print(ggplot(res_melt, aes(x=Assay, y=Distance, color=Assay)) + theme_thesis(font_size) + geom_jitter(width=0.1, height=0, shape=17) + geom_text_repel(aes(label=Cell), fontface="bold", size=label_size, force=0.5) + ggtitle(my_title))
   }
   
   return(res)
