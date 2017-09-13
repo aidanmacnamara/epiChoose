@@ -121,8 +121,11 @@ for(i in 1:length(lung_go)) {
   x = cbind(x, rownames(x))
   y = melt(x)
   names(y) = c("Cell Line", "Gene", "FPKM")
-  png(paste0("tmp/plot_", i, "_2_max.png"), height=448, width=1014)
+  png(paste0("tmp/plot_", i, "_2_max.png"), height=448, width=2014)
   print(ggplot(y, aes(x=Gene, y=FPKM)) + geom_bar(aes(fill=`Cell Line`), position="dodge", stat="identity") + theme_thesis(10) + theme(axis.text.x=element_text(angle=45, hjust=1, size=10)))
+  dev.off()
+  png(paste0("tmp/plot_", i, "_3_max.png"), height=800, width=900)
+  print(ggplot(y, aes(x=`Cell Line`, y=log(FPKM))) + geom_boxplot() + theme_thesis() + theme(axis.text.x=element_text(angle=45, hjust=1)))
   dev.off()
   
   lm_input = data.frame(
@@ -138,7 +141,7 @@ for(i in 1:length(lung_go)) {
   lm_res = lm(rna_response ~ k27ac + k4me3 + k27me3 + k27ac:k4me3:k27me3, data=lm_input)
   r_squared[i] = summary(lm_res)$adj.r.squared
   
-  png(paste0("tmp/plot_", i, "_3_max.png"), height=632, width=1446)
+  png(paste0("tmp/plot_", i, "_4_max.png"), height=632, width=1446)
   print(ggpairs(dplyr::select(lm_input, rna_response, k27ac, k4me3, k27me3)) + theme_thesis(20))
   dev.off()
   
@@ -155,7 +158,7 @@ for(i in 1:length(cut_data)) {
 }
 
 
-j=6
+j=1
 y = tbl_df(data.frame(log(t(cut_data[[j]]$res))))
 y$gene = rownames(y)
 
@@ -164,7 +167,7 @@ y$thresh[is.na(y$thresh)] = FALSE
 y$label = NA
 y$label[y$thresh] = as.character(y$gene[y$thresh])
 
-ggplot(y, aes(x=BEAS2B_BR1_Baseline, y=A549_BR1_Baseline)) + geom_point() + theme_thesis() # + geom_text_repel(aes(label=label), fontface="bold")
+ggplot(y, aes(x=BEAS2B_BR1_Baseline, y=A549_BR1_Baseline)) + geom_point() + theme_thesis() + geom_text_repel(aes(label=label), fontface="bold")
 
 
 # LOOP THROUGH BLOOD GO TERMS ---------------------------------------------

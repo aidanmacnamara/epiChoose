@@ -5,7 +5,7 @@
 #' @param dat
 #' @return TO ADD
 
-convert_reg_matrix <- function(dat, roi, gene_list, reg_window=0, summ_method=c("mean","max")) {
+convert_reg_matrix <- function(dat, roi, gene_list, reg_window=0, summ_method=c("mean","max","sum")) {
   
   summ_method = match.arg(summ_method)
   
@@ -23,6 +23,9 @@ convert_reg_matrix <- function(dat, roi, gene_list, reg_window=0, summ_method=c(
     }
     if(summ_method=="max") {
       dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, max, na.rm=TRUE)
+    }
+    if(summ_method=="sum") {
+      dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, sum, na.rm=TRUE)
     }
   }
   
