@@ -30,7 +30,7 @@ pick_tss <- function(x, p_window=100) {
   return(data.frame(cbind(x[1,], promoter_start, promoter_end)))
 }
 
-gene_list_all = group_by(gene_list_all, hgnc_symbol) %>% do(pick_tss(., 500))
+gene_list_all = group_by(gene_list_all, hgnc_symbol) %>% do(pick_tss(., 1000))
 gene_list_all$strand[gene_list_all$strand==1] = "+"
 gene_list_all$strand[gene_list_all$strand==-1] = "-"
 gene_list_all = makeGRangesFromDataFrame(gene_list_all, keep.extra.columns=TRUE, start.field="start_position", end.field="end_position")

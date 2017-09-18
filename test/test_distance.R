@@ -64,11 +64,11 @@ tss_data = vector("list",3)
 for(i in 1:length(tss_data)) {
   
   gsk_input = "data/data_gsk.csv"
-  gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, tss_data[[i]], marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=4))
+  gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, tss_list[[i]], marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=4))
   gsk_chip_filtered = prep_across_datatypes(gsk_chip)
   
   encode_input = "data/data_encode.csv"
-  encode_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(encode_input, tss_data[[i]], marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
+  encode_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(encode_input, tss_list[[i]], marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
   encode_chip_filtered = prep_across_datatypes(encode_chip)
   
   mask_data = vector("list", 5)
