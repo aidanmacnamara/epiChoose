@@ -64,19 +64,19 @@ tss_data = vector("list",3)
 for(i in 1:length(tss_data)) {
   
   gsk_input = "data/data_gsk.csv"
-  gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=4))
+  gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, tss_data[[i]], marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=4))
   gsk_chip_filtered = prep_across_datatypes(gsk_chip)
   
   encode_input = "data/data_encode.csv"
-  encode_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(encode_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
+  encode_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(encode_input, tss_data[[i]], marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
   encode_chip_filtered = prep_across_datatypes(encode_chip)
   
   mask_data = vector("list", 5)
   for(i in 1:length(mask_data)) {
-    mask_data[[i]]$res = rbind(blueprint_chip_filtered[[i]]$res, gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res)
+    mask_data[[i]]$res = rbind(gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res)
     # renormalize as we are multiple sources
     mask_data[[i]]$res = quantile_norm(mask_data[[i]]$res)
-    mask_data[[i]]$annot = bind_rows(blueprint_chip_filtered[[i]]$annot, gsk_chip_filtered[[i]]$annot, encode_chip_filtered[[i]]$annot)
+    mask_data[[i]]$annot = bind_rows(gsk_chip_filtered[[i]]$annot, encode_chip_filtered[[i]]$annot)
   }
   
   names(mask_data) = marks
