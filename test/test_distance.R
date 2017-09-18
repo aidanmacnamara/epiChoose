@@ -6,29 +6,83 @@ load("r_data/all_data.RData")
 load("r_data/gsk_chip_filtered.RData")
 
 
-# PROJECT 1 RESULT --------------------------------------------------------
+# TEST WINDOWS ------------------------------------------------------------
 
-start_data = mask_data # choose which dataset
+marks = c("H3K27ac","H3K4me3","H3K27me3","ATAC","CTCF")
 
-sample_ix = 1:dim(start_data[[1]]$res)[1] # what samples
+# link to ensembl
+mart_1 = useMart("ensembl", dataset="hsapiens_gene_ensembl")
 
-# sample labels
-single_labels = rownames(start_data[[1]]$res)[sample_ix]
-group_labels = c(rep("GSK",43), rep("ENCODE",31))
+gene_list_grab = getBM(attributes=c("ensembl_gene_id","hgnc_symbol","chromosome_name","start_position","end_position","strand","transcription_start_site"), mart=mart_1, filters=list(chromosome_name=c(as.character(1:22), "X", "Y"), with_protein_id=TRUE))
 
-# slice matrices if necessary
-# for(i in 1:length(start_data)) {
-#   start_data[[i]]$res = start_data[[i]]$res[sample_ix,]
-#   start_data[[i]]$annot = start_data[[i]]$annot[sample_ix,]
-# }
+pick_tss <- function(x, p_window=100) {
+  
+  if(x$strand[1]==1) {
+    promoter_end = min(x$transcription_start_site) + p_window
+    promoter_start = min(x$transcription_start_site) - p_window
+  } else if (x$strand[1]==-1) {
+    promoter_start = max(x$transcription_start_site) - p_window
+    promoter_end = max(x$transcription_start_site) + p_window
+  } else {
+    promoter_start = NA
+    promoter_end = NA
+  }
+  
+  return(data.frame(cbind(x[1,], promoter_start, promoter_end)))
+}
 
-pca_data = prep_for_plot(start_data, annot_1=group_labels, annot_2=single_labels, marks=names(start_data), plot_type="mds")
+tss_list = list()
 
-png(filename="c:/Downloads/tmp/out.png", height=1200, width=6000)
-ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1, scales="free")
-dev.off()
+for(i in c(500,1e3,2e3)) { # window size around tss
+  
+  # pick out 1 tss per gene
+  gene_list_all = group_by(gene_list_grab, hgnc_symbol) %>% do(pick_tss(., i))
+  gene_list_all$strand[gene_list_all$strand==1] = "+"
+  gene_list_all$strand[gene_list_all$strand==-1] = "-"
+  gene_list_all = makeGRangesFromDataFrame(gene_list_all, keep.extra.columns=TRUE, start.field="start_position", end.field="end_position")
+  newNames = paste("chr", levels(seqnames(gene_list_all)), sep="")
+  names(newNames) = levels(seqnames(gene_list_all))
+  gene_list_all = renameSeqlevels(gene_list_all, newNames)
+  gene_list_all = gene_list_all[-1]
+  gene_list_all = sort(gene_list_all)
+  
+  my_promoters_gene_all = data.frame(
+    seqnames = as.character(seqnames(gene_list_all)),
+    start = mcols(gene_list_all)$promoter_start,
+    end = mcols(gene_list_all)$promoter_end,
+    gene = mcols(gene_list_all)$hgnc_symbol
+  )
+  my_promoters_gene_all = dplyr::arrange(my_promoters_gene_all, seqnames, start, end) # make sure list is sorted
+  tss_list = c(tss_list, list(makeGRangesFromDataFrame(my_promoters_gene_all, keep.extra.columns=TRUE)))
+}
 
-res = dist_mat(start_data, comp_ix=list(77:88, 43), labels=single_labels, plot_labels="KU812")
+
+# GET AUCS ----------------------------------------------------------------
+
+tss_data = vector("list",3)
+
+for(i in 1:length(tss_data)) {
+  
+  gsk_input = "data/data_gsk.csv"
+  gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=4))
+  gsk_chip_filtered = prep_across_datatypes(gsk_chip)
+  
+  encode_input = "data/data_encode.csv"
+  encode_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(encode_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
+  encode_chip_filtered = prep_across_datatypes(encode_chip)
+  
+  mask_data = vector("list", 5)
+  for(i in 1:length(mask_data)) {
+    mask_data[[i]]$res = rbind(blueprint_chip_filtered[[i]]$res, gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res)
+    # renormalize as we are multiple sources
+    mask_data[[i]]$res = quantile_norm(mask_data[[i]]$res)
+    mask_data[[i]]$annot = bind_rows(blueprint_chip_filtered[[i]]$annot, gsk_chip_filtered[[i]]$annot, encode_chip_filtered[[i]]$annot)
+  }
+  
+  names(mask_data) = marks
+  tss_data[[i]] = mask_data
+  
+}
 
 
 # HOW DO DISTANCES CHANGE WITH GENE SETS? ---------------------------------
