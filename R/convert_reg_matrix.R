@@ -14,7 +14,11 @@ convert_reg_matrix <- function(dat, roi, gene_list, reg_window=0, summ_method=c(
   
   my_ol = findOverlaps(gene_list, roi)
   dat_out = matrix(NA, nrow=dim(dat)[1], ncol=length(gene_list))
-  colnames(dat_out) = gene_list$hgnc_symbol
+  if(!is.null(gene_list$hgnc_symbol)) {
+    colnames(dat_out) = gene_list$hgnc_symbol
+  } else {
+    colnames(dat_out) = gene_list$gene
+  }
   rownames(dat_out) = rownames(dat)
   
   for(i in 1:dim(dat_out)[2]) {
