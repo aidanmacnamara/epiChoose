@@ -196,10 +196,13 @@ ensembl = useMart("ensembl", dataset="hsapiens_gene_ensembl")
 term_genes = getBM(attributes=c("hgnc_symbol","go_id"), filters="go", values=lung_go, mart=ensembl)
 term_genes = filter(term_genes, go_id %in% lung_go)
 
+# alt list
+# msig = read.gmt("../c2.cp.reactome.v6.0.symbols.gmt")
+# lung_go = names(msig)
+# lung_go = names(table(term_genes$go))[table(term_genes$go)>10] # only use those > 10 genes
+
 # load("z:/sandbox/epiChoose/r_data/column_annotation/roi_ensembl_multicell.RData")
 # load("z:/sandbox/epiChoose/r_data/column_annotation/gene_list_all.RData")
-
-# lung_go = names(table(term_genes$go))[table(term_genes$go)>10] # only use those > 10 genes
 
 all_res = matrix(NA, nrow=length(tss_data)*4, ncol=length(lung_go))
 rownames(all_res) = paste(rep(names(tss_data)), rep(c("H3K27ac","H3K4me3","H3K27me3","RNA"), each=6))
@@ -213,6 +216,7 @@ for(i in 1:length(lung_go)) {
   
   # get the genes
   genes = filter(term_genes, go_id==lung_go[i]) %>% dplyr::select(hgnc_symbol) %>% unlist()
+  # genes = msig[[i]]
   if(is_empty(genes)) next
   
   # genes_loc = gene_list_all[gene_list_all$hgnc_symbol %in% genes]
@@ -238,6 +242,7 @@ for(i in 1:length(lung_go)) {
       
       all_diff[k+r_ix[l],i] = mean(unlist(res[d_ix[l],1:2])) - mean(unlist(res[d_ix[l],3:4]))
       if(l==4) all_diff[k+r_ix[l],i] = res[d_ix[l],1] - res[d_ix[l],3]
+      if(is.na(all_diff[k+r_ix[l],i])) next
       
       if(all_diff[k+r_ix[l],i] > 0) {
         all_res[k+r_ix[l],i] = "BEAS2B"
@@ -254,13 +259,64 @@ for(i in 1:length(lung_go)) {
 
 # EXPORT GO TERMS FOR IGV -------------------------------------------------
 
-
 u_ids = unique(term_genes$go_id)
-to_export = data.frame()
+to_export = vector("list", length(u_ids))
 
-y = tbl_df(term_genes %>% mutate(ind=row_number()) %>% spread(go_id, hgnc_symbol) %>% dplyr::select(-ind))
-y[is.na(y)] = ""
-y = apply(y, 2, sort)
+for(i in 1:length(u_ids)) {
+  to_export[[i]] = term_genes[term_genes$go_id==u_ids[i], 'hgnc_symbol']  
+}
+
+f <- function(data) {
+  nCol <- max(vapply(data, length, 0))
+  data <- lapply(data, function(row) c(row, rep(NA, nCol-length(row))))
+  data <- matrix(unlist(data), nrow=length(data), ncol=nCol, byrow=TRUE)
+  # data = t(data)
+  data.frame(data)
+}
+
+to_export = f(to_export)
+to_export[is.na(to_export)] = ""
+to_export = cbind(u_ids, NA, to_export)
+
+write_tsv(to_export, "out.gmt", col_names=FALSE)
+
+
+# PLOT --------------------------------------------------------------------
+
+for(i in 1:length(lung_go)) {
+  
+  if(i %in% c(15)) next
+  
+  # get the genes
+  genes = filter(term_genes, go_id==lung_go[i]) %>% dplyr::select(hgnc_symbol) %>% unlist()
+  # genes = msig[[i]]
+  if(is_empty(genes)) next
+  
+  # genes_loc = gene_list_all[gene_list_all$hgnc_symbol %in% genes]
+  # col_ix = subjectHits(findOverlaps(genes_loc, roi))
+  col_ix = which(gene_list_all$hgnc_symbol %in% genes)
+  if(length(col_ix)<2) next
+  
+  end_data = tss_data[[5]]
+  
+  # slice matrices if necessary
+  for(j in 1:length(end_data)) { # each data type
+    end_data[[j]]$res = end_data[[j]]$res[,col_ix]
+  }
+  
+  png(paste0("max/plot_", str_replace(lung_go[i], ":", "_"), "_1.png"), height=575, width=1271)
+  res = dist_mat(end_data, comp_ix=list(c(1:14,18:21), 15), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), my_title=lung_go[i], plot_res=TRUE, use_corr=TRUE, font_size=30)
+  dev.off()
+  
+  x = end_data[[6]]$res[c(1,3,15),]
+  x = cbind(x, rownames(x))
+  y = melt(x)
+  names(y) = c("Cell Line", "Gene", "FPKM")
+  png(paste0("max/plot_", str_replace(lung_go[i], ":", "_"), "_2.png"), height=448, width=2014)
+  print(ggplot(y, aes(x=Gene, y=FPKM)) + geom_bar(aes(fill=`Cell Line`), position="dodge", stat="identity") + theme_thesis(10) + theme(axis.text.x=element_text(angle=45, hjust=1, size=10)))
+  dev.off()
+
+}
 
 
 # LOOK AT DIFFERENCES -----------------------------------------------------
