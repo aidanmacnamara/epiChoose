@@ -190,32 +190,42 @@ for(i in 1:length(tss_data)) {
 
 # LOOP THROUGH RELEVANT LUNG GO TERMS -------------------------------------
 
+msig = read.gmt("c5.bp.v6.0.symbols.gmt")
+
 lung_go = c(NA,"GO:0006855","GO:0042908","GO:0006281","GO:0004033","GO:0006805","GO:0009494","GO:0017144 ",NA,"GO:0002314","GO:0002377","GO:0002467","GO:0016064","GO:0019882","GO:0042571","GO:0006915","GO:0008219","GO:0000302","GO:0072593","GO:0006802","GO:0006979","GO:0034599","GO:0010193","GO:0070994","GO:0000303","GO:0006801","GO:0006749","GO:0033355","GO:0034635","GO:0036347","GO:1901370","GO:0006809","GO:0071731","GO:0007263","GO:0035713","GO:0046210","GO:0042744","GO:0050665","GO:0045071","GO:0051607")
 
 ensembl = useMart("ensembl", dataset="hsapiens_gene_ensembl")
-term_genes = getBM(attributes=c("hgnc_symbol","go_id"), filters="go", values=lung_go, mart=ensembl)
-term_genes = filter(term_genes, go_id %in% lung_go)
+go_genes = vector("list", length(lung_go))
+names(go_genes) = lung_go
 
-# alt list
-# msig = read.gmt("../c2.cp.reactome.v6.0.symbols.gmt")
-# lung_go = names(msig)
-# lung_go = names(table(term_genes$go))[table(term_genes$go)>10] # only use those > 10 genes
+for(i in 1:length(lung_go)) {
+  print(paste("Query", i))
+  go_res = getBM(attributes=c("hgnc_symbol","go_id"), filters="go", values=lung_go[i], mart=ensembl)
+  if(!dim(go_res)[1]) next
+  go_genes[[i]] = unique(go_res$hgnc_symbol)
+}
+
+go_genes = c(go_genes, msig)
 
 # load("z:/sandbox/epiChoose/r_data/column_annotation/roi_ensembl_multicell.RData")
 # load("z:/sandbox/epiChoose/r_data/column_annotation/gene_list_all.RData")
 
-all_res = matrix(NA, nrow=length(tss_data)*4, ncol=length(lung_go))
+all_res = matrix(NA, nrow=length(tss_data)*4, ncol=length(go_genes))
 rownames(all_res) = paste(rep(names(tss_data)), rep(c("H3K27ac","H3K4me3","H3K27me3","RNA"), each=6))
 # rownames(all_res) = names(tss_data)
-colnames(all_res) = lung_go
+colnames(all_res) = names(go_genes)
 all_diff = all_res
+r_ix = c(0,6,12,18)
+d_ix = c(1:3,6)
 
-for(i in 1:length(lung_go)) {
+for(i in 1:length(go_genes)) {
   
-  if(i %in% c(15)) next
+  print(paste("Building for term", i))
+  
+  # if(i %in% c(440,573,578,676)) next
   
   # get the genes
-  genes = filter(term_genes, go_id==lung_go[i]) %>% dplyr::select(hgnc_symbol) %>% unlist()
+  genes = go_genes[[i]]
   # genes = msig[[i]]
   if(is_empty(genes)) next
   
@@ -233,10 +243,7 @@ for(i in 1:length(lung_go)) {
       end_data[[j]]$res = end_data[[j]]$res[,col_ix]
     }
     
-    res = dist_mat(end_data, comp_ix=list(c(1:14,18:21), 15), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), my_title=paste(lung_go[i], names(tss_data)[k]), plot_res=FALSE, use_corr=TRUE, font_size=30)
-    
-    r_ix = c(0,6,12,18)
-    d_ix = c(1:3,6)
+    res = dist_mat(end_data, comp_ix=list(c(1:14,18:21), 15), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), my_title=paste(names(go_genes)[i], names(tss_data)[k]), plot_res=TRUE, use_corr=TRUE, font_size=30)
     
     for(l in 1:4) {
       
@@ -257,14 +264,18 @@ for(i in 1:length(lung_go)) {
 }
 
 
+# PICK OUT BIG DIFFS ------------------------------------------------------
+
+# maximise difference between cell lines
+# minimize difference between cell line and cell type
+
+summ_ix = 5
+all_res_filt = all_res[summ_ix+c(0,6,12,18),]
+all_diff_filt = all_diff[summ_ix+c(0,6,12,18),]
+which(abs(all_diff_filt[1,])>0.9 & all_res_filt[1,]=="BEAS2B")
+
+
 # EXPORT GO TERMS FOR IGV -------------------------------------------------
-
-u_ids = unique(term_genes$go_id)
-to_export = vector("list", length(u_ids))
-
-for(i in 1:length(u_ids)) {
-  to_export[[i]] = term_genes[term_genes$go_id==u_ids[i], 'hgnc_symbol']  
-}
 
 f <- function(data) {
   nCol <- max(vapply(data, length, 0))
@@ -274,71 +285,79 @@ f <- function(data) {
   data.frame(data)
 }
 
-to_export = f(to_export)
+to_export = f(go_genes)
 to_export[is.na(to_export)] = ""
-to_export = cbind(u_ids, NA, to_export)
+to_export = cbind(names(go_genes), NA, to_export)
 
 write_tsv(to_export, "out.gmt", col_names=FALSE)
 
 
-# PLOT --------------------------------------------------------------------
+# PLOT WITH RNA -----------------------------------------------------------
 
-for(i in 1:length(lung_go)) {
+term_ix = grep("GO_GLYCERALDEHYDE_3_PHOSPHATE_METABOLIC_PROCESS", names(go_genes))
+
+for(term_ix in 29:40) {
   
-  if(i %in% c(15)) next
+  if(term_ix %in% c(7,8,9,20,24,28,30,31,36)) next
+  
+  summ_ix = 2
   
   # get the genes
-  genes = filter(term_genes, go_id==lung_go[i]) %>% dplyr::select(hgnc_symbol) %>% unlist()
-  # genes = msig[[i]]
-  if(is_empty(genes)) next
-  
-  # genes_loc = gene_list_all[gene_list_all$hgnc_symbol %in% genes]
-  # col_ix = subjectHits(findOverlaps(genes_loc, roi))
+  genes = go_genes[[term_ix]]
+  # genes = c("AKR1C1","BAMBI","ICAM1","KCTD15")
   col_ix = which(gene_list_all$hgnc_symbol %in% genes)
-  if(length(col_ix)<2) next
-  
-  end_data = tss_data[[5]]
+  end_data = tss_data[[summ_ix]]
   
   # slice matrices if necessary
   for(j in 1:length(end_data)) { # each data type
-    end_data[[j]]$res = end_data[[j]]$res[,col_ix]
+    end_data[[j]]$res = end_data[[j]]$res[,col_ix,drop=FALSE]
   }
   
-  png(paste0("max/plot_", str_replace(lung_go[i], ":", "_"), "_1.png"), height=575, width=1271)
-  res = dist_mat(end_data, comp_ix=list(c(1:14,18:21), 15), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), my_title=lung_go[i], plot_res=TRUE, use_corr=TRUE, font_size=30)
+  png(filename=paste0("final/", str_replace(names(go_genes)[term_ix], ":", "_"), "_plot_1.png"), height=575, width=1271)
+  res = dist_mat(end_data, comp_ix=list(c(1:14,18:21), 15), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), my_title=paste("", names(tss_data)[summ_ix]), plot_res=TRUE, use_corr=TRUE, font_size=30)
   dev.off()
   
   x = end_data[[6]]$res[c(1,3,15),]
   x = cbind(x, rownames(x))
   y = melt(x)
   names(y) = c("Cell Line", "Gene", "FPKM")
-  png(paste0("max/plot_", str_replace(lung_go[i], ":", "_"), "_2.png"), height=448, width=2014)
-  print(ggplot(y, aes(x=Gene, y=FPKM)) + geom_bar(aes(fill=`Cell Line`), position="dodge", stat="identity") + theme_thesis(10) + theme(axis.text.x=element_text(angle=45, hjust=1, size=10)))
+  png(filename=paste0("final/", str_replace(names(go_genes)[term_ix], ":", "_"), "_plot_2.png"), height=448, width=2014)
+  print(ggplot(y, aes(x=Gene, y=FPKM)) + geom_bar(aes(fill=`Cell Line`), position="dodge", stat="identity") + theme_thesis(20) + theme(axis.text.x=element_text(angle=45, hjust=1, size=20)))
   dev.off()
-
 }
 
 
 # LOOK AT DIFFERENCES -----------------------------------------------------
 
-cut_data = start_data
+cut_data = tss_data[[5]] # use max
 
 for(i in 1:length(cut_data)) {
   cut_data[[i]]$res = cut_data[[i]]$res[c(1,3,15),]
   cut_data[[i]]$annot = cut_data[[i]]$annot[c(1,3,15),]
 }
 
+spotfire_export = do.call("cbind", lapply(cut_data, function(x) data.frame(log(t(x$res+1)))))
+spotfire_export$gene = rownames(spotfire_export)
+spotfire_export = spotfire_export[apply(spotfire_export[,grep("RNA", names(spotfire_export))], 1, function(x) !any(is.na(x))),]
 
-j=1
-y = tbl_df(data.frame(log(t(cut_data[[j]]$res))))
-y$gene = rownames(y)
+# close to a549
+spotfire_export$diff_h3k27ac_a549 = abs(spotfire_export$H3K27ac.A549_BR1_Baseline-spotfire_export$H3K27ac.BEAS2B_BR1_Baseline) - abs(spotfire_export$H3K27ac.A549_BR1_Baseline-spotfire_export$H3K27ac.NHBE_BR1_Baseline)
+spotfire_export$diff_RNA_a549 = abs(spotfire_export$RNA.A549_BR1_Baseline-spotfire_export$RNA.BEAS2B_BR1_Baseline) - abs(spotfire_export$RNA.A549_BR1_Baseline-spotfire_export$RNA.NHBE_BR1_Baseline)
 
-y$thresh = as.logical(y$BEAS2B_BR1_Baseline>10 & y$A549_BR1_Baseline<3)
-y$thresh[is.na(y$thresh)] = FALSE
-y$label = NA
-y$label[y$thresh] = as.character(y$gene[y$thresh])
+# close to beas2b
+spotfire_export$diff_h3k27ac_beas2b = abs(spotfire_export$H3K27ac.A549_BR1_Baseline-spotfire_export$H3K27ac.BEAS2B_BR1_Baseline) - abs(spotfire_export$H3K27ac.BEAS2B_BR1_Baseline-spotfire_export$H3K27ac.NHBE_BR1_Baseline)
+spotfire_export$diff_RNA_beas2b = abs(spotfire_export$RNA.A549_BR1_Baseline-spotfire_export$RNA.BEAS2B_BR1_Baseline) - abs(spotfire_export$RNA.BEAS2B_BR1_Baseline-spotfire_export$RNA.NHBE_BR1_Baseline)
 
-ggplot(y, aes(x=BEAS2B_BR1_Baseline, y=A549_BR1_Baseline)) + geom_point() + theme_thesis() + geom_text_repel(aes(label=label), fontface="bold")
+# y$thresh = as.logical(y$BEAS2B_BR1_Baseline<6 & y$A549_BR1_Baseline>9)
+# y$thresh[is.na(y$thresh)] = FALSE
+# y$label = NA
+# y$label[y$thresh] = as.character(y$gene[y$thresh])
+# 
+# ggplot(y, aes(x=BEAS2B_BR1_Baseline, y=A549_BR1_Baseline)) + geom_point() + theme_thesis() # + geom_text_repel(aes(label=label), fontface="bold")
+
+write_csv(spotfire_export, "y.csv")
+
+write_tsv(filter(spotfire_export, diff_h3k27ac_a549>1.5 & spotfire_export$diff_RNA_a549>0.9) %>% dplyr::select(gene), "out.txt")
 
 
 # LOOK AT COURCOT ---------------------------------------------------------
