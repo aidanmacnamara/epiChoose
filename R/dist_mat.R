@@ -11,7 +11,7 @@ dist_mat <- function(x, comp_ix, labels, plot_labels="", plot_res=TRUE, my_title
   
   get_dists <- function(x) {
     x = x$res
-    complete_ix = which(apply(x, 1, function(x) !all(is.na(x))))
+    complete_ix = which(apply(x, 1, function(x) !all(is.na(x)))) # find samples with any data
     
     if(use_corr) {
       y = matrix(NA, nrow=dim(x)[1], ncol=dim(x)[1])
@@ -21,7 +21,7 @@ dist_mat <- function(x, comp_ix, labels, plot_labels="", plot_res=TRUE, my_title
     }    
     
     rownames(y) = rownames(x)
-    x = cor(t(x[complete_ix,]), use="complete.obs")
+    x = cor(t(x[complete_ix,]), use="pairwise.complete.obs")
     
     if(use_corr) {
       y[complete_ix,complete_ix] = x
