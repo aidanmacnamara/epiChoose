@@ -190,7 +190,8 @@ for(i in 1:length(tss_data)) {
 
 # LOOP THROUGH RELEVANT LUNG GO TERMS -------------------------------------
 
-msig = read.gmt("c5.bp.v6.0.symbols.gmt")
+require(qusage)
+msig = read.gmt("tmp/c5.bp.v6.0.symbols.gmt")
 
 lung_go = c(NA,"GO:0006855","GO:0042908","GO:0006281","GO:0004033","GO:0006805","GO:0009494","GO:0017144 ",NA,"GO:0002314","GO:0002377","GO:0002467","GO:0016064","GO:0019882","GO:0042571","GO:0006915","GO:0008219","GO:0000302","GO:0072593","GO:0006802","GO:0006979","GO:0034599","GO:0010193","GO:0070994","GO:0000303","GO:0006801","GO:0006749","GO:0033355","GO:0034635","GO:0036347","GO:1901370","GO:0006809","GO:0071731","GO:0007263","GO:0035713","GO:0046210","GO:0042744","GO:0050665","GO:0045071","GO:0051607")
 
@@ -243,7 +244,7 @@ for(i in 1:length(go_genes)) {
       end_data[[j]]$res = end_data[[j]]$res[,col_ix]
     }
     
-    res = dist_mat(end_data, comp_ix=list(c(1:14,18:21), 15), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), my_title=paste(names(go_genes)[i], names(tss_data)[k]), plot_res=TRUE, use_corr=TRUE, font_size=30)
+    res = dist_mat(end_data, comp_ix=list(c(1:14,18:21), 15), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), my_title=paste(names(go_genes)[i], names(tss_data)[k]), plot_res=FALSE, use_corr=TRUE, font_size=30)
     
     for(l in 1:4) {
       
@@ -300,7 +301,7 @@ for(term_ix in 29:40) {
   
   if(term_ix %in% c(7,8,9,20,24,28,30,31,36)) next
   
-  summ_ix = 2
+  summ_ix = 5
   
   # get the genes
   genes = go_genes[[term_ix]]
@@ -355,14 +356,14 @@ spotfire_export$diff_RNA_beas2b = abs(spotfire_export$RNA.A549_BR1_Baseline-spot
 # 
 # ggplot(y, aes(x=BEAS2B_BR1_Baseline, y=A549_BR1_Baseline)) + geom_point() + theme_thesis() # + geom_text_repel(aes(label=label), fontface="bold")
 
-write_csv(spotfire_export, "y.csv")
+write_csv(spotfire_export, "tmp/spotfire_export.csv")
 
-write_tsv(filter(spotfire_export, diff_h3k27ac_a549>1.5 & spotfire_export$diff_RNA_a549>0.9) %>% dplyr::select(gene), "out.txt")
+# write_tsv(filter(spotfire_export, diff_h3k27ac_a549>1.5 & spotfire_export$diff_RNA_a549>0.9) %>% dplyr::select(gene), "out.txt")
 
 
 # LOOK AT COURCOT ---------------------------------------------------------
 
-courcot = read_tsv("c:/Downloads/tmp/courcot_table_1.txt")
+courcot = read_tsv("tmp/courcot_table_1.txt")
 
 genes_loc = gene_list_all[gene_list_all$hgnc_symbol %in% courcot$Gene]
 
