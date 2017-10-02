@@ -29,7 +29,7 @@ prep_rna <- function(fpkm_table, gene_list, chip_labels, rna_labels, quantile_no
     rna_output[-r_ix,] = t(res_trans)
   }
   
-  return(list(res=data.frame(rna_output), annot=data.frame()))
+  return(list(res=data.frame(rna_output, check.names=FALSE), annot=data.frame()))
   
 }
 

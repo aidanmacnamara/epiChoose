@@ -1,4 +1,5 @@
 library(shiny)
+mtcars2 <- mtcars[, c("mpg", "cyl", "disp", "hp", "wt", "am", "gear")]
 
 shinyServer(function(input, output) {
   
@@ -11,10 +12,10 @@ shinyServer(function(input, output) {
       my_choices$gene_choice = unlist(regmatches(gene_choice, gregexpr("[A-Z][[:alnum:]]+", gene_choice)))
       
       cell_target_choice <- renderPrint({input$cell_target_choice})()
-      my_choices$cell_target_choice = unlist(regmatches(cell_target_choice, gregexpr("[[:alnum:]_]+", cell_target_choice)))[-1]
+      my_choices$cell_target_choice = unlist(regmatches(cell_target_choice, gregexpr("[[:alnum:]_]+", cell_target_choice)))[-1] # remove na added
       
       cell_candidate_choice <- renderPrint({input$cell_candidate_choice})()
-      my_choices$cell_candidate_choice = unlist(regmatches(cell_candidate_choice, gregexpr("[[:alnum:]_]+", cell_candidate_choice)))[-1]
+      my_choices$cell_candidate_choice = unlist(regmatches(cell_candidate_choice, gregexpr("[[:alnum:]_]+", cell_candidate_choice)))[-1] # remove na added
       
       return(my_choices)
     }
@@ -57,5 +58,20 @@ shinyServer(function(input, output) {
       
     }
   })
+  
+  output$plot1 <- renderPlot({
+    ggplot(dat_out, aes_string(names(dat_out)[2], names(dat_out)[3])) + geom_point(alpha=0.2) + theme_thesis()
+  })
+  
+  output$click_info <- renderPrint({
+    # Because it's a ggplot2, we don't need to supply xvar or yvar; if this
+    # were a base graphics plot, we'd need those.
+    nearPoints(dat_out, input$plot1_click, addDist=TRUE)
+  })
+  
+  output$brush_info <- renderPrint({
+    brushedPoints(dat_out, input$plot1_brush)
+  })
+  
 })
 

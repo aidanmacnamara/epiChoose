@@ -50,11 +50,22 @@ ui <- fluidPage(
     mainPanel(
       tabsetPanel(
         id = "tabs",
-        tabPanel("Something", plotOutput("dist_plot", height=800))
+        tabPanel("Gene Choice", plotOutput("dist_plot", height=800)),
+        tabPanel("Model Choice",
+                 column(width=6,
+                        plotOutput("plot1", height=600,
+                                   click = "plot1_click",
+                                   brush = brushOpts(id="plot1_brush")
+                        )
+                 ),
+                 column(width=6,
+                        h4("Brushed points"),
+                        verbatimTextOutput("brush_info")
+                 )
+        )
       ),
       width=9
     )
   )
 )
-  
-  
+
