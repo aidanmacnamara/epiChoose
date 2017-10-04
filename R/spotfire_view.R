@@ -18,6 +18,7 @@ spotfire_view <- function(dat, x_axis="H3K27ac", y_axis="RNA", comp_ix=list(c(1)
 
   dat_out = data.frame(colnames(dat_1), dat_1_out, dat_2_out)
   names(dat_out) = c("Gene", x_axis, y_axis)
+  dat_out = dat_out[apply(dat_out, 1, function(x) !any(is.na(x))),] # remove any points with na
   
   return(dat_out)
   

@@ -191,7 +191,7 @@ for(i in 1:length(tss_data)) {
 # LOOP THROUGH RELEVANT LUNG GO TERMS -------------------------------------
 
 require(qusage)
-msig = read.gmt("tmp/c5.bp.v6.0.symbols.gmt")
+msig_go_bp = read.gmt("tmp/c5.bp.v6.0.symbols.gmt")
 
 lung_go = c(NA,"GO:0006855","GO:0042908","GO:0006281","GO:0004033","GO:0006805","GO:0009494","GO:0017144 ",NA,"GO:0002314","GO:0002377","GO:0002467","GO:0016064","GO:0019882","GO:0042571","GO:0006915","GO:0008219","GO:0000302","GO:0072593","GO:0006802","GO:0006979","GO:0034599","GO:0010193","GO:0070994","GO:0000303","GO:0006801","GO:0006749","GO:0033355","GO:0034635","GO:0036347","GO:1901370","GO:0006809","GO:0071731","GO:0007263","GO:0035713","GO:0046210","GO:0042744","GO:0050665","GO:0045071","GO:0051607")
 
@@ -206,7 +206,7 @@ for(i in 1:length(lung_go)) {
   go_genes[[i]] = unique(go_res$hgnc_symbol)
 }
 
-go_genes = c(go_genes, msig)
+go_genes = c(go_genes, msig_go_bp)
 
 # load("z:/sandbox/epiChoose/r_data/column_annotation/roi_ensembl_multicell.RData")
 # load("z:/sandbox/epiChoose/r_data/column_annotation/gene_list_all.RData")
@@ -227,7 +227,7 @@ for(i in 1:length(go_genes)) {
   
   # get the genes
   genes = go_genes[[i]]
-  # genes = msig[[i]]
+  # genes = msig_go_bp[[i]]
   if(is_empty(genes)) next
   
   # genes_loc = gene_list_all[gene_list_all$hgnc_symbol %in% genes]

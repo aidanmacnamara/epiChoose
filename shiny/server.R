@@ -1,5 +1,4 @@
 library(shiny)
-mtcars2 <- mtcars[, c("mpg", "cyl", "disp", "hp", "wt", "am", "gear")]
 
 shinyServer(function(input, output) {
   
@@ -10,6 +9,9 @@ shinyServer(function(input, output) {
       
       gene_choice <- renderPrint({input$gene_choice})()
       my_choices$gene_choice = unlist(regmatches(gene_choice, gregexpr("[A-Z][[:alnum:]]+", gene_choice)))
+      
+      go_choice <- renderPrint({input$go_choice})()
+      my_choices$go_choice = str_replace(go_choice, "^.*\"([[:alnum:]\\s]+)\"", "\\1")
       
       cell_target_choice <- renderPrint({input$cell_target_choice})()
       my_choices$cell_target_choice = unlist(regmatches(cell_target_choice, gregexpr("[[:alnum:]_]+", cell_target_choice)))[-1] # remove na added
@@ -24,15 +26,21 @@ shinyServer(function(input, output) {
   output$dist_plot <- renderPlot({
     
     if(
-      my_choices()$gene_choice[1]!="NULL" &
+      (my_choices()$gene_choice[1]!="NULL" | my_choices()$go_choice[1]!="NULL") &
       my_choices()$cell_target_choice[1]!="NULL" &
       my_choices()$cell_candidate_choice[1]!="NULL"
     ) {
       
-      genes = my_choices()$gene_choice
+      if(my_choices()$go_choice[1]!="NULL") {
+        genes = msig_go_bp[[which(my_choices()$go_choice==names(msig_go_bp))]]
+      } else {
+        genes = my_choices()$gene_choice
+      }
       # genes = go_genes[[2]]
+      
       c_cells = my_choices()$cell_candidate_choice
       # c_cells = c("A549_BR1_Baseline","A549_BR2_Baseline","BEAS2B_BR1_Baseline","BEAS2B_BR2_Baseline")
+      
       t_cells = my_choices()$cell_target_choice
       # t_cells = "NHBE_BR1_Baseline"
       
@@ -54,7 +62,7 @@ shinyServer(function(input, output) {
       print(t_ix)
       print(c_ix)
       
-      res = dist_mat(dat_plot, comp_ix=list(c_ix, t_ix), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), plot_res=TRUE, use_corr=TRUE, font_size=30)
+      res = dist_mat(dat_plot, comp_ix=list(c_ix, t_ix), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), plot_res=TRUE, use_corr=TRUE, font_size=30, label_size=input$label.size)
       
     }
   })
@@ -71,6 +79,10 @@ shinyServer(function(input, output) {
   
   output$brush_info <- renderPrint({
     brushedPoints(dat_out, input$plot1_brush)
+  })
+  
+  output$download_table <- downloadHandler("selected_genes.csv", content=function(file) {
+    write.csv(out$brush_info, file, quote=TRUE, row.names=FALSE)
   })
   
 })
