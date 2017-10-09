@@ -3,6 +3,7 @@
 #' @description This is a new line ...
 #' @details What's this?
 #' @return TO ADD
+#' @export
 
 prep_rna <- function(fpkm_table, gene_list, chip_labels, rna_labels, quantile_norm=TRUE) {
   

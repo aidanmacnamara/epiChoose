@@ -3,6 +3,7 @@
 #' @details What's this?
 #' @param dat
 #' @return TO ADD
+#' @export
 
 data_shape <- function(x) {
   

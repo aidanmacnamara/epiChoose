@@ -4,6 +4,7 @@
 #' @details What's this?
 #' @param dat
 #' @return TO ADD
+#' @export
 
 convert_reg_matrix <- function(dat, roi, gene_list, reg_window=0, summ_method=c("mean","max","sum")) {
   

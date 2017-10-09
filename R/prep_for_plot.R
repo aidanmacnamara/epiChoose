@@ -4,6 +4,7 @@
 #' @details What's this?
 #' @param all_data
 #' @return TO ADD
+#' @export
 
 prep_for_plot <- function(all_data, annot_1, annot_2, marks, plot_type=c("pca","mds"), which_pcs=c(1,2), roi=NULL) {
   
