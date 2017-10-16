@@ -7,10 +7,14 @@ require(biomaRt)
 require(rtracklayer)
 require(Sushi)
 
-load("gene_list_all.RData")
-load("t_list.RData")
-load("dat.RData")
-load("msig_go_bp.RData")
+# load("gene_list_all.RData")
+# load("t_list.RData")
+# load("dat.RData")
+# load("msig_go_bp.RData")
+
+# single_labels = rownames(dat[[1]]$res)
+# group_labels = "GSK"
+# pca_data = prep_for_plot(dat, annot_1=group_labels, annot_2=single_labels, marks=names(dat), plot_type="mds")
 
 shinyServer(function(input, output) {
   
@@ -36,6 +40,51 @@ shinyServer(function(input, output) {
     }
   )
   
+  model_choice <- reactive(
+    {
+      
+      model_choice = list()
+      
+      c_choice = renderPrint({input$candidate_choice})()
+      c_choice = unlist(regmatches(c_choice, gregexpr("[[:alnum:]_]+", c_choice)))[-1] # remove na added
+      c_ix = which(rownames(dat[[1]]$res) %in% c_choice)
+      
+      a_choice = renderPrint({input$alt_choice})()
+      a_choice = unlist(regmatches(a_choice, gregexpr("[[:alnum:]_]+", a_choice)))[-1] # remove na added
+      a_ix = which(rownames(dat[[1]]$res) %in% a_choice)
+      
+      t_choice = renderPrint({input$target_choice})()
+      t_choice = unlist(regmatches(t_choice, gregexpr("[[:alnum:]_]+", t_choice)))[-1] # remove na added
+      t_ix = which(rownames(dat[[1]]$res) %in% t_choice)
+      
+      x_axis_choice <- renderPrint({input$x_axis})()
+      x_axis_choice = str_replace(x_axis_choice, "^.*\"([[:alnum:]\\s]+)\"", "\\1") 
+      x_axis_ix = which(names(dat)==x_axis_choice)
+      
+      x_axis_choice <- renderPrint({input$x_axis})()
+      x_axis_choice = str_replace(x_axis_choice, "^.*\"([[:alnum:]\\s]+)\"", "\\1") 
+      
+      y_axis_choice <- renderPrint({input$y_axis})()
+      y_axis_choice = str_replace(y_axis_choice, "^.*\"([[:alnum:]\\s]+)\"", "\\1")
+      
+      if(
+        length(c_ix) &
+        length(a_ix) &
+        length(t_ix) &
+        x_axis_choice!="NULL" &
+        y_axis_choice!="NULL"
+      )  {
+        
+        model_choice$my_df = spotfire_view(dat, x_axis=x_axis_choice, y_axis=y_axis_choice, comp_ix=list(c_ix, a_ix, t_ix))
+        rownames(model_choice$my_df) = NULL
+        model_choice$my_df = tbl_df(model_choice$my_df)
+      }
+      
+      return(model_choice)
+      
+    } 
+  )
+  
   output$dist_plot_1 <- renderPlot({
     
     if(
@@ -49,16 +98,11 @@ shinyServer(function(input, output) {
       } else {
         genes = my_choices()$gene_choice
       }
-      # genes = go_genes[[2]]
       
       c_cells = my_choices()$cell_candidate_choice
-      # c_cells = c("A549_BR1_Baseline","A549_BR2_Baseline","BEAS2B_BR1_Baseline","BEAS2B_BR2_Baseline")
-      
       t_cells = my_choices()$cell_target_choice
-      # t_cells = "NHBE_BR1_Baseline"
       
       col_ix = which(colnames(dat[[1]]$res) %in% genes)
-      # print(col_ix)
       
       # slice matrices if necessary
       dat_plot = dat
@@ -69,57 +113,62 @@ shinyServer(function(input, output) {
       single_labels = rownames(dat_plot[[1]]$res)
       
       c_ix = match(c_cells, rownames(dat[[1]]$res))
-      # c_ix = c(1:14,18:21)
       t_ix = match(t_cells, rownames(dat[[1]]$res))
       
-      # print(t_ix)
-      # print(c_ix)
-      
-      res = dist_mat(dat_plot, comp_ix=list(c_ix, t_ix), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), plot_res=TRUE, use_corr=TRUE, font_size=25, label_size=input$label.size)
+      res = dist_mat(dat_plot, comp_ix=list(c_ix, t_ix), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), plot_res=TRUE, use_corr=TRUE, font_size=15, label_size=input$label.size.1)
       
     } else {
-      res = dist_mat(x=dat, comp_ix=list(), labels=single_labels, plot_res=TRUE, use_corr=TRUE, font_size=25, label_size=input$label.size, plot_blank=TRUE)
+      res = dist_mat(x=dat, comp_ix=list(), labels=single_labels, plot_res=TRUE, use_corr=TRUE, font_size=15, label_size=input$label.size.1, plot_blank=TRUE)
     }
   })
   
   output$dist_plot_2 <- renderPlot({
-    qplot(1,1) + theme_thesis(20)
+    
+    print(ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=3, shape=17) + theme_thesis(20) + geom_text_repel(aes(label=annot_2), fontface="bold", size=input$label.size.2, force=0.5) + facet_wrap(~mark, ncol=2, scales="free"))
+    
   })
   
-  output$plot1 <- renderPlot({
+  observeEvent(input$do_model, {
     
-    dat_out = spotfire_view(dat)
-    
-    if(my_choices()$gene_choice[1]!="NULL" | my_choices()$go_choice[1]!="NULL") {
-      if(my_choices()$go_choice[1]!="NULL") {
-        genes = msig_go_bp[[which(names(msig_go_bp)==my_choices()$go_choice)]]
+    output$plot1 <- renderPlot({
+      
+      dat_out = model_choice()$my_df
+      
+      if(my_choices()$gene_choice[1]!="NULL" | my_choices()$go_choice[1]!="NULL") {
+        if(my_choices()$go_choice[1]!="NULL") {
+          genes = msig_go_bp[[which(names(msig_go_bp)==my_choices()$go_choice)]]
+        } else {
+          genes = my_choices()$gene_choice
+        }
+        dat_out$color = ifelse(dat_out$Gene %in% genes, 2, 1)
       } else {
-        genes = my_choices()$gene_choice
+        dat_out$color = 1
       }
-      dat_out$color = ifelse(dat_out$Gene %in% genes, 2, 1)
-    } else {
-      dat_out$color = 1
-    }
-    
-    dat_out$color = factor(dat_out$color)
-    dat_out = tbl_df(dat_out)
-    ggplot(dat_out, aes_string(names(dat_out)[2], names(dat_out)[3])) + geom_point(size=2, aes(color=color, alpha=color)) + theme_thesis() + scale_color_discrete(guide=FALSE) + scale_alpha_manual(guide=FALSE, values=c(0.3,0.8))
+      
+      dat_out$color = factor(dat_out$color)
+      dat_out = tbl_df(dat_out)
+      ggplot(dat_out, aes_string(names(dat_out)[2], names(dat_out)[3])) + geom_point(size=2, aes(color=color, alpha=color)) + theme_thesis() + scale_color_discrete(guide=FALSE) + scale_alpha_manual(guide=FALSE, values=c(0.3,0.8))
+      
+    })
     
   })
   
-  output$click_info <- renderPrint({
-    # Because it's a ggplot2, we don't need to supply xvar or yvar; if this
-    # were a base graphics plot, we'd need those.
-    nearPoints(dat_out, input$plot1_click, addDist=TRUE)
+  selected_data <- reactive({
+    brushedPoints(model_choice()$my_df, input$plot1_brush)
   })
   
   output$brush_info <- renderPrint({
-    brushedPoints(dat_out, input$plot1_brush)
+    selected_data()
   })
   
-  output$download_table <- downloadHandler("selected_genes.csv", content=function(file) {
-    write.csv(out$brush_info, file, quote=TRUE, row.names=FALSE)
-  })
+  output$download_table <- downloadHandler(
+    filename = function() { 
+      paste('selected_rows', '.csv', sep='') 
+    },
+    content = function(file) {
+      write_csv(selected_data(), file)
+    }
+  )
   
   output$sushi<- renderPlot({
     

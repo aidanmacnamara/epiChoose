@@ -1,11 +1,11 @@
 require(shiny)
 require(stringr)
 
-load("dat.RData")
-load("msig_go_bp.RData")
-
-cells = rownames(dat[[1]]$res)
-genes = colnames(dat[[1]]$res)
+# load("dat.RData")
+# load("msig_go_bp.RData")
+# 
+# cells = rownames(dat[[1]]$res)
+# genes = colnames(dat[[1]]$res)
 # names(msig_go_bp) = str_replace(str_replace_all(names(msig_go_bp), "_", " "), "GO\\s+", "")
 
 ui <- fluidPage(
@@ -18,7 +18,8 @@ ui <- fluidPage(
       
       selectInput("cell_target_choice", label="Cell Target Choice", 
                   choices = as.list(sort(cells)),
-                  multiple=TRUE),
+                  multiple=TRUE,
+                  selected=list("NHBE_BR1_Baseline")),
       
       helpText(
         "Choose the target cell type"
@@ -29,7 +30,14 @@ ui <- fluidPage(
       
       selectInput("cell_candidate_choice", label="Cell Model Choice", 
                   choices = as.list(sort(cells)),
-                  multiple=TRUE),
+                  multiple=TRUE,
+                  selected=list(
+                    "A549_BR1_Baseline",
+                    "A549_BR2_Baseline",
+                    "BEAS2B_BR1_Baseline",
+                    "BEAS2B_BR2_Baseline",
+                    "A549_Broad"
+                  )),
       
       helpText(
         "Choose the possible cell models"
@@ -68,7 +76,7 @@ ui <- fluidPage(
         "Choose which data type to use"
       ),
       
-      width=3
+      width=2
     ),
     
     mainPanel(
@@ -81,73 +89,77 @@ ui <- fluidPage(
                  h3(""),
                  h3(""),
                  
-                 column(width=6,
+                 column(width=5,
                         plotOutput("dist_plot_1", height=600),
-                        sliderInput("label.size", NULL, min=1, max=10, value=4, step=1)
+                        sliderInput("label.size.1", NULL, min=1, max=10, value=4, step=1)
                  ),
-                 column(width=6,
-                        plotOutput("dist_plot_2", height=600)
+                 column(width=7,
+                        plotOutput("dist_plot_2", height=800),
+                        sliderInput("label.size.2", NULL, min=1, max=10, value=4, step=1)
                  )
         ),
         
         tabPanel("Model Choice",
-                 column(width=6,
-                        plotOutput("plot1", height=600,
-                                   click = "plot1_click",
-                                   brush = brushOpts(id="plot1_brush")
-                        ),
-                        
-                        h3(""),
-                        h3(""),
-                        
-                        column(width=4,     
-                               selectInput("candidate_choice", label="Candidate Choice", 
-                                           choices = as.list(LETTERS[1:3]),
-                                           multiple=TRUE),
-                               
-                               helpText(
-                                 "Choose the model candidate"
-                               )
-                        ),
-                        
-                        column(width=4,     
-                               selectInput("alt_choice", label="Alternative Choice", 
-                                           choices = as.list(LETTERS[4:6]),
-                                           multiple=TRUE),
-                               
-                               helpText(
-                                 "Choose the model alternative"
-                               )
-                        ),
-                        
-                        column(width=2,     
-                               selectInput("x_axis", label="X-axis", 
-                                           choices = as.list(LETTERS[4:6]),
-                                           multiple=TRUE),
-                               
-                               helpText(
-                                 "Choose the data type for the x-axis"
-                               )
-                        ),
-                        
-                        column(width=2,     
-                               selectInput("y_axis", label="Y-axis", 
-                                           choices = as.list(LETTERS[4:6]),
-                                           multiple=TRUE),
-                               
-                               helpText(
-                                 "Choose the data type for the y-axis"
-                               )
-                        )
+                 fluidRow(
+                   column(width=7,
+                          plotOutput("plot1", height=600,
+                                     click = "plot1_click",
+                                     brush = brushOpts(id="plot1_brush")
+                          )
+                   ),
+                   
+                   column(width=5,
+                          h4("Brushed points"),
+                          verbatimTextOutput("brush_info"),
+                          
+                          downloadButton(
+                            'download_table',
+                            'Download'
+                          )
+                   )
                  ),
-                 column(width=6,
-                        h4("Brushed points"),
-                        verbatimTextOutput("brush_info")
+                 
+                 h3(""),
+                 h3(""),
+                 
+                 column(width=3,   
+                        
+                        selectInput("target_choice", label="Target Choice", 
+                                    choices = as.list(sort(cells)),
+                                    multiple=TRUE,
+                                    selected=list("NHBE_BR1_Baseline")),
+                        
+                        
+                        selectInput("x_axis", label="X-axis", 
+                                    choices = as.list(sort(names(dat))),
+                                    multiple=FALSE,
+                                    selected=list("H3K27ac"))
                  ),
-                 downloadButton(
-                   'downloadData',
-                   'Download'
+                 
+                 column(width=3,
+                        
+                        selectInput("candidate_choice", label="Candidate Choice", 
+                                    choices = as.list(sort(cells)),
+                                    multiple=TRUE,
+                                    selected=list("A549_BR1_Baseline")),
+                        
+                        selectInput("y_axis", label="Y-axis", 
+                                    choices = as.list(sort(names(dat))),
+                                    multiple=FALSE,
+                                    selected=list("RNA"))
+                 ),
+                 
+                 
+                 column(width=3,
+                        
+                        selectInput("alt_choice", label="Alternative Choice", 
+                                    choices = as.list(sort(cells)),
+                                    multiple=TRUE,
+                                    selected=list("BEAS2B_BR1_Baseline")),
+                        
+                        actionButton("do_model", "Run")
                  )
+                 
         ),
         
         tabPanel("Gene Browser",
