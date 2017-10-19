@@ -1,11 +1,11 @@
 require(shiny)
 require(stringr)
 
-# load("dat.RData")
-# load("msig_go_bp.RData")
-# 
-# cells = rownames(dat[[1]]$res)
-# genes = colnames(dat[[1]]$res)
+load("dat.RData")
+load("msig_go_bp.RData")
+
+cells = rownames(dat[[1]]$res)
+genes = colnames(dat[[1]]$res)
 # names(msig_go_bp) = str_replace(str_replace_all(names(msig_go_bp), "_", " "), "GO\\s+", "")
 
 ui <- fluidPage(
@@ -20,6 +20,8 @@ ui <- fluidPage(
                   choices = as.list(sort(cells)),
                   multiple=TRUE,
                   selected=list("NHBE_BR1_Baseline")),
+      
+      bsTooltip("cell_target_choice", "something", placement="bottom", trigger="hover", options=NULL),
       
       helpText(
         "Choose the target cell type"

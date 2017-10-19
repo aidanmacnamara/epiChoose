@@ -7,14 +7,14 @@ require(biomaRt)
 require(rtracklayer)
 require(Sushi)
 
-# load("gene_list_all.RData")
-# load("t_list.RData")
-# load("dat.RData")
-# load("msig_go_bp.RData")
+load("gene_list_all.RData")
+load("t_list.RData")
+load("dat.RData")
+load("msig_go_bp.RData")
 
-# single_labels = rownames(dat[[1]]$res)
-# group_labels = "GSK"
-# pca_data = prep_for_plot(dat, annot_1=group_labels, annot_2=single_labels, marks=names(dat), plot_type="mds")
+single_labels = rownames(dat[[1]]$res)
+group_labels = "GSK"
+pca_data = prep_for_plot(dat, annot_1=group_labels, annot_2=single_labels, marks=names(dat), plot_type="mds")
 
 shinyServer(function(input, output) {
   
@@ -40,7 +40,7 @@ shinyServer(function(input, output) {
     }
   )
   
-  model_choice <- reactive(
+  model_choice <- eventReactive(input$do_model,
     {
       
       model_choice = list()
@@ -128,28 +128,24 @@ shinyServer(function(input, output) {
     
   })
   
-  observeEvent(input$do_model, {
+  output$plot1 <- renderPlot({
     
-    output$plot1 <- renderPlot({
-      
-      dat_out = model_choice()$my_df
-      
-      if(my_choices()$gene_choice[1]!="NULL" | my_choices()$go_choice[1]!="NULL") {
-        if(my_choices()$go_choice[1]!="NULL") {
-          genes = msig_go_bp[[which(names(msig_go_bp)==my_choices()$go_choice)]]
-        } else {
-          genes = my_choices()$gene_choice
-        }
-        dat_out$color = ifelse(dat_out$Gene %in% genes, 2, 1)
+    dat_out = model_choice()$my_df
+    
+    if(my_choices()$gene_choice[1]!="NULL" | my_choices()$go_choice[1]!="NULL") {
+      if(my_choices()$go_choice[1]!="NULL") {
+        genes = msig_go_bp[[which(names(msig_go_bp)==my_choices()$go_choice)]]
       } else {
-        dat_out$color = 1
+        genes = my_choices()$gene_choice
       }
-      
-      dat_out$color = factor(dat_out$color)
-      dat_out = tbl_df(dat_out)
-      ggplot(dat_out, aes_string(names(dat_out)[2], names(dat_out)[3])) + geom_point(size=2, aes(color=color, alpha=color)) + theme_thesis() + scale_color_discrete(guide=FALSE) + scale_alpha_manual(guide=FALSE, values=c(0.3,0.8))
-      
-    })
+      dat_out$color = ifelse(dat_out$Gene %in% genes, 2, 1)
+    } else {
+      dat_out$color = 1
+    }
+    
+    dat_out$color = factor(dat_out$color)
+    dat_out = tbl_df(dat_out)
+    ggplot(dat_out, aes_string(names(dat_out)[2], names(dat_out)[3])) + geom_point(size=2, aes(color=color, alpha=color)) + theme_thesis() + scale_color_discrete(guide=FALSE) + scale_alpha_manual(guide=FALSE, values=c(0.3,0.8))
     
   })
   
