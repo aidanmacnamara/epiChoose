@@ -12,7 +12,7 @@ load_all()
 # ROI ---------------------------------------------------------------------
 
 # look across all regulatory regions
-load("r_data/column_annotation/roi.RData")
+load("r_data/column_annotation/roi_ensembl_multicell.RData")
 
 marks = c("H3K27ac","H3K4me3","H3K27me3","ATAC","CTCF")
 
@@ -29,7 +29,7 @@ for(i in 1:length(blueprint_chip)) {
 }
 
 # make sure rows are in the same order
-blueprint_chip_filtered = prep_gsk_chip_filter(blueprint_chip)
+blueprint_chip_filtered = prep_across_datatypes(blueprint_chip)
 
 # take out samples with missing data for 1 or more data type
 na_df = data.frame(lapply(blueprint_chip_filtered, function(x) apply(x$res, 1, function(y) !all(is.na(y)))))
@@ -45,7 +45,7 @@ for(i in 1:length(blueprint_chip_filtered)) {
 # GSK DATA ----------------------------------------------------------------
 
 gsk_input = "data/data_gsk.csv"
-gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=4))
+gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=5))
 gsk_chip_filtered = prep_across_datatypes(gsk_chip)
 
 
