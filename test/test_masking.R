@@ -13,7 +13,7 @@ load_all()
 
 # look across all regulatory regions
 load("r_data/column_annotation/roi_ensembl_multicell.RData")
-
+load("r_data/column_annotation/gene_list_all.RData")
 marks = c("H3K27ac","H3K4me3","H3K27me3","ATAC","CTCF")
 
 
@@ -69,43 +69,68 @@ for(i in 1:length(mask_data)) {
 names(mask_data) = marks
 
 
-# ANALYSIS ----------------------------------------------------------------
+# SHRINK TO GENES ---------------------------------------------------------
 
-group_labels = c(rep("BLUEPRINT",76), rep("GSK",18), rep("ENCODE",18))
-single_labels = rownames(mask_data[[2]]$res)
+start_data = mask_data
 
-# total plot
-pca_data = prep_for_plot(mask_data, annot_1=group_labels, annot_2=single_labels, marks=names(mask_data), plot_type="mds")
-
-png(filename="out.png", height=800, width=3200)
-ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + facet_wrap(~mark, nrow=1, scales="free") # + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5)
-dev.off()
-
-# masking based on all data types
-sig_list = vector("list", length(mask_data))
-names(sig_list) = names(mask_data)
-
-for(i in 1:length(sig_list)) {
-  limma_res = limma_diff(mask_data[[i]]$res, groups=list(1:16, 17:50), thresh=5000)
-  limma_res$gene = roi$gene[as.numeric(rownames(limma_res))]
-  limma_gsea = arrange(limma_res, desc(diff)) %>% filter(adj.P.Val<0.0001, abs(diff)>1) %>% select(gene, diff)
-  write_tsv(limma_gsea, paste0("c:/Downloads/tmp/gsea/gene_ranks/otar_", i, ".rnk"), col_names=FALSE)  
-  sig_list[[i]] = limma_gsea
+for(i in 1:length(start_data[1:5])) {
+  
+  print(paste("Processing data type", names(start_data)[i]))
+  start_data[[i]]$res = convert_reg_matrix(start_data[[i]]$res, roi, gene_list_all, reg_window=2000, summ_method="max")
+  
 }
 
-venn.diagram(lapply(sig_list, function(x) x$gene), filename="out.png", imagetype="png")
-venn_res = calculate.overlap(lapply(sig_list, function(x) x$gene))
-venn_genes = c(venn_res$a6, venn_res$a7, venn_res$a5, venn_res$a2)
-feature_ix = match(venn_genes, roi$gene)
+single_labels = rownames(start_data[[1]]$res)
+group_labels = c(rep("BLUEPRINT",178), rep("GSK",43), rep("ENCODE",31))
 
-mask_data_sliced = mask_data
-for(i in 1:length(mask_data_sliced)) {
-  mask_data_sliced[[i]]$res = mask_data_sliced[[i]]$res[,-feature_ix]
-}
 
-pca_data = prep_for_plot(mask_data_sliced, annot_1=group_labels, annot_2=single_labels, marks=c("rna","H3K27ac", "H3K4me3", "H3K27me3"))
+# ADD RNA -----------------------------------------------------------------
 
-png(filename="out.png", height=800, width=3200)
-ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
-dev.off()
+u937 = list.files("z:/links/bix-analysis-stv/2016/CTTV/U937/data/Outputs/star/bam_files/genecounts/")
+thp1 = list.files("z:/links/bix-analysis-stv/2016/CTTV/THP1/data/genecounts/")
+
+u937_df = lapply(as.list(u937), function(x) read_tsv(paste0("z:/links/bix-analysis-stv/2016/CTTV/U937/data/Outputs/star/bam_files/genecounts/", x), col_names=FALSE))
+thp1_df = lapply(as.list(thp1), function(x) read_tsv(paste0("z:/links/bix-analysis-stv/2016/CTTV/THP1/data/genecounts/", x), col_names=FALSE))
+
+# merge into sample per column
+my_names = u937_df[[1]]$X1
+p2_rna = data.frame(do.call("cbind", lapply(u937_df, function(x) x$X2)))
+p2_rna = cbind(NA, my_names, p2_rna)
+p2_rna = cbind(p2_rna, data.frame(do.call("cbind", lapply(thp1_df, function(x) x$X2[match(my_names, x$X1)]))))
+
+# get names
+sample_info = read_csv("z:/links/bix-analysis-stv/2016/CTTV/U937/data/sampleInfo.csv", col_names=FALSE)
+
+all_names = sample_info$X1[c(match(str_extract(u937, "^[[:alnum:]]+"), sample_info$X32), match(str_extract(thp1, "^[[:alnum:]]+"), sample_info$X32))]
+
+names(p2_rna) = c("Gene ID", "Gene Name", all_names)
+
+# change names so they match with epigenetic labels
+names(p2_rna) = str_replace(names(p2_rna), "THP1", "THP-1")
+names(p2_rna) = str_replace(names(p2_rna), "CTR", "Baseline")
+names(p2_rna) = str_replace(names(p2_rna), "_RNA", "")
+names(p2_rna) = str_replace(names(p2_rna), "Baseline\\+LPS", "LPS")
+
+p2_rna = tbl_df(p2_rna)
+
+p1_rna = read_tsv("z:/sandbox/epiChoose/data/rna/E-MTAB-4101-query-results.fpkms.tsv", skip=4)
+p3_rna = read_tsv("z:/sandbox/epiChoose/data/rna/E-MTAB-4729-query-results.fpkms.tsv", skip=4)
+# bp_rna = read_tsv("z:/sandbox/epiChoose/data/rna/E-MTAB-3827-query-results.fpkms.tsv", skip=4)
+
+rna = tbl_df(merge(merge(p1_rna, p3_rna, all=TRUE), p2_rna, all=TRUE, by="Gene Name"))
+names(rna)[2] = "Gene ID"
+rna = rna[,-which(names(rna)=="Gene ID.y")]
+names(rna)[3:11] = paste0(names(rna)[3:11], "_BR1_Baseline")
+names(rna) = str_replace(names(rna), "-", "")
+names(rna) = str_replace(names(rna), "P1", "P-1")
+
+# rna_bp = prep_blueprint_rna() # leave this for the moment
+
+rna_add = prep_rna(rna, gene_list_all$hgnc_symbol, single_labels, names(rna)[-c(1,2)])
+
+start_data[[6]] = rna_add
+names(start_data)[6] = "RNA"
+start_data[[1]]$annot$Project[which(group_labels=="BLUEPRINT")] = "BLUEPRINT"
+start_data[[1]]$annot$Project[which(group_labels=="ENCODE")] = "ENCODE"
+
 
