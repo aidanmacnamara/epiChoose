@@ -3,7 +3,7 @@
 #' @description This is a new line ...
 #' @details What's this?
 #' @param all_data
-#' @param comp_ix
+#' @param comp_ix A list of length 2 giving the 1. target(s) and 2. the candidate(s)
 #' @return TO ADD
 #' @export
 

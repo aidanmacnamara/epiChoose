@@ -5,7 +5,11 @@
 \title{Computes the final distance matrix for comparisons of choice}
 \usage{
 dist_mat(x, comp_ix, labels, plot_labels = "", plot_res = TRUE,
-  my_title = "", use_corr = FALSE, font_size = 15, label_size = 4)
+  my_title = "", use_corr = FALSE, font_size = 15, label_size = 4,
+  plot_blank = FALSE)
+}
+\arguments{
+\item{comp_ix}{A list of length 2 giving the 1. target(s) and 2. the candidate(s)}
 }
 \value{
 TO ADD
