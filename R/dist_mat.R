@@ -7,7 +7,7 @@
 #' @return TO ADD
 #' @export
 
-dist_mat <- function(x, comp_ix, labels, plot_labels="", plot_res=TRUE, my_title="", use_corr=FALSE, font_size=15, label_size=4, plot_blank=FALSE) {
+dist_mat <- function(x, comp_ix, labels, plot_labels="", plot_res=TRUE, my_title="", use_corr=FALSE, font_size=15, label_size=4, plot_blank=FALSE, get_p_values=FALSE) {
   
   if(plot_blank) {
     

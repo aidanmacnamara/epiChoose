@@ -71,11 +71,11 @@ diff_test <- function(dat, parametric=TRUE, log_s=FALSE) {
 all_res = data.frame()
 all_res_means = data.frame()
 
-go_list = lung_go$genes
-# go_list = msig_go_bp
+# go_list = lung_go$genes
+go_list = msig_go_bp
 
-go_names = lung_go$names
-# go_names = names(msig_go_bp)
+# go_names = lung_go$names
+go_names = names(msig_go_bp)
 
 for(i in 1:length(go_list)) {
   
@@ -124,6 +124,21 @@ for(i in 1:length(go_list)) {
 
 all_res = tbl_df(all_res)
 
+
+# ADD LFC -----------------------------------------------------------------
+
+calc_fc <- function(x, all_res_means) {
+  g1_score = all_res_means$mean[all_res_means$Assay==x[1] & all_res_means$go==x[5] & all_res_means$Cell.Line==x[2]]
+  g2_score = all_res_means$mean[all_res_means$Assay==x[1] & all_res_means$go==x[5] & all_res_means$Cell.Line==x[3]]
+  return(log(g1_score, base=2)-log(g2_score, base=2))
+}
+
+# add log fold change
+all_res$LFC = apply(all_res, 1, calc_fc, all_res_means)
+
+
+# ANALYSE -----------------------------------------------------------------
+
 # check significant rna + h3k27ac results with a bonferroni cut-off
-filter(all_res, Assay=="RNA" | Assay=="H3K27ac", p.value<0.05) %>% arrange(go)
+View(filter(all_res, Assay=="RNA" | Assay=="H3K27ac", p.value<0.05) %>% arrange(LFC))
 
