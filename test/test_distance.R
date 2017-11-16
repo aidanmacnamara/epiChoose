@@ -71,11 +71,11 @@ diff_test <- function(dat, parametric=TRUE, log_s=FALSE) {
 all_res = data.frame()
 all_res_means = data.frame()
 
-# go_list = lung_go$genes
-go_list = msig_go_bp
+go_list = lung_go$genes
+# go_list = msig_go_bp
 
-# go_names = lung_go$names
-go_names = names(msig_go_bp)
+go_names = lung_go$names
+# go_names = names(msig_go_bp)
 
 for(i in 1:length(go_list)) {
   
@@ -94,7 +94,7 @@ for(i in 1:length(go_list)) {
     end_data[[j]]$res = end_data[[j]]$res[sample_ix,col_ix]
   }
   
-  # res = dist_mat(end_data, comp_ix=list(c(1:14,18:21), 15), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), my_title=go_names[i], plot_res=TRUE, use_corr=TRUE, font_size=20)
+  res = dist_mat(end_data, comp_ix=list(c(1:14,18:21), 15), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), my_title=go_names[i], plot_res=TRUE, use_corr=TRUE, font_size=20)
   
   comp_ix = c(1,3,15)
   y_all = data.frame()
@@ -111,9 +111,9 @@ for(i in 1:length(go_list)) {
   y_all = tbl_df(y_all)
   # y_all = filter(y_all, !is.na(Score))
   
-  # ggplot(y_all, aes(x=Gene, y=Score)) + geom_bar(aes(fill=`Cell Line`), position="dodge", stat="identity") + theme_thesis(10) + theme(axis.text.x=element_text(angle=45, hjust=1)) + facet_wrap(~Assay, nrow=2, scales="free")
+  ggplot(y_all, aes(x=Gene, y=Score)) + geom_bar(aes(fill=`Cell Line`), position="dodge", stat="identity") + theme_thesis(10) + theme(axis.text.x=element_text(angle=45, hjust=1)) + facet_wrap(~Assay, nrow=2, scales="free")
   
-  # ggplot(y_all, aes(x=`Cell Line`, y=log(Score+1))) + geom_boxplot() + theme_thesis(10) + facet_wrap(~Assay, nrow=2, scales="free") + theme(axis.text.x=element_text(angle=45, hjust=1))
+  ggplot(y_all, aes(x=`Cell Line`, y=log(Score+1))) + geom_boxplot() + theme_thesis(10) + facet_wrap(~Assay, nrow=2, scales="free") + theme(axis.text.x=element_text(angle=45, hjust=1))
   
   # ggplot(y_all, aes(x=`Cell Line`, y=Score)) + geom_point() + geom_line(aes(group=Gene)) + theme_thesis(10) + facet_wrap(~Assay, nrow=2, scales="free")
   
@@ -140,5 +140,9 @@ all_res$LFC = apply(all_res, 1, calc_fc, all_res_means)
 # ANALYSE -----------------------------------------------------------------
 
 # check significant rna + h3k27ac results with a bonferroni cut-off
-View(filter(all_res, Assay=="RNA" | Assay=="H3K27ac", p.value<0.05) %>% arrange(LFC))
+View(filter(all_res, Assay=="RNA" | Assay=="H3K27ac", p.value<0.05) %>% arrange(p.value))
 
+
+# DISTANCE BY REGULATORY TYPE ---------------------------------------------
+
+# look at overall pc plots splitting by segmentation categories
