@@ -2,87 +2,86 @@
 #' @description TO ADD
 #' @description This is a new line ...
 #' @details What's this?
-#' @param all_data
+#' @param x The original data object, sliced and filtered as necessary
 #' @param comp_ix A list of length 2 giving the 1. target(s) and 2. the candidate(s)
-#' @return TO ADD
+#' @return A list containing the ggplot objects and statistics
 #' @export
 
-dist_mat <- function(x, comp_ix, labels, plot_labels="", plot_res=TRUE, my_title="", use_corr=FALSE, font_size=15, label_size=4, plot_blank=FALSE, get_p_values=FALSE) {
+# start with dat
+tmp = dat
+
+# select genes and cells
+genes = msig_go_bp[[3101]]
+col_ix = which(colnames(tmp[[1]]$res) %in% genes)
+
+c_cells = rownames(tmp[[1]]$res)[c(205,199,217,211)]
+t_cells = c("S001S7_inflammatory macrophage","S001MJ_inflammatory macrophage","S0022I_inflammatory macrophage")
+c_ix = match(c_cells, rownames(dat[[1]]$res))
+t_ix = match(t_cells, rownames(dat[[1]]$res))
+
+for(j in 1:length(tmp)) { # each data type
+  tmp[[j]]$res = tmp[[j]]$res[c(c_ix,t_ix),col_ix,drop=FALSE]
+}
+
+c_ix = match(c_cells, rownames(tmp[[1]]$res))
+t_ix = match(t_cells, rownames(tmp[[1]]$res))
+comp_ix = list(c_ix, t_ix)
+
+dist_mat <- function(tmp, comp_ix, labels, plot_labels="", my_title="", font_size=15, label_size=4, get_p_values=FALSE) {
   
-  if(plot_blank) {
-    
-    res_melt = data.frame(Cell=NA, Assay=names(x), Distance=NA)
-    print(ggplot(res_melt, aes(x=Assay, y=Distance, color=Assay)) + theme_thesis(font_size) + geom_blank() + ggtitle(my_title) + theme(axis.text.x=element_text(angle=45, hjust=1)))
-    
-    return(NULL)
-    
-  } else {
-    
-    get_dists <- function(x) {
-      x = x$res
-      complete_ix = which(apply(x, 1, function(x) !all(is.na(x)))) # find samples with any data
-      
-      if(use_corr) {
-        y = matrix(NA, nrow=dim(x)[1], ncol=dim(x)[1])
-        colnames(y) = rownames(x)
-      } else {
-        y = matrix(NA, nrow=dim(x)[1], ncol=2)
-      }    
-      
-      rownames(y) = rownames(x)
-      x = cor(t(x[complete_ix,]), use="pairwise.complete.obs")
-      
-      if(use_corr) {
-        y[complete_ix,complete_ix] = x
-      } else {
-        x = 0.5 * (1-x)
-        x = cmdscale(x, eig=T)$points
-        y[complete_ix,] = x
-      }
-      
-      return(y)
-      
+  tmp_copy = tmp
+  
+  if(length(comp_ix[[2]])>1) { # get the mean of the target cells
+    for(i in 1:length(tmp_copy)) {
+      tmp_copy[[i]]$res = rbind(tmp_copy[[i]]$res, apply(tmp_copy[[i]]$res[comp_ix[[2]],], 2, mean, na.rm=TRUE))
     }
+  }
+  
+  comp_target = dim(tmp_copy[[1]]$res)[1]
+  
+  get_dists <- function(x) {
     
-    all_dists = lapply(x, get_dists)
+    x = x$res
+    complete_ix = which(apply(x, 1, function(x) !all(is.na(x)))) # find samples with any data
     
-    res = data.frame()
+    y = matrix(NA, nrow=dim(x)[1], ncol=dim(x)[1])
+    colnames(y) = rownames(x)
+    rownames(y) = rownames(x)
     
-    for(k in 1:length(x)) {
-      
-      out_mat = matrix(NA, nrow=length(comp_ix[[2]]), ncol=length(comp_ix[[1]]))
-      for(i in 1:dim(out_mat)[1]) {
-        for(j in 1:dim(out_mat)[2]) {
-          
-          if(use_corr) {
-            out_mat[i,j] = 1 - all_dists[[k]][comp_ix[[1]][j],comp_ix[[2]][[i]]]
-          } else {
-            out_mat[i,j] = sqrt((all_dists[[k]][comp_ix[[1]][j],1] - median(all_dists[[k]][comp_ix[[2]][[i]],1], na.rm=TRUE))^2 + (all_dists[[k]][comp_ix[[1]][j],2] - median(all_dists[[k]][comp_ix[[2]][[i]],2], na.rm=TRUE))^2)
-          }
-          
-        }
-      }
-      
-      res = rbind(res, out_mat)
-      
-    }
+    x = cor(t(x[complete_ix,]), use="pairwise.complete.obs")
+    y[complete_ix,complete_ix] = x
     
-    names(res) = labels[comp_ix[[1]]]
-    rownames(res) = names(x)
-    
-    if(plot_res) {
-      res_melt = melt(t(res))
-      names(res_melt) = c("Cell", "Assay", "Distance")
-      label_ix = c()
-      for(i in 1:length(plot_labels)) {
-        label_ix = c(label_ix, grep(plot_labels[i], res_melt$Cell))      
-      }
-      res_melt$Cell[-label_ix] = NA
-      print(ggplot(res_melt, aes(x=Assay, y=Distance, color=Assay)) + theme_thesis(font_size) + geom_jitter(width=0.1, height=0, shape=17) + geom_text_repel(aes(label=Cell), fontface="bold", size=label_size, force=0.5) + ggtitle(my_title) + theme(axis.text.x=element_text(angle=45, hjust=1)))
-    }
-    
-    return(res)
+    return(y)
     
   }
+  
+  all_dists = lapply(tmp_copy, get_dists)
+  
+  res = do.call("rbind", lapply(all_dists, function(x) 1-x[comp_ix[[1]], comp_target]))
+  
+  res_melt = melt(t(res))
+  names(res_melt) = c("Cell", "Assay", "Distance")
+  
+  p_1 = ggplot(res_melt, aes(x=Assay, y=Distance, color=Assay)) + theme_thesis(font_size) + geom_jitter(width=0.1, height=0, shape=17) + geom_text_repel(aes(label=Cell), fontface="bold", size=label_size, force=0.5) + ggtitle(my_title) + theme(axis.text.x=element_text(angle=45, hjust=1))
+  
+  y_all = data.frame()
+  for(j in 1:length(tmp)) {
+    x = tmp[[j]]$res
+    if(all(is.na(x))) next
+    y = melt(as.matrix(x))
+    y = cbind(y, names(end_data[j]))
+    names(y) = c("Cell Line", "Gene", "Score", "Assay")
+    # if(length(which((filter(y, !is.na(Score)) %>% dplyr::select(Gene) %>% table()) == length(unique(y$`Cell Line`)))) < 2) next # if there are < 2 genes with observations from all cell lines, skip ...
+    y_all = rbind(y_all, y)
+  }
+  y_all = tbl_df(y_all)
+  
+  p_2 = ggplot(y_all, aes(x=Gene, y=Score)) + geom_bar(aes(fill=`Cell Line`), position="dodge", stat="identity") + theme_thesis(10) + theme(axis.text.x=element_text(angle=45, hjust=1)) + facet_wrap(~Assay, nrow=1, scales="free")
+  
+  p_3 = ggplot(y_all, aes(x=`Cell Line`, y=log(Score+1))) + geom_boxplot() + theme_thesis(10) + facet_wrap(~Assay, nrow=2, scales="free") + theme(axis.text.x=element_text(angle=45, hjust=1))
+  
+  p_4 = ggplot(y_all, aes(x=`Cell Line`, y=Score)) + geom_point() + geom_line(aes(group=Gene)) + theme_thesis(10) + facet_wrap(~Assay, nrow=2, scales="free")
+  
+  
 }
 
