@@ -46,11 +46,11 @@ lung_go = tbl_df(lung_go)
 load("z:/sandbox/epiChoose/r_data/column_annotation/gene_list_all.RData")
 
 # pick out the lung and blood samples
-sample_ix = c(1:17,42:44,72)+178
+sample_ix = c(179:182,193:195,222,251)
 
 # sample labels
 single_labels = rownames(start_data[[1]]$res)[sample_ix]
-group_labels = c(rep("GSK",19), rep("ENCODE",2))
+group_labels = c(rep("GSK",8), rep("ENCODE",2))
 
 diff_test <- function(dat, parametric=TRUE, log_s=FALSE) {
   
@@ -94,7 +94,7 @@ for(i in 1:length(go_list)) {
     end_data[[j]]$res = end_data[[j]]$res[sample_ix,col_ix]
   }
   
-  res = dist_mat(end_data, comp_ix=list(c(1:14,18:21), 15), labels=single_labels, plot_labels=c("BEAS2B","A549","NHLF"), my_title=go_names[i], plot_res=TRUE, use_corr=TRUE, font_size=20)
+  res = dist_mat(end_data, comp_ix=list(c(1:4,8:9), c(5:7)), labels=single_labels)
   
   comp_ix = c(1,3,15)
   y_all = data.frame()

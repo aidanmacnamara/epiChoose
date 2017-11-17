@@ -7,33 +7,32 @@
 #' @return A list containing the ggplot objects and statistics
 #' @export
 
-# start with dat
-tmp = dat
+# tmp = dat
+# genes = msig_go_bp[[3101]]
+# col_ix = which(colnames(tmp[[1]]$res) %in% genes)
+# c_cells = rownames(tmp[[1]]$res)[c(205,199,217,211)]
+# t_cells = c("S001S7_inflammatory macrophage","S001MJ_inflammatory macrophage","S0022I_inflammatory macrophage")
+# c_ix = match(c_cells, rownames(dat[[1]]$res))
+# t_ix = match(t_cells, rownames(dat[[1]]$res))
+# for(j in 1:length(tmp)) { # each data type
+#   tmp[[j]]$res = tmp[[j]]$res[c(c_ix,t_ix),col_ix,drop=FALSE]
+# }
+# 
+# c_ix = match(c_cells, rownames(tmp[[1]]$res))
+# t_ix = match(t_cells, rownames(tmp[[1]]$res))
+# comp_ix = list(c_ix, t_ix)
 
-# select genes and cells
-genes = msig_go_bp[[3101]]
-col_ix = which(colnames(tmp[[1]]$res) %in% genes)
-
-c_cells = rownames(tmp[[1]]$res)[c(205,199,217,211)]
-t_cells = c("S001S7_inflammatory macrophage","S001MJ_inflammatory macrophage","S0022I_inflammatory macrophage")
-c_ix = match(c_cells, rownames(dat[[1]]$res))
-t_ix = match(t_cells, rownames(dat[[1]]$res))
-
-for(j in 1:length(tmp)) { # each data type
-  tmp[[j]]$res = tmp[[j]]$res[c(c_ix,t_ix),col_ix,drop=FALSE]
-}
-
-c_ix = match(c_cells, rownames(tmp[[1]]$res))
-t_ix = match(t_cells, rownames(tmp[[1]]$res))
-comp_ix = list(c_ix, t_ix)
-
-dist_mat <- function(tmp, comp_ix, labels, plot_labels="", my_title="", font_size=15, label_size=4, get_p_values=FALSE) {
+dist_mat <- function(tmp, comp_ix, labels, my_title="", font_size=15, label_size=4, label_points=TRUE, get_p_values=FALSE) {
   
   tmp_copy = tmp
   
   if(length(comp_ix[[2]])>1) { # get the mean of the target cells
     for(i in 1:length(tmp_copy)) {
       tmp_copy[[i]]$res = rbind(tmp_copy[[i]]$res, apply(tmp_copy[[i]]$res[comp_ix[[2]],], 2, mean, na.rm=TRUE))
+    }
+  } else {
+    for(i in 1:length(tmp_copy)) {
+      tmp_copy[[i]]$res = rbind(tmp_copy[[i]]$res, tmp_copy[[i]]$res[comp_ix[[2]],])
     }
   }
   
@@ -48,8 +47,10 @@ dist_mat <- function(tmp, comp_ix, labels, plot_labels="", my_title="", font_siz
     colnames(y) = rownames(x)
     rownames(y) = rownames(x)
     
-    x = cor(t(x[complete_ix,]), use="pairwise.complete.obs")
-    y[complete_ix,complete_ix] = x
+    if(!is_empty(complete_ix)) {
+      x = cor(t(x[complete_ix,]), use="pairwise.complete.obs")
+      y[complete_ix,complete_ix] = x
+    }
     
     return(y)
     
@@ -62,7 +63,11 @@ dist_mat <- function(tmp, comp_ix, labels, plot_labels="", my_title="", font_siz
   res_melt = melt(t(res))
   names(res_melt) = c("Cell", "Assay", "Distance")
   
-  p_1 = ggplot(res_melt, aes(x=Assay, y=Distance, color=Assay)) + theme_thesis(font_size) + geom_jitter(width=0.1, height=0, shape=17) + geom_text_repel(aes(label=Cell), fontface="bold", size=label_size, force=0.5) + ggtitle(my_title) + theme(axis.text.x=element_text(angle=45, hjust=1))
+  if(label_points) {
+    p_1 = ggplot(res_melt, aes(x=Assay, y=Distance, color=Assay)) + theme_thesis(font_size) + geom_jitter(width=0.1, height=0, shape=17) + geom_text_repel(aes(label=Cell), fontface="bold", size=label_size, force=0.5) + ggtitle(my_title) + theme(axis.text.x=element_text(angle=45, hjust=1))
+  } else {
+    p_1 = ggplot(res_melt, aes(x=Assay, y=Distance, color=Assay)) + theme_thesis(font_size) + geom_jitter(width=0.1, height=0, shape=17) + ggtitle(my_title) + theme(axis.text.x=element_text(angle=45, hjust=1))
+  }
   
   y_all = data.frame()
   for(j in 1:length(tmp)) {
@@ -76,12 +81,13 @@ dist_mat <- function(tmp, comp_ix, labels, plot_labels="", my_title="", font_siz
   }
   y_all = tbl_df(y_all)
   
-  p_2 = ggplot(y_all, aes(x=Gene, y=Score)) + geom_bar(aes(fill=`Cell Line`), position="dodge", stat="identity") + theme_thesis(10) + theme(axis.text.x=element_text(angle=45, hjust=1)) + facet_wrap(~Assay, nrow=1, scales="free")
+  p_2 = ggplot(y_all, aes(x=Gene, y=Score)) + geom_bar(aes(fill=`Cell Line`), position="dodge", stat="identity") + theme_thesis(10) + theme(axis.text.x=element_text(angle=45, hjust=1)) + facet_wrap(~Assay, nrow=2, scales="free")
   
   p_3 = ggplot(y_all, aes(x=`Cell Line`, y=log(Score+1))) + geom_boxplot() + theme_thesis(10) + facet_wrap(~Assay, nrow=2, scales="free") + theme(axis.text.x=element_text(angle=45, hjust=1))
   
   p_4 = ggplot(y_all, aes(x=`Cell Line`, y=Score)) + geom_point() + geom_line(aes(group=Gene)) + theme_thesis(10) + facet_wrap(~Assay, nrow=2, scales="free")
   
+  return(list(plots=list(p_1,p_2,p_3,p_4), stats=list(corr=res, mean=y_all)))
   
 }
 
