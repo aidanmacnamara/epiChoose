@@ -74,7 +74,7 @@ dist_mat <- function(tmp, comp_ix, labels, my_title="", font_size=15, label_size
     x = tmp[[j]]$res
     if(all(is.na(x))) next
     y = melt(as.matrix(x))
-    y = cbind(y, names(end_data[j]))
+    y = cbind(y, names(tmp[j]))
     names(y) = c("Cell Line", "Gene", "Score", "Assay")
     # if(length(which((filter(y, !is.na(Score)) %>% dplyr::select(Gene) %>% table()) == length(unique(y$`Cell Line`)))) < 2) next # if there are < 2 genes with observations from all cell lines, skip ...
     y_all = rbind(y_all, y)
