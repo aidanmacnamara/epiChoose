@@ -57,16 +57,34 @@ dist_mat <- function(tmp, comp_ix, labels, my_title="", font_size=15, label_size
   }
   
   all_dists = lapply(tmp_copy, get_dists)
-  
   res = do.call("rbind", lapply(all_dists, function(x) 1-x[comp_ix[[1]], comp_target]))
-  
   res_melt = melt(t(res))
   names(res_melt) = c("Cell", "Assay", "Distance")
   
+  
+  get_corr_p <- function(x) {
+    x = x$res
+    y = rep(NA, length(comp_ix[[1]]))
+    if(all(is.na(x[comp_target,]))) {
+      return(y)
+    } else {
+      for(i in 1:length(y)) {
+        y[i] = cor.test(x[comp_ix[[1]][i],], x[comp_target,])$p.value
+      }
+      return(y)
+    }
+  }
+  
+  if(get_p_values) {
+    corr_p = data.frame(do.call("rbind", lapply(tmp_copy, get_corr_p)))
+    names(corr_p) = rownames(tmp[[1]]$res)[comp_ix[[1]]]
+  }
+  
+  
   if(label_points) {
-    p_1 = ggplot(res_melt, aes(x=Assay, y=Distance, color=Assay)) + theme_thesis(font_size) + geom_jitter(width=0.1, height=0, shape=17) + geom_text_repel(aes(label=Cell), fontface="bold", size=label_size, force=0.5) + ggtitle(my_title) + theme(axis.text.x=element_text(angle=45, hjust=1))
+    p_1 = ggplot(res_melt, aes(x=Assay, y=Distance, color=Assay)) + theme_thesis(font_size) + geom_jitter(width=0.1, height=0, shape=17) + geom_text_repel(aes(label=Cell), fontface="bold", size=label_size, force=0.5) + ggtitle(my_title)
   } else {
-    p_1 = ggplot(res_melt, aes(x=Assay, y=Distance, color=Assay)) + theme_thesis(font_size) + geom_jitter(width=0.1, height=0, shape=17) + ggtitle(my_title) + theme(axis.text.x=element_text(angle=45, hjust=1))
+    p_1 = ggplot(res_melt, aes(x=Assay, y=Distance, color=Assay)) + theme_thesis(font_size) + geom_jitter(width=0.1, height=0, shape=17) + ggtitle(my_title)
   }
   
   y_all = data.frame()
@@ -81,13 +99,17 @@ dist_mat <- function(tmp, comp_ix, labels, my_title="", font_size=15, label_size
   }
   y_all = tbl_df(y_all)
   
-  p_2 = ggplot(y_all, aes(x=Gene, y=Score)) + geom_bar(aes(fill=`Cell Line`), position="dodge", stat="identity") + theme_thesis(10) + theme(axis.text.x=element_text(angle=45, hjust=1)) + facet_wrap(~Assay, nrow=2, scales="free")
+  p_2 = ggplot(y_all, aes(x=Gene, y=Score)) + geom_bar(aes(fill=`Cell Line`), position="dodge", stat="identity") + facet_wrap(~Assay, nrow=2, scales="free")
   
-  p_3 = ggplot(y_all, aes(x=`Cell Line`, y=log(Score+1))) + geom_boxplot() + theme_thesis(10) + facet_wrap(~Assay, nrow=2, scales="free") + theme(axis.text.x=element_text(angle=45, hjust=1))
+  p_3 = ggplot(y_all, aes(x=`Cell Line`, y=log(Score+1))) + geom_boxplot() + facet_wrap(~Assay, nrow=2, scales="free")
   
-  p_4 = ggplot(y_all, aes(x=`Cell Line`, y=Score)) + geom_point() + geom_line(aes(group=Gene)) + theme_thesis(10) + facet_wrap(~Assay, nrow=2, scales="free")
+  p_4 = ggplot(y_all, aes(x=`Cell Line`, y=Score)) + geom_point() + geom_line(aes(group=Gene)) + facet_wrap(~Assay, nrow=2, scales="free")
   
-  return(list(plots=list(p_1,p_2,p_3,p_4), stats=list(corr=res, mean=y_all)))
+  if(get_p_values) {
+    return(list(plots=list(p_1,p_2,p_3,p_4), stats=list(corr=res, mean=y_all, corr_p=corr_p)))
+  } else {
+    return(list(plots=list(p_1,p_2,p_3,p_4), stats=list(corr=res, mean=y_all, corr_p=NA)))
+  }
   
 }
 
