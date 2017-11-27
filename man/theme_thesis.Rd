@@ -4,7 +4,7 @@
 \alias{theme_thesis}
 \title{Plotting parameters}
 \usage{
-theme_thesis(base_size = 30)
+theme_thesis(base_size = 30, angle_45 = TRUE)
 }
 \value{
 TO ADD

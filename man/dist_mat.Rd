@@ -4,15 +4,16 @@
 \alias{dist_mat}
 \title{Computes the final distance matrix for comparisons of choice}
 \usage{
-dist_mat(x, comp_ix, labels, plot_labels = "", plot_res = TRUE,
-  my_title = "", use_corr = FALSE, font_size = 15, label_size = 4,
-  plot_blank = FALSE)
+dist_mat(tmp, comp_ix, labels, my_title = "", font_size = 15,
+  label_size = 4, label_points = TRUE, get_p_values = FALSE)
 }
 \arguments{
 \item{comp_ix}{A list of length 2 giving the 1. target(s) and 2. the candidate(s)}
+
+\item{x}{The original data object, sliced and filtered as necessary}
 }
 \value{
-TO ADD
+A list containing the ggplot objects and statistics
 }
 \description{
 TO ADD
