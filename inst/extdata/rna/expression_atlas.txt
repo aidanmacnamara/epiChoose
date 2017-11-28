@@ -1,0 +1,24 @@
+Project 1:
+
+	- http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-4101/
+	- http://www.ebi.ac.uk/gxa/experiments/E-MTAB-4101?ref=aebrowse
+	
+Project 2:
+
+	- http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-5191/
+	- No Expression Atlas (TODO: add baseline?)
+
+Project 3:
+
+	- https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-4729/
+	- https://www.ebi.ac.uk/gxa/experiments/E-MTAB-4729?ref=aebrowse
+	
+Blueprint (rRNA-depleted total RNA):
+
+	- http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-3827/
+	- http://www.ebi.ac.uk/gxa/experiments/E-MTAB-3827?ref=aebrowse
+	
+Blueprint (polyA mRNA):
+
+	- http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-3819/
+	- http://www.ebi.ac.uk/gxa/experiments/E-MTAB-3819?ref=aebrowse
