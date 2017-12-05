@@ -46,11 +46,11 @@ lung_go = tbl_df(lung_go)
 load("z:/sandbox/epiChoose/r_data/column_annotation/gene_list_all.RData")
 
 # pick out the lung and blood samples
-sample_ix = c(179:182,193:195,222,251)
+sample_ix = c(179:182,196,202,187,193:195,222,251)
 
 # sample labels
 single_labels = rownames(start_data[[1]]$res)[sample_ix]
-group_labels = c(rep("GSK",8), rep("ENCODE",2))
+group_labels = c(rep("GSK",10), rep("ENCODE",2))
 
 diff_test <- function(dat, parametric=TRUE, log_s=FALSE) {
   
@@ -94,7 +94,7 @@ for(i in 1:length(go_list)) {
     end_data[[j]]$res = end_data[[j]]$res[sample_ix,col_ix]
   }
   
-  res = dist_mat(end_data, comp_ix=list(c(1:4,8:9), c(5:7)), labels=single_labels)
+  res = dist_mat(end_data, comp_ix=list(c(1:7,11:12), c(8:10)), labels=single_labels)
   
   comp_ix = c(1,3,15)
   y_all = data.frame()
@@ -141,6 +141,10 @@ all_res$LFC = apply(all_res, 1, calc_fc, all_res_means)
 
 # check significant rna + h3k27ac results with a bonferroni cut-off
 View(filter(all_res, Assay=="RNA" | Assay=="H3K27ac", p.value<0.05) %>% arrange(p.value))
+
+
+# GLOBAL ------------------------------------------------------------------
+
 
 
 # DISTANCE BY REGULATORY TYPE ---------------------------------------------
