@@ -4,7 +4,8 @@
 \alias{prep_rna}
 \title{Prepares RNA data so it is the same shape and format as the ChIP data}
 \usage{
-prep_rna(fpkm_table, gene_list, chip_labels, rna_labels, quantile_norm = TRUE)
+prep_rna(fpkm_table, gene_list, chip_labels, rna_labels, quantile_norm = TRUE,
+  col_skip = 2)
 }
 \value{
 TO ADD

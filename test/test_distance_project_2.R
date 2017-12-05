@@ -1,7 +1,8 @@
 # start off with mask_data
 
-load("mask_data_no_bp_with_atac.RData")
-marks = names(mask_data) # what marks to select
+load("data/dat.RData")
+load("data/column_annotation/gene_list_all.RData")
+marks = names(dat) # what marks to select
 
 
 # GET RNA DATA ------------------------------------------------------------
@@ -34,12 +35,15 @@ names(r_df) = str_replace(names(r_df), "Baseline\\+LPS", "LPS")
 
 # SUMMARISE ENSEMBL REG ---------------------------------------------------
 
-start_data = mask_data
+start_data = dat
 
 # sample labels
-sample_ix = c(18:29,66) # project 2 data
-single_labels = rownames(start_data[[1]]$res)[sample_ix]
-group_labels = c(rep("GSK",12), rep("ENCODE",1))
+single_labels = rownames(start_data[[1]]$res)
+# sample_ix = c(grep("monocyte", single_labels, ignore.case=TRUE), grep("macrophage", single_labels, ignore.case=TRUE), 196:219) # project 2 data + relevant monocyte/macrophage data
+sample_ix = grep("THP-1.*PMA", single_labels)
+single_labels = single_labels[sample_ix]
+# group_labels = c(rep("Blueprint",33), rep("ENCODE",24))
+# group_labels[12] = "ENCODE"
 
 # slice matrices
 for(i in 1:length(start_data)) {
@@ -47,12 +51,7 @@ for(i in 1:length(start_data)) {
   start_data[[i]]$annot = start_data[[i]]$annot[sample_ix,]
 }
 
-# shrink regulatory matrices to gene matrices
-for(i in 1:length(start_data[1:5])) {
-  start_data[[i]]$res = convert_reg_matrix(start_data[[i]]$res, roi, gene_list_all, reg_window=2000, summ_method="max")
-}
-
-rna_add = prep_rna(r_df[,c(1:2,15:26)], gene_list_all$hgnc_symbol, single_labels, names(r_df)[15:26])
+rna_add = prep_rna(r_df, gene_list_all$hgnc_symbol, single_labels, names(r_df)[3:26])
 
 start_data[[6]] = rna_add
 names(start_data)[6] = "RNA"
@@ -60,37 +59,51 @@ names(start_data)[6] = "RNA"
 
 # ALL DATA SUMMARY --------------------------------------------------------
 
-pca_data = prep_for_plot(start_data, annot_1=group_labels, annot_2=single_labels, marks=names(start_data), plot_type="mds")
+df_1 = tbl_df(data.frame(Gene=colnames(start_data[[1]]$res), do.call("cbind", lapply(start_data[c(1:3,6)], function(x) t(x$res)))))
+df_rep_1 = dplyr::select(df_1, Gene, contains("BR1")) %>% mutate(Rep=1)
+df_rep_2 = dplyr::select(df_1, Gene, contains("BR2")) %>% mutate(Rep=2)
 
-png(filename="plots/overall_mds.png", height=2400, width=4000)
-print(ggplot(pca_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + theme_thesis(60) + geom_text_repel(aes(label=annot_2), fontface="bold", size=10, force=0.5) + facet_wrap(~mark, nrow=2, scales="free"))
-dev.off()
+names(df_rep_1) = str_replace_all(names(df_rep_1), "_BR[12]", "")
+names(df_rep_2) = str_replace_all(names(df_rep_2), "_BR[12]", "")
 
-
-# EXPORT TO SPOTFIRE ------------------------------------------------------
-
-df_1 = data.frame(Gene=colnames(start_data[[1]]$res), do.call("cbind", lapply(start_data[c(1:3,6)], function(x) t(x$res))))
+df_1 = tbl_df(rbind(df_rep_1, df_rep_2))
 
 names(df_1) = str_replace(names(df_1), "\\.1$", "_H3K4me3")
 names(df_1) = str_replace(names(df_1), "\\.2$", "_H3K27me3")
 names(df_1) = str_replace(names(df_1), "\\.3$", "_RNA")
 
-df_1[,-1] = log(df_1[,-1]+1)
-write_csv(df_1, "df_1.csv")
+df_1[,-c(1, dim(df_1)[2])] = log(df_1[,-c(1, dim(df_1)[2])]+1)
 
 
 # LPS GENE SET ------------------------------------------------------------
 
-load("shiny/msig_go_bp.RData")
-m_up = read_tsv("GSE3982_CTRL_VS_LPS_4H_MAC_UP.txt", skip=2, col_names=FALSE)
-m_down = read_tsv("GSE3982_CTRL_VS_LPS_4H_MAC_DN.txt", skip=2, col_names=FALSE)
+load("../epiView/data/msig_go_bp.RData")
+m_up = read_tsv("c:/Downloads/tmp/otar_020_tmp/GSE3982_CTRL_VS_LPS_4H_MAC_UP.txt", skip=2, col_names=FALSE)
+m_down = read_tsv("c:/Downloads/tmp/otar_020_tmp/GSE3982_CTRL_VS_LPS_4H_MAC_DN.txt", skip=2, col_names=FALSE)
 
-gene_ix = which(df_1$Gene %in% unlist(msig_go_bp[grep("LIPOPOLYSACCHARIDE", names(msig_go_bp))]))
-gene_ix = which(df_1$Gene %in% unlist(m_down$X1))
+gene_ix = which(df_1$Gene %in% unique(c(m_up$X1, m_down$X1, unlist(msig_go_bp[grep("LIPOPOLYSACCHARIDE", names(msig_go_bp))]))))
+# gene_ix = which(df_1$Gene %in% unlist(m_down$X1))
 
 df_1_filtered = df_1[gene_ix,]
 
-ggplot(df_1_filtered, aes(THP.1_BR1_PMA_RNA, THP.1_BR1_PMA.LPS_RNA)) + geom_point() + theme_thesis(20) + geom_abline(slope=1) # + geom_text_repel(aes(label=Gene), fontface="bold", force=0.5)
+ggplot(df_1_filtered, aes(x=THP.1_PMA_RNA, y=THP.1_PMA.LPS_RNA, color=factor(Rep))) + geom_point() + theme_thesis(20) + geom_abline(slope=1) # + geom_text_repel(aes(label=Gene), fontface="bold", force=0.5)
+
+# is there any difference in pma signature between up/non-regulated genes?
+
+df_1_filtered$rna_diff = ifelse(df_1_filtered$THP.1_PMA.LPS > df_1_filtered$THP.1_PMA, "Yes", "No")
+ggplot(df_1_filtered, aes(x=rna_diff, y=THP.1_PMA)) + geom_boxplot() + theme_thesis(20)
+
+
+# COMBINATIONS ------------------------------------------------------------
+
+ggplot(df_1_filtered, aes(x=THP.1_PMA_H3K27me3/THP.1_PMA, y=THP.1_PMA.LPS_RNA/THP.1_PMA_RNA), color=Rep) + geom_point(na.rm =TRUE) + theme_thesis(20) + xlab("PMA Epigenetics") + ylab("Expression Change") # + geom_text_repel(aes(label=label), fontface="bold", force=0.5) + scale_x_continuous(limits=c(0.5,1.25))
+
+ggplot(df_1_filtered, aes(x=THP.1_PMA_H3K4me3/THP.1_PMA_H3K27me3, y=THP.1_PMA.LPS_RNA/THP.1_PMA_RNA), color=Rep) + geom_point(na.rm =TRUE) + theme_thesis(20) + xlab("PMA Epigenetics") + ylab("Expression Change") # + geom_text_repel(aes(label=label), fontface="bold", force=0.5) + scale_x_continuous(limits=c(0.5,1.25))
+
+ggplot(df_1_filtered, aes(x=THP.1_PMA_H3K27me3, y=THP.1_PMA.LPS_RNA/THP.1_PMA_RNA), color=Rep) + geom_point(na.rm =TRUE) + theme_thesis(20) + xlab("PMA Epigenetics") + ylab("Expression Change") # + geom_text_repel(aes(label=label), fontface="bold", force=0.5) + scale_x_continuous(limits=c(0.5,1.25))
+
+
+
 
 df_1_filtered$label = df_1_filtered$Gene
 df_1_filtered$label[df_1_filtered$THP.1_BR1_PMA_H3K27me3/df_1_filtered$THP.1_BR1_PMA < 0.85] = ""

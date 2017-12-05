@@ -1,3 +1,5 @@
+# example showing the difference between mean and correlation
+
 x = data.frame(
   s1=rnorm(20,0,1),
   s2=rnorm(20,0,1)
