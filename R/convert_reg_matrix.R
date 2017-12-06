@@ -6,15 +6,26 @@
 #' @return TO ADD
 #' @export
 
-convert_reg_matrix <- function(dat, roi, gene_list, reg_window=0, summ_method=c("mean","max","sum")) {
+convert_reg_matrix <- function(dat, roi, gene_list, reg_window=0, summ_method=c("mean","max","sum","window","tss"), tss_window=2e3) {
   
   summ_method = match.arg(summ_method)
   
-  start(gene_list) = start(gene_list) - reg_window
-  end(gene_list) = end(gene_list) + reg_window
+  if(summ_method=="tss") {
+    
+    start(gene_list) = gene_list$transcription_start_site - tss_window
+    end(gene_list) = gene_list$transcription_start_site + tss_window
+    
+  } else { # summarise across gene body
+    
+    start(gene_list) = start(gene_list) - reg_window
+    end(gene_list) = end(gene_list) + reg_window
+    
+  }
   
   my_ol = findOverlaps(gene_list, roi)
+  
   dat_out = matrix(NA, nrow=dim(dat)[1], ncol=length(gene_list))
+  
   if(!is.null(gene_list$hgnc_symbol)) {
     colnames(dat_out) = gene_list$hgnc_symbol
   } else {
@@ -26,11 +37,11 @@ convert_reg_matrix <- function(dat, roi, gene_list, reg_window=0, summ_method=c(
     if(summ_method=="mean") {
       dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, mean, na.rm=TRUE)
     }
-    if(summ_method=="max") {
+    if(summ_method=="max"|summ_method=="tss") {
       dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, max, na.rm=TRUE)
     }
     if(summ_method=="sum") {
-      dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, sum, na.rm=TRUE)
+      dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, function(x) {sum(x, na.rm=TRUE) / sum(width(roi[subjectHits(my_ol)[queryHits(my_ol)==i]]))})
     }
   }
   

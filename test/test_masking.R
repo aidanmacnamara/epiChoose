@@ -12,14 +12,14 @@ load_all()
 # ROI ---------------------------------------------------------------------
 
 # look across all regulatory regions
-load("r_data/column_annotation/roi_ensembl_multicell.RData")
-load("r_data/column_annotation/gene_list_all.RData")
+load("data/column_annotation/roi_ensembl_multicell.RData")
+load("data/column_annotation/gene_list_all.RData")
 marks = c("H3K27ac","H3K4me3","H3K27me3","ATAC","CTCF")
 
 
 # BLUEPRINT DATA ----------------------------------------------------------
 
-blueprint_input = "data/data_blueprint_parsed.csv"
+blueprint_input = "inst/extdata/data_blueprint_parsed.csv"
 
 require(BiocParallel)
 # blueprint_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(blueprint_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
@@ -44,14 +44,14 @@ for(i in 1:length(blueprint_chip_filtered)) {
 
 # GSK DATA ----------------------------------------------------------------
 
-gsk_input = "data/data_gsk.csv"
+gsk_input = "inst/extdata/data_gsk.csv"
 gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=5))
 gsk_chip_filtered = prep_across_datatypes(gsk_chip)
 
 
 # ENCODE DATA -------------------------------------------------------------
 
-encode_input = "data/data_encode.csv"
+encode_input = "inst/extdata/data_encode.csv"
 encode_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(encode_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
 encode_chip_filtered = prep_across_datatypes(encode_chip)
 
@@ -69,20 +69,10 @@ for(i in 1:length(mask_data)) {
 names(mask_data) = marks
 
 
-# SHRINK TO GENES ---------------------------------------------------------
+# GET LABELS --------------------------------------------------------------
 
-start_data = mask_data
-
-for(i in 1:length(start_data[1:5])) {
-  
-  print(paste("Processing data type", names(start_data)[i]))
-  start_data[[i]]$res = convert_reg_matrix(start_data[[i]]$res, roi, gene_list_all, reg_window=2000, summ_method="max")
-  
-}
-
-single_labels = rownames(start_data[[1]]$res)
+single_labels = rownames(mask_data[[1]]$res)
 group_labels = c(rep("BLUEPRINT",178), rep("GSK",43), rep("ENCODE",31))
-
 
 # ADD RNA -----------------------------------------------------------------
 
@@ -128,9 +118,22 @@ names(rna) = str_replace(names(rna), "P1", "P-1")
 
 rna_add = prep_rna(rna, gene_list_all$hgnc_symbol, single_labels, names(rna)[-c(1,2)])
 
-start_data[[6]] = rna_add
-names(start_data)[6] = "RNA"
-start_data[[1]]$annot$Project[which(group_labels=="BLUEPRINT")] = "BLUEPRINT"
-start_data[[1]]$annot$Project[which(group_labels=="ENCODE")] = "ENCODE"
 
+# EDIT NAMES --------------------------------------------------------------
+
+mask_data[[1]]$annot$Project[which(group_labels=="BLUEPRINT")] = "BLUEPRINT"
+mask_data[[1]]$annot$Project[which(group_labels=="ENCODE")] = "ENCODE"
+
+mask_data[[6]] = rna_add
+names(mask_data)[6] = "RNA"
+
+
+# REG TO GENE COLLAPSES ---------------------------------------------------
+
+dat_max = mask_data # max across gene body
+
+for(i in 1:length(dat_max[1:5])) {
+  print(paste("Processing data type", names(dat_max)[i]))
+  dat_max[[i]]$res = convert_reg_matrix(dat_max[[i]]$res, roi, gene_list_all, reg_window=2e3, summ_method="max")
+}
 
