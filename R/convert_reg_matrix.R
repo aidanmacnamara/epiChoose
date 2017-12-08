@@ -6,7 +6,7 @@
 #' @return TO ADD
 #' @export
 
-convert_reg_matrix <- function(dat, roi, gene_list, reg_window=0, summ_method=c("mean","max","sum","window","tss"), tss_window=2e3) {
+convert_reg_matrix <- function(dat, roi, gene_list, summ_method=c("mean","max","sum","window","tss"), tss_window=2e3, reg_window=2e3) {
   
   summ_method = match.arg(summ_method)
   
