@@ -91,7 +91,7 @@ for(i in 1:length(blueprint_chip_filtered)) {
 
 # GSK DATA ----------------------------------------------------------------
 
-gsk_input = "inst/extdata/data_gsk.csv"
+gsk_input = "inst/extdata/data_gsk.xslx"
 gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi, marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=5))
 gsk_chip_filtered = prep_across_datatypes(gsk_chip)
 

@@ -2,7 +2,7 @@
 #' @description This function takes as input a .csv file with fields: Label, Mark, Bigwig
 #' @description This is a new line ...
 #' @details What's this?
-#' @param input_data The metadata for each sample. A .csv file that contains 'Label', 'Mark', and 'Bigwig' fields.
+#' @param input_data The metadata for each sample. A .csv/.xslx file that contains 'Label', 'Mark', and 'Bigwig' fields.
 #' @param root TO ADD
 #' @param roi Region of interest, a sorted Granges object that specifies the genomic regions to calculate AUC. It also need 'gene' in the metadata
 #' @param mark Which mark in \code{input_data} to use
@@ -13,8 +13,15 @@ make_auc_matrix <- function(input_data, roi, mark, tmp_dir, quantile_norm=TRUE) 
   require(stringr)
   require(readr)
   require(limma)
+  require(readxl)
   
+  if(grepl("\\.csv$", input_data)) {
   dat = readr::read_csv(input_data)
+  }
+  if(grepl("\\.xslx$", input_data)) {
+    dat = read_excel(input_data)
+  }
+  
   dat = dplyr::filter(dat, Mark==mark)
   
   res_matrix = matrix(NA, nrow=dim(dat)[1], ncol=length(roi))

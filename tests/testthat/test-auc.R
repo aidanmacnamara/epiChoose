@@ -2,31 +2,32 @@ context("AUC per region")
 
 # pick an example gene
 g = "SAMD11"
+win = 2e3
 
-# pick example
-s_names = c("A549_BR1_Baseline","A549_BR2_Baseline")
-s_bigwigs = 
+# get regulatory regions
+data("roi_reg.RData", package="epiChoose")
+data("gene_list_all", package="epiChoose")
+load("data/dat.RData") # data("dat", package="epiChoose")
+data_gsk = read_excel(system.file("extdata", "data_gsk.xlsx", package="epiChoose"))
+
+# generate data for test
+# s_name = c("A549_BR1_Baseline")
+# s_bigwig = filter(data_gsk, Label==s_name, Mark=="H3K27ac") %>% dplyr::select(Bigwig) %>% unlist()
+# g_loc = gene_list_all[gene_list_all$hgnc_symbol==g]
+# start(g_loc) = start(g_loc) - win
+# end(g_loc) = end(g_loc) + win
+# roi_test = roi_reg[subjectHits(findOverlaps(g_loc, roi_reg))]
+# roi_test = as.data.frame(roi_test)[,1:3]
+# roi_test = arrange(roi_test, seqnames, start, end)
+# write_tsv(roi_test, "inst/extdata/roi_test.bed", col_names=FALSE)
+# cmd = paste0("WiggleTools/wiggletools apply AUC inst/extdata/roi_test.bed ", s_bigwig, " > inst/extdata/roi_test.out")
+
+res_test = read_tsv(system.file("extdata", "roi_test.out", package="epiChoose"), col_names=FALSE)
+
+test_that("make_auc_matrix.R is returning the correct summary gene metrics (max):",
+          {
+            expect_equal(dat$H3K27ac$res[which(rownames(dat$H3K27ac$res)==s_name), which(colnames(dat$H3K27ac$res)==g)], max(res_test$X4))
+          }
+)
 
 
-l = "C004GD_mature neutrophil"
-coords = "chr1  1012923 1013923"
-cmd = "WiggleTools/wiggletools apply AUC test.bed ~/links/CB.HTS.Analysis/CTTV020/data/BLUEPRINT/C004GDH1.ERX207032.H3K27ac.bwa.GRCh38.20150528.bw"
-
-test_chip = make_auc_matrix("data/data_blueprint_parsed_test.csv", roi, "H3K27ac", "tmp/", quantile_norm=FALSE)
-
-blueprint_chip[[1]]$res[which(blueprint_chip[[1]]$annot$Label==l), which(roi$gene==g)]
-blueprint_chip_cut[[1]]$res[which(blueprint_chip_cut[[1]]$annot$Label==l), which(roi$gene==g)]
-blueprint_chip_cut_final[[1]]$res[which(blueprint_chip_cut_final[[1]]$annot$Label==l), which(roi$gene==g)]
-
-i = which(paste(dat$donor, dat$cell_type, sep="_")==l)
-y = dat$data[i]
-filter(y[[1]], gene==g) %>% dplyr::select(chip_k27ac) %>% exp()
-
-# chip data looks good, so mapping from res_1 to res_2 should be tight...
-# start from all_dat
-old_dat = group_by(all_dat, donor, cell_type, group) %>% nest() # group by donor / cell type
-j = which(paste(old_dat$donor, old_dat$cell_type, sep="_")==l)
-old_dat_1 = old_dat$data[[j]] # pick first donor / cell type
-x1 = arrange(old_dat_1, gene)
-y1 = arrange(y[[1]], gene)
-plot(x1$chip_k27ac, y1$chip_k27ac)
