@@ -42,17 +42,17 @@ save(gene_list_all, file="data/gene_list_all.RData")
 mart = useMart("ENSEMBL_MART_FUNCGEN", dataset="hsapiens_regulatory_feature")
 roi_reg = getBM(attributes=c("chromosome_name","chromosome_start","chromosome_end","feature_type_name"), filters=list(chromosome_name=c(as.character(1:22), "X", "Y")), mart=mart)
 roi_reg$chromosome_name = paste("chr", roi_reg$chromosome_name, sep="")
+roi_reg = arrange(roi_reg, chromosome_name, chromosome_start, chromosome_end)
 
 roi_reg = makeGRangesFromDataFrame(roi_reg, keep.extra.columns=TRUE, start.field="chromosome_start", end.field="chromosome_end", seqnames.field="chromosome_name")
-roi_reg = sort(roi_reg)
 save(roi_reg, file="data/roi_reg.RData")
 
 mart = useMart("ENSEMBL_MART_FUNCGEN", dataset="hsapiens_external_feature")
 roi_reg_other = getBM(attributes=c("chromosome_name","chromosome_start","chromosome_end","feature_type","feature_type_class"), filters=list(chromosome_name=c(as.character(1:22), "X", "Y")), mart=mart)
 roi_reg_other$chromosome_name = paste("chr", roi_reg_other$chromosome_name, sep="")
+roi_reg_other = arrange(roi_reg_other, chromosome_name, chromosome_start, chromosome_end)
 
 roi_reg_other = makeGRangesFromDataFrame(roi_reg_other, keep.extra.columns=TRUE, start.field="chromosome_start", end.field="chromosome_end", seqnames.field="chromosome_name")
-roi_reg_other = sort(roi_reg_other)
 save(roi_reg_other, file="data/roi_reg_other.RData")
 
 
