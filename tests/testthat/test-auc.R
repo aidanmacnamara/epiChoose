@@ -1,9 +1,9 @@
 context("AUC per region")
 
-
-# test bed?
-
+# pick an example gene
 g = "SAMD11"
+
+# pick example
 s_names = c("A549_BR1_Baseline","A549_BR2_Baseline")
 s_bigwigs = 
 

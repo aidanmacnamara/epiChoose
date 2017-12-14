@@ -16,24 +16,18 @@ mart = useMart("ensembl", dataset="hsapiens_gene_ensembl")
 # genes
 gene_list_all = getBM(attributes=c("ensembl_gene_id","hgnc_symbol","chromosome_name","start_position","end_position","strand","transcription_start_site"), mart=mart, filters=list(chromosome_name=c(as.character(1:22), "X", "Y"), with_protein_id=TRUE))
 
-# pick out 1 tss per gene
-pick_tss <- function(x, p_window=100) {
-  
+# pick out 1 tss per gene (min position)
+pick_tss <- function(x) {
   if(x$strand[1]==1) {
-    promoter_end = min(x$transcription_start_site) + p_window
-    promoter_start = min(x$transcription_start_site) - p_window
-  } else if (x$strand[1]==-1) {
-    promoter_start = max(x$transcription_start_site) - p_window
-    promoter_end = max(x$transcription_start_site) + p_window
-  } else {
-    promoter_start = NA
-    promoter_end = NA
+    tss_ix = which.min(x$transcription_start_site)
   }
-  
-  return(data.frame(cbind(x[1,], promoter_start, promoter_end)))
+  if (x$strand[1]==-1) {
+    tss_ix = which.max(x$transcription_start_site)
+  } 
+  return(x[tss_ix,])
 }
 
-gene_list_all = group_by(gene_list_all, hgnc_symbol) %>% do(pick_tss(., 1000))
+gene_list_all = group_by(gene_list_all, hgnc_symbol) %>% do(pick_tss(.))
 gene_list_all$strand[gene_list_all$strand==1] = "+"
 gene_list_all$strand[gene_list_all$strand==-1] = "-"
 gene_list_all = makeGRangesFromDataFrame(gene_list_all, keep.extra.columns=TRUE, start.field="start_position", end.field="end_position")
@@ -42,7 +36,7 @@ names(newNames) = levels(seqnames(gene_list_all))
 gene_list_all = renameSeqlevels(gene_list_all, newNames)
 gene_list_all = gene_list_all[-1] # no hgnc symbol
 gene_list_all = sort(gene_list_all)
-save(gene_list_all, file="data/column_annotation/gene_list_all.RData")
+save(gene_list_all, file="data/gene_list_all.RData")
 
 # regulatory build
 mart = useMart("ENSEMBL_MART_FUNCGEN", dataset="hsapiens_regulatory_feature")
@@ -51,7 +45,7 @@ roi_reg$chromosome_name = paste("chr", roi_reg$chromosome_name, sep="")
 
 roi_reg = makeGRangesFromDataFrame(roi_reg, keep.extra.columns=TRUE, start.field="chromosome_start", end.field="chromosome_end", seqnames.field="chromosome_name")
 roi_reg = sort(roi_reg)
-save(roi_reg, file="data/column_annotation/roi_reg.RData")
+save(roi_reg, file="data/roi_reg.RData")
 
 mart = useMart("ENSEMBL_MART_FUNCGEN", dataset="hsapiens_external_feature")
 roi_reg_other = getBM(attributes=c("chromosome_name","chromosome_start","chromosome_end","feature_type","feature_type_class"), filters=list(chromosome_name=c(as.character(1:22), "X", "Y")), mart=mart)
@@ -59,26 +53,26 @@ roi_reg_other$chromosome_name = paste("chr", roi_reg_other$chromosome_name, sep=
 
 roi_reg_other = makeGRangesFromDataFrame(roi_reg_other, keep.extra.columns=TRUE, start.field="chromosome_start", end.field="chromosome_end", seqnames.field="chromosome_name")
 roi_reg_other = sort(roi_reg_other)
-save(roi_reg_other, file="data/column_annotation/roi_reg_other.RData")
+save(roi_reg_other, file="data/roi_reg_other.RData")
 
 
 # ROI ---------------------------------------------------------------------
 
 # look across all regulatory regions
-load("data/column_annotation/roi_reg.RData")
-load("data/column_annotation/gene_list_all.RData")
+load("data/roi_reg.RData")
+load("data/gene_list_all.RData")
 marks = c("H3K27ac","H3K4me3","H3K27me3","ATAC","CTCF")
 
 
 # BLUEPRINT DATA ----------------------------------------------------------
 
-blueprint_input = "inst/extdata/data_blueprint_parsed.csv"
+blueprint_input = "inst/extdata/blueprint_parsed.csv"
 
 require(BiocParallel)
 # blueprint_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(blueprint_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
 blueprint_chip = vector("list", length=length(marks))
 for(i in 1:length(blueprint_chip)) {
-  blueprint_chip[[i]] = make_auc_matrix(blueprint_input, roi, marks[i], "tmp/", quantile_norm=TRUE)
+  blueprint_chip[[i]] = make_auc_matrix(blueprint_input, roi_reg, marks[i], "tmp/", quantile_norm=TRUE)
 }
 
 # make sure rows are in the same order
