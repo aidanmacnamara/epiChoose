@@ -16,9 +16,9 @@ make_auc_matrix <- function(input_data, roi, mark, tmp_dir, quantile_norm=TRUE) 
   require(readxl)
   
   if(grepl("\\.csv$", input_data)) {
-  dat = readr::read_csv(input_data)
+    dat = readr::read_csv(input_data)
   }
-  if(grepl("\\.xslx$", input_data)) {
+  if(grepl("\\.xlsx$", input_data)) {
     dat = read_excel(input_data)
   }
   
