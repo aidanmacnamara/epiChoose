@@ -3,8 +3,9 @@ context("AUC per region")
 # get regulatory regions
 data("roi_reg.RData", package="epiChoose")
 data("gene_list_all", package="epiChoose")
-data("dat_max_db", package="epiChoose")
+data("dat_max_gb", package="epiChoose")
 data("dat_tss", package="epiChoose")
+data("dat_sum_gb", package="epiChoose")
 data_gsk = read_excel(system.file("extdata", "data_gsk.xlsx", package="epiChoose"))
 
 # generate data for test
@@ -36,6 +37,21 @@ test_that("make_auc_matrix.R is returning the correct summary gene metrics (max)
                 subjectHits(findOverlaps(g_loc, roi_reg))
                 ])
               )
+          }
+)
+
+test_that("make_auc_matrix.R is returning the correct summary gene metrics (sum):",
+          {
+            expect_equal(
+              dat_sum_gb$H3K27ac$res[
+                which(rownames(dat_sum_gb$H3K27ac$res)==s_name),
+                which(colnames(dat_sum_gb$H3K27ac$res)==g)
+                ], 
+              sum(total_data$H3K27ac$res[
+                which(rownames(total_data$H3K27ac$res)==s_name),
+                subjectHits(findOverlaps(g_loc, roi_reg))
+                ])
+            )
           }
 )
 

@@ -184,7 +184,7 @@ for(i in 1:length(dat_tss[1:5])) {
   dat_tss[[i]]$res = convert_reg_matrix(dat_tss[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="tss")
 }
 
-# dat_sum_gb = total_data # normalised sum of aucs across gene body (h3k27me3 relevant)
+dat_sum_gb = total_data # normalised sum of aucs across gene body (h3k27me3 relevant)
 for(i in 1:length(dat_sum_gb[1:5])) {
   print(paste("Processing data type", names(dat_sum_gb)[i]))
   dat_sum_gb[[i]]$res = convert_reg_matrix(dat_sum_gb[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="sum")

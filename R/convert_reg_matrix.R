@@ -41,7 +41,8 @@ convert_reg_matrix <- function(dat, roi, gene_list, summ_method=c("mean","max","
       dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, max, na.rm=TRUE)
     }
     if(summ_method=="sum") {
-      dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, function(x) {sum(x, na.rm=TRUE) / sum(width(roi[subjectHits(my_ol)[queryHits(my_ol)==i]]))})
+      # dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, function(x) {sum(x, na.rm=TRUE) / sum(width(roi[subjectHits(my_ol)[queryHits(my_ol)==i]]))})
+      dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, sum, na.rm=TRUE) 
     }
   }
   
