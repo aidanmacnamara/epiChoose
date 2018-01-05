@@ -4,8 +4,8 @@
 \alias{convert_reg_matrix}
 \title{Shrinks a regulatory data matrix to a gene matrix using the gene list provided}
 \usage{
-convert_reg_matrix(dat, roi, gene_list, reg_window = 0,
-  summ_method = c("mean", "max", "sum"))
+convert_reg_matrix(dat, roi, gene_list, summ_method = c("mean", "max", "sum",
+  "window", "tss"), tss_window = 2000, reg_window = 2000)
 }
 \value{
 TO ADD

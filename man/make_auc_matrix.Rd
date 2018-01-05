@@ -7,7 +7,7 @@
 make_auc_matrix(input_data, roi, mark, tmp_dir, quantile_norm = TRUE)
 }
 \arguments{
-\item{input_data}{The metadata for each sample. A .csv file that contains 'Label', 'Mark', and 'Bigwig' fields.}
+\item{input_data}{The metadata for each sample. A .csv/.xslx file that contains 'Label', 'Mark', and 'Bigwig' fields.}
 
 \item{roi}{Region of interest, a sorted Granges object that specifies the genomic regions to calculate AUC. It also need 'gene' in the metadata}
 

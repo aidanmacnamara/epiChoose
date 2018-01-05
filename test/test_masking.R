@@ -192,4 +192,7 @@ for(i in 1:length(dat_sum_gb[1:5])) {
 
 # dat_max_10_closest = total_data # max from 10 closest peaks (ctcf relevant)
 
+dat_all = list(dat_max_gb, dat_tss, dat_sum_gb, NA)
+names(dat_all) = c("max", "tss", "sum", "closest")
+
 
