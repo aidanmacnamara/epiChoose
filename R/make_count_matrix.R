@@ -7,6 +7,7 @@
 #' @param roi Region of interest, a sorted Granges object that specifies the genomic regions to calculate AUC.
 #' @param mark Which mark in \code{input_data} to use
 #' @return TO ADD
+#' @export
 
 make_count_matrix <- function(input_data, roi, mark, change_seqnames=TRUE) {
   

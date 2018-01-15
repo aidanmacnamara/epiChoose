@@ -6,6 +6,7 @@
 #' @param root TO ADD
 #' @param roi Region of interest, a sorted Granges object that specifies the genomic regions to calculate AUC. It also need 'gene' in the metadata
 #' @param mark Which mark in \code{input_data} to use
+#' @export
 
 make_auc_matrix <- function(input_data, roi, mark, tmp_dir, quantile_norm=TRUE) {
   

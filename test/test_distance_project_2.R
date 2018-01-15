@@ -1,103 +1,22 @@
 # start off with mask_data
 
-load("data/dat.RData")
-load("data/column_annotation/gene_list_all.RData")
-marks = names(dat) # what marks to select
+load("data/roi_reg.RData")
+load("data/total_data.RData")
+load("data/gene_list_all.RData")
 
-
-# GET RNA DATA ------------------------------------------------------------
-
-u937 = list.files("z:/links/bix-analysis-stv/2016/CTTV/U937/data/Outputs/star/bam_files/genecounts/")
-thp1 = list.files("z:/links/bix-analysis-stv/2016/CTTV/THP1/data/genecounts/")
-
-u937_df = lapply(as.list(u937), function(x) read_tsv(paste0("z:/links/bix-analysis-stv/2016/CTTV/U937/data/Outputs/star/bam_files/genecounts/", x), col_names=FALSE))
-thp1_df = lapply(as.list(thp1), function(x) read_tsv(paste0("z:/links/bix-analysis-stv/2016/CTTV/THP1/data/genecounts/", x), col_names=FALSE))
-
-# merge into sample per column
-my_names = u937_df[[1]]$X1
-r_df = data.frame(do.call("cbind", lapply(u937_df, function(x) x$X2)))
-r_df = cbind(NA, my_names, r_df)
-r_df = cbind(r_df, data.frame(do.call("cbind", lapply(thp1_df, function(x) x$X2[match(my_names, x$X1)]))))
-
-# get names
-sample_info = read_csv("z:/links/bix-analysis-stv/2016/CTTV/U937/data/sampleInfo.csv", col_names=FALSE)
-
-all_names = sample_info$X1[c(match(str_extract(u937, "^[[:alnum:]]+"), sample_info$X32), match(str_extract(thp1, "^[[:alnum:]]+"), sample_info$X32))]
-
-names(r_df) = c("NULL", "Gene Name", all_names)
-
-# change names so they match with epigenatic labels
-names(r_df) = str_replace(names(r_df), "THP1", "THP-1")
-names(r_df) = str_replace(names(r_df), "CTR", "Baseline")
-names(r_df) = str_replace(names(r_df), "_RNA", "")
-names(r_df) = str_replace(names(r_df), "Baseline\\+LPS", "LPS")
-
-
-# DESEQ2 ------------------------------------------------------------------
-
-thp_counts = as.matrix(r_df[,grep("THP-1.*PMA", names(r_df))])
-thp_genes = r_df$`Gene Name`
-is_na = which(apply(thp_counts, 1, function(x) any(is.na(x))))
-thp_genes = thp_genes[-is_na]
-thp_counts = thp_counts[-is_na,]
-
-thp_counts = SummarizedExperiment(thp_counts)
-col_data = data.frame(
-  Rep=factor(c(1,1,2,2)),
-  Condition=factor(rep(c("PMA+LPS","PMA"),2))
-)
-rownames(col_data) = rownames(colData(thp_counts))
-colData(thp_counts) <- DataFrame(col_data)
-
-dds <- DESeqDataSet(thp_counts, design = ~Condition)
-nrow(dds)
-row_ix = which(rowSums(counts(dds)) > 1)
-dds <- dds[row_ix,]
-thp_genes = thp_genes[row_ix]
-nrow(dds)
-
-rld <- rlog(dds, blind=FALSE)
-head(assay(rld), 3)
-
-par(mfrow=c(1,2))
-dds <- estimateSizeFactors(dds)
-plot(log2(counts(dds, normalized=TRUE)[,1:2]+1), pch=16, cex=0.3)
-plot(assay(rld)[,1:2], pch=16, cex=0.3)
-
-sample_dists <- dist(t(assay(rld)))
-sample_dists_mat <- as.matrix(sample_dists)
-rownames(sample_dists_mat) <- rld$cell
-colors <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
-pheatmap(sample_dists_mat, clustering_distance_rows=sample_dists, clustering_distance_cols=sample_dists, col=colors)
-
-dds <- DESeq(dds)
-thp_res = results(dds)
-thp_res_df = tbl_df(data.frame(Gene=thp_genes, thp_res))
-thp_res_df = thp_res_df %>% filter(padj <= 0.01) %>% arrange(desc(log2FoldChange))
-
-
-# SUMMARISE ENSEMBL REG ---------------------------------------------------
-
-start_data = dat
-
-# sample labels
-single_labels = rownames(start_data[[1]]$res)
-# sample_ix = c(grep("monocyte", single_labels, ignore.case=TRUE), grep("macrophage", single_labels, ignore.case=TRUE), 196:219) # project 2 data + relevant monocyte/macrophage data
-sample_ix = grep("THP-1.*PMA", single_labels)
-single_labels = single_labels[sample_ix]
-# group_labels = c(rep("Blueprint",33), rep("ENCODE",24))
-# group_labels[12] = "ENCODE"
-
-# slice matrices
-for(i in 1:length(start_data)) {
-  start_data[[i]]$res = start_data[[i]]$res[sample_ix,]
-  start_data[[i]]$annot = start_data[[i]]$annot[sample_ix,]
+# try only promoter-annotated regions
+dat_max_p = total_data
+for(i in 1:length(dat_max_p[1:5])) {
+  print(paste("Processing data type", names(dat_max_p)[i]))
+  dat_max_p[[i]]$res = convert_reg_matrix(dat_max_p[[i]]$res[,roi_reg$feature_type_name=="Promoter"], roi_reg[roi_reg$feature_type_name=="Promoter"], gene_list_all, reg_window=0, summ_method="max")
 }
 
-rna_add = prep_rna(r_df, gene_list_all$hgnc_symbol, single_labels, names(r_df)[3:26])
+single_labels = rownames(total_data$H3K27ac$res)
+group_labels = factor(total_data$H3K27ac$annot$Project)
 
-start_data[[6]] = rna_add
-names(start_data)[6] = "RNA"
+plot_pca(dat_max_p$H3K27ac$res, annot_1=single_labels, annot_2=group_labels, out_file="out.png")
+
+
 
 
 # ALL DATA SUMMARY --------------------------------------------------------
