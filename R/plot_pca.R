@@ -1,8 +1,10 @@
-#' @title Takes a matrix and label information and produces a PCA plots
-#' @description TO ADD
-#' @description This is a new line ...
-#' @details What's this?
-#' @return TO ADD
+#' @title Takes a matrix and label information and produces a PCA plot
+#' @description From the starting point of a datatype matrix and associated labels, this outputs a PCA plot
+#' @param dat A sample * region matrix
+#' @param annot_1 The labels for each point
+#' @param annot_2 The group labels 
+#' @return A PCA plot
+#' @export
 
 plot_pca <- function(dat, annot_1, annot_2, roi=NULL, which_pcs=c(1,2), out_file) {
   

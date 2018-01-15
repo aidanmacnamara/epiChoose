@@ -2,18 +2,20 @@
 % Please edit documentation in R/plot_pca.R
 \name{plot_pca}
 \alias{plot_pca}
-\title{Takes a matrix and label information and produces a PCA plots}
+\title{Takes a matrix and label information and produces a PCA plot}
 \usage{
 plot_pca(dat, annot_1, annot_2, roi = NULL, which_pcs = c(1, 2), out_file)
 }
+\arguments{
+\item{dat}{A sample * region matrix}
+
+\item{annot_1}{The labels for each point}
+
+\item{annot_2}{The group labels}
+}
 \value{
-TO ADD
+A PCA plot
 }
 \description{
-TO ADD
-
-This is a new line ...
-}
-\details{
-What's this?
+From the starting point of a datatype matrix and associated labels, this outputs a PCA plot
 }
