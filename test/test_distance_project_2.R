@@ -16,6 +16,11 @@ group_labels = factor(total_data$H3K27ac$annot$Project)
 
 plot_pca(dat_max_p$H3K27ac$res, annot_1=single_labels, annot_2=group_labels, out_file="out.png")
 
+# look at counts
+# counts of all data types across promoters?
+# plan - look at counts first and then try and repeat with auc
+
+data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
 
 
 
