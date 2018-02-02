@@ -1,27 +1,20 @@
-# start off with mask_data
 
-load("data/roi_reg.RData")
-load("data/total_data.RData")
-load("data/gene_list_all.RData")
+require(GenomicAlignments)
+require("data/roi_reg.RData")
+require(BiocParallel)
 
-# try only promoter-annotated regions
-dat_max_p = total_data
-for(i in 1:length(dat_max_p[1:5])) {
-  print(paste("Processing data type", names(dat_max_p)[i]))
-  dat_max_p[[i]]$res = convert_reg_matrix(dat_max_p[[i]]$res[,roi_reg$feature_type_name=="Promoter"], roi_reg[roi_reg$feature_type_name=="Promoter"], gene_list_all, reg_window=0, summ_method="max")
-}
-
-single_labels = rownames(total_data$H3K27ac$res)
-group_labels = factor(total_data$H3K27ac$annot$Project)
-
-plot_pca(dat_max_p$H3K27ac$res, annot_1=single_labels, annot_2=group_labels, out_file="out.png")
+data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
 
 # look at counts
 # counts of all data types across promoters?
 # plan - look at counts first and then try and repeat with auc
 
-data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
+files = grep("THP1", list.files("z:/links//RD-Epigenetics-NetworkData/otar_020/GSK/chip-seq/project_2/bam/", full.names=TRUE), value=TRUE)
+bamfiles <- BamFileList(files, yieldSize=2000000)
+lapply(bamfiles, seqinfo)
 
+register(MulticoreParam())
+se <- summarizeOverlaps(features=roi_reg, reads=bamfiles, mode="Union", ignore.strand=TRUE)
 
 
 # ALL DATA SUMMARY --------------------------------------------------------
