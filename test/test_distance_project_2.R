@@ -1,7 +1,7 @@
 
 require(GenomicAlignments)
-require("data/roi_reg.RData")
 require(BiocParallel)
+load("data/roi_reg.RData")
 
 data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
 
@@ -9,7 +9,7 @@ data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
 # counts of all data types across promoters?
 # plan - look at counts first and then try and repeat with auc
 
-files = grep("THP1", list.files("z:/links//RD-Epigenetics-NetworkData/otar_020/GSK/chip-seq/project_2/bam/", full.names=TRUE), value=TRUE)
+files = grep("THP1", list.files("/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/GSK/chip-seq/project_2/bam/", full.names=TRUE), value=TRUE)
 bamfiles <- BamFileList(files, yieldSize=2000000)
 lapply(bamfiles, seqinfo)
 
