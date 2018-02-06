@@ -11,17 +11,19 @@ data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
 
 files = grep("THP1",
              c(
-               list.files("/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/GSK/chip-seq/project_2/bam/"),
-               list.files("/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/GSK/atac-seq/project_2/bam/")
-             ), full.names=TRUE, value=TRUE)
+               list.files("z:/links/RD-Epigenetics-NetworkData/otar_020/GSK/chip-seq/project_2/bam/", full.names=TRUE),
+               list.files("z:/links/RD-Epigenetics-NetworkData/otar_020/GSK/atac-seq/project_2/bam/", full.names=TRUE)
+             ), value=TRUE)
+
+col_data = data_gsk[match(str_extract(files, "[[:alnum:]\\._-]+$"), str_extract(data_gsk$Bam, "[[:alnum:]\\._-]+$")),] %>% dplyr::select(Cell, Mark, Rep, Stimulus)
+v_ix = grep("VD3", col_data$Stimulus)
+col_data = data.frame(lapply(col_data[-v_ix,], factor))
+files = files[-v_ix]
+
 bamfiles <- BamFileList(files, yieldSize=2000000)
 lapply(bamfiles, seqinfo)
-
 register(MulticoreParam())
 se <- summarizeOverlaps(features=roi_reg, reads=bamfiles, mode="Union", ignore.strand=TRUE)
-
-col_data = data_gsk[match(colnames(se), str_extract(data_gsk$Bam, "[[:alnum:]\\._-]+$")),] %>% select(Cell, Mark, Rep, Stimulus)
-col_data = data.frame(lapply(col_data, factor))
 
 rownames(col_data) = rownames(colData(se))
 colData(se) <- DataFrame(col_data)
