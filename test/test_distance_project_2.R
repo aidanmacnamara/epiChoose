@@ -11,8 +11,8 @@ data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
 
 files = grep("THP1",
              c(
-               list.files("z:/links/RD-Epigenetics-NetworkData/otar_020/GSK/chip-seq/project_2/bam/", full.names=TRUE),
-               list.files("z:/links/RD-Epigenetics-NetworkData/otar_020/GSK/atac-seq/project_2/bam/", full.names=TRUE)
+               list.files("/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/GSK/chip-seq/project_2/bam/", full.names=TRUE),
+               list.files("/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/GSK/atac-seq/project_2/bam/", full.names=TRUE)
              ), value=TRUE)
 
 col_data = data_gsk[match(str_extract(files, "[[:alnum:]\\._-]+$"), str_extract(data_gsk$Bam, "[[:alnum:]\\._-]+$")),] %>% dplyr::select(Cell, Mark, Rep, Stimulus)
