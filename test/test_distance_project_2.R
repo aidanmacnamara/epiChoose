@@ -9,7 +9,11 @@ data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
 # counts of all data types across promoters?
 # plan - look at counts first and then try and repeat with auc
 
-files = grep("THP1", list.files("/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/GSK/chip-seq/project_2/bam/", full.names=TRUE), value=TRUE)
+files = grep("THP1",
+             c(
+               list.files("/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/GSK/chip-seq/project_2/bam/"),
+               list.files("/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/GSK/atac-seq/project_2/bam/")
+             ), full.names=TRUE, value=TRUE)
 bamfiles <- BamFileList(files, yieldSize=2000000)
 lapply(bamfiles, seqinfo)
 
@@ -34,9 +38,17 @@ nrow(dds)
 dds <- estimateSizeFactors(dds)
 
 rld = rlog(dds, blind=FALSE)
+sample_dists <- dist(t(assay(rld)))
 
+require("pheatmap")
+require("RColorBrewer")
 
+sd_mat <- as.matrix(sample_dists)
+rownames(sd_mat) = paste(rld$Mark, rld$Stimulus, rld$Rep, sep ="_")
+colnames(sd_mat) = NULL
+colors = colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
 
+pheatmap(sd_mat, clustering_distance_rows=sample_dists, clustering_distance_cols=sample_dists, col=colors)
 
 
 # RNA RESPONSE ------------------------------------------------------------
