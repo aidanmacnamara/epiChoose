@@ -35,8 +35,6 @@ se_filt = se[,-grep("VD3", colData(se)$Stimulus)]
 
 dds <- DESeqDataSet(se_filt, design=~Mark+Rep+Stimulus)
 nrow(dds)
-dds <- dds[rowSums(counts(dds))>1,]
-nrow(dds)
 dds <- estimateSizeFactors(dds)
 
 rld = rlog(dds, blind=FALSE)
