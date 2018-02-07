@@ -36,15 +36,22 @@ colData(se) <- DataFrame(col_data)
 marks = unique(col_data$Mark)
 dds_list = vector("list", length(marks))
 names(dds_list) = marks
+rld_list = dds_list
 
 for(i in 1:length(dds_list)) {
   dds_list[[i]] <- DESeqDataSet(se_filt[,which(col_data$Mark==marks[i])], design=~Rep+Stimulus)
   nrow(dds_list[[i]])
   dds_list[[i]] <- estimateSizeFactors(dds_list[[i]])
+
+  # log convert to equalise variance across means (for plotting)  
+  rld_list[[i]] = rlog(dds_list[[i]], blind=FALSE)  
+  
+  # run dds
+  dds_list[[i]] <- DESeq(dds_list[[i]])
 }
 
-# log convert to equalise variance across means (for plotting)
-rld = rlog(dds, blind=FALSE)
+
+
 sample_dists <- dist(t(assay(rld)))
 
 require("pheatmap")
