@@ -8,18 +8,22 @@ data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
 # look at counts
 # counts of all data types across promoters?
 # plan - look at counts first and then try and repeat with auc
+# /GWD/bioinfo/projects
 
 files = grep("THP1",
              c(
-               list.files("/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/GSK/chip-seq/project_2/bam/", full.names=TRUE),
-               list.files("/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/GSK/atac-seq/project_2/bam/", full.names=TRUE)
+               list.files("z:/links/RD-Epigenetics-NetworkData/otar_020/GSK/chip-seq/project_2/bam/", full.names=TRUE),
+               list.files("z:/links/RD-Epigenetics-NetworkData/otar_020/GSK/atac-seq/project_2/bam/", full.names=TRUE)
              ), value=TRUE)
 
 col_data = data_gsk[match(str_extract(files, "[[:alnum:]\\._-]+$"), str_extract(data_gsk$Bam, "[[:alnum:]\\._-]+$")),] %>% dplyr::select(Cell, Mark, Rep, Stimulus)
+
+# take out vds
 v_ix = grep("VD3", col_data$Stimulus)
 col_data = data.frame(lapply(col_data[-v_ix,], factor))
 files = files[-v_ix]
 
+# get counts over reg regions
 bamfiles <- BamFileList(files, yieldSize=2000000)
 lapply(bamfiles, seqinfo)
 register(MulticoreParam())
@@ -28,17 +32,18 @@ se <- summarizeOverlaps(features=roi_reg, reads=bamfiles, mode="Union", ignore.s
 rownames(col_data) = rownames(colData(se))
 colData(se) <- DataFrame(col_data)
 
-# slice se to relevant conditions
-se_filt = se[,-grep("VD3", colData(se)$Stimulus)]
+# construct object per mark
+marks = unique(col_data$Mark)
+dds_list = vector("list", length(marks))
+names(dds_list) = marks
 
-# some pca
+for(i in 1:length(dds_list)) {
+  dds_list[[i]] <- DESeqDataSet(se_filt[,which(col_data$Mark==marks[i])], design=~Rep+Stimulus)
+  nrow(dds_list[[i]])
+  dds_list[[i]] <- estimateSizeFactors(dds_list[[i]])
+}
 
-# pma vs. baseline, lps vs. baseline
-
-dds <- DESeqDataSet(se_filt, design=~Mark+Rep+Stimulus)
-nrow(dds)
-dds <- estimateSizeFactors(dds)
-
+# log convert to equalise variance across means (for plotting)
 rld = rlog(dds, blind=FALSE)
 sample_dists <- dist(t(assay(rld)))
 
@@ -51,6 +56,11 @@ colnames(sd_mat) = NULL
 colors = colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
 
 pheatmap(sd_mat, clustering_distance_rows=sample_dists, clustering_distance_cols=sample_dists, col=colors)
+plotPCA(rld, intgroup=c("Mark")) + theme_thesis()
+
+# run deseq
+dds <- DESeq(dds)
+dd_res = 
 
 
 # RNA RESPONSE ------------------------------------------------------------
@@ -59,35 +69,13 @@ thp_diff = read_excel("z:/links/bix-analysis-stv/2016/CTTV/THP1/documents/AllGen
 thp_diff_filt = filter(thp_diff, THP1_LPS_padj<0.01, THP1_LPS_log2FoldChange>2) %>% arrange(desc(THP1_LPS_log2FoldChange))
 
 
-# PLOTS -------------------------------------------------------------------
-
-n_peaks = unlist(lapply(peak_list, length))
-col_data = data.frame(col_data, peaks=n_peaks[sapply(paste(col_data$donor, col_data$time, sep="_"), function(x) grep(x, names(peak_list)))])
-ggplot(col_data, aes(x=time, y=peaks)) + geom_boxplot() + theme_thesis()
-
-rld <- rlog(dds, blind=FALSE)
-head(assay(rld), 3)
-
-par(mfrow=c(1,2))
-plot(log2(counts(dds, normalized=TRUE)[,1:2]+1), pch=16, cex=0.3)
-plot(assay(rld)[,1:2], pch=16, cex=0.3)
-
-sampleDists <- dist(t(assay(rld)))
-sampleDistMatrix <- as.matrix(sampleDists)
-rownames(sampleDistMatrix) <- rld$cell
-# colnames(sampleDistMatrix) <- NULL
-colors <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
-pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors)
-plotPCA(rld, intgroup=c("time"))
 
 
-# DESEQ -------------------------------------------------------------------
 
-dds <- DESeq(dds)
-res_all = list()
-res_all[[1]] <- results(dds, contrast=c("time","3hr","Un"), alpha=0.05, lfcThreshold=1.5)
-res_all[[2]] <- results(dds, contrast=c("time","24hr","Un"), alpha=0.05, lfcThreshold=1.5)
-res_all[[3]] <- results(dds, contrast=c("time","48hr","Un"), alpha=0.05, lfcThreshold=1.5)
+
+
+
+
 
 
 # ANNOTATE ----------------------------------------------------------------
