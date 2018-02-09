@@ -42,7 +42,7 @@ for(i in 1:length(dds_list)) {
   dds_list[[i]] <- DESeqDataSet(se_filt[,which(col_data$Mark==marks[i])], design=~Rep+Stimulus)
   nrow(dds_list[[i]])
   dds_list[[i]] <- estimateSizeFactors(dds_list[[i]])
-
+  
   # log convert to equalise variance across means (for plotting)  
   rld_list[[i]] = rlog(dds_list[[i]], blind=FALSE)  
   
@@ -50,39 +50,79 @@ for(i in 1:length(dds_list)) {
   dds_list[[i]] <- DESeq(dds_list[[i]])
 }
 
-
-
-sample_dists <- dist(t(assay(rld)))
-
 require("pheatmap")
 require("RColorBrewer")
 
-sd_mat <- as.matrix(sample_dists)
-rownames(sd_mat) = paste(rld$Mark, rld$Stimulus, rld$Rep, sep ="_")
-colnames(sd_mat) = NULL
-colors = colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+for(i in 1:length(rld_list)) {
+  
+  sample_dists <- dist(t(assay(rld_list[[i]])))
+  sd_mat <- as.matrix(sample_dists)
+  rownames(sd_mat) = paste(rld_list[[i]]$Stimulus, rld_list[[i]]$Rep, sep ="_")
+  colnames(sd_mat) = NULL
+  colors = colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+  png(paste0("hm_", i, ".png"), height=902, width=787)
+  pheatmap(sd_mat, clustering_distance_rows=sample_dists, clustering_distance_cols=sample_dists, col=colors, main=names(rld_list)[i])
+  dev.off()
+  png(paste0("pc_", i, ".png"), height=902, width=787)
+  print(plotPCA(rld_list[[i]], intgroup=c("Stimulus")) + theme_thesis() + ggtitle(names(rld_list)[i]))
+  dev.off()
+  
+}
 
-pheatmap(sd_mat, clustering_distance_rows=sample_dists, clustering_distance_cols=sample_dists, col=colors)
-plotPCA(rld, intgroup=c("Mark")) + theme_thesis()
-
-# run deseq
-dds <- DESeq(dds)
-dd_res = 
+# get fpkms
+fpkm_list = vector("list", length(dds_list))
+names(fpkm_list) = names(dds_list)
+for(i in 1:length(fpkm_list)) {
+  fpkm_list[[i]] = fpkm(dds_list[[i]])
+}
 
 
 # RNA RESPONSE ------------------------------------------------------------
 
 thp_diff = read_excel("z:/links/bix-analysis-stv/2016/CTTV/THP1/documents/AllGenes_THP1_U937_Altius_DE.xls")
-thp_diff_filt = filter(thp_diff, THP1_LPS_padj<0.01, THP1_LPS_log2FoldChange>2) %>% arrange(desc(THP1_LPS_log2FoldChange))
+thp_diff_filt = filter(thp_diff, THP1_LPS_padj<0.01, THP1_LPS_log2FoldChange>1.2) %>% arrange(desc(THP1_LPS_log2FoldChange))
 
+thp_rand = thp_diff[!thp_diff$gene %in% thp_diff_filt$gene & thp_diff$THP1_LPS_log2FoldChange!="NA",][
+  sample
+  (
+    1:dim(thp_diff[!thp_diff$gene %in% thp_diff_filt$gene & thp_diff$THP1_LPS_log2FoldChange!="NA",])[1],
+    dim(thp_diff_filt)[1],
+    replace=FALSE
+  ),]
 
+gene_model = data.frame(gene=c(thp_diff_filt$gene, thp_rand$gene), rna_lps=c(thp_diff_filt$THP1_LPS_log2FoldChange, thp_rand$THP1_LPS_log2FoldChange), H3K27ac=NA, H3K4me3=NA, H3K27me3=NA, CTCF=NA, ATAC=NA, H3K27ac_LPS=NA, H3K4me3_LPS=NA, H3K27me3_LPS=NA, CTCF_LPS=NA, ATAC_LPS=NA, Group=factor(c(rep("Significant",146), rep("Random",146))))
 
+for(i in 1:length(gene_model$gene)) {
 
+  h3k27ac_ix = which(grepl("Promoter|Enhancer", roi_reg$feature_type_name) & roi_reg$SYMBOL==gene_model$gene[i])
+  gene_model$H3K27ac[i] = mean(fpkm_list$H3K27ac[h3k27ac_ix,7:8])
+  gene_model$H3K27ac_LPS[i] = mean(fpkm_list$H3K27ac[h3k27ac_ix,5:6])
+  
+  h3k4me3_ix = which(grepl("Promoter|Enhancer", roi_reg$feature_type_name) & roi_reg$SYMBOL==gene_model$gene[i])
+  gene_model$H3K4me3[i] = mean(fpkm_list$H3K4me3[h3k4me3_ix,7:8])
+  gene_model$H3K4me3_LPS[i] = mean(fpkm_list$H3K4me3[h3k4me3_ix,5:6])
+  
+  h3k27me3_ix = which(grepl("Promoter|Enhancer", roi_reg$feature_type_name) & roi_reg$SYMBOL==gene_model$gene[i])
+  gene_model$H3K27me3[i] = mean(fpkm_list$H3K27me3[h3k27me3_ix,7:8])
+  gene_model$H3K27me3_LPS[i] = mean(fpkm_list$H3K27me3[h3k27me3_ix,5:6])
+  
+  ctcf_ix = which(roi_reg$feature_type_name=="CTCF Binding Site" & roi_reg$SYMBOL==gene_model$gene[i])
+  gene_model$CTCF[i] = mean(fpkm_list$CTCF[ctcf_ix,7:8])
+  gene_model$CTCF_LPS[i] = mean(fpkm_list$CTCF[ctcf_ix,5:6])
+  
+  atac_ix = which(roi_reg$feature_type_name=="Open chromatin" & roi_reg$SYMBOL==gene_model$gene[i])
+  gene_model$ATAC[i] = mean(fpkm_list$ATAC[atac_ix,7:8])
+  gene_model$ATAC_LPS[i] = mean(fpkm_list$ATAC[atac_ix,5:6])
+  
+}
 
+gene_model_long = gather(gene_model, "Mark", "Mean FPKM", 3:12)
+gene_model_long$`Mean FPKM` = log(gene_model_long$`Mean FPKM`+0.1)
+gene_model_long$Mark = factor(gene_model_long$Mark)
+ggplot(gene_model_long, aes(Group, `Mean FPKM`)) + geom_boxplot() + theme_thesis() + facet_wrap(~Mark)
 
-
-
-
+summary(lm(data=gene_model, formula=rna_lps~H3K27ac+H3K4me3+H3K27me3))
+summary(glm(data=gene_model, formula=Group~H3K27ac+H3K4me3+H3K27me3, family=binomial(link='logit')))
 
 
 # ANNOTATE ----------------------------------------------------------------

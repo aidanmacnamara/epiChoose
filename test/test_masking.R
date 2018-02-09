@@ -6,6 +6,9 @@ require(devtools)
 require(SummarizedExperiment)
 require(ggrepel)
 require(VennDiagram)
+require(TxDb.Hsapiens.UCSC.hg38.knownGene) # for peak to gene
+require(ChIPseeker) # for peak to gene
+require(org.Hs.eg.db) # for peak to gene
 load_all()
 
 
@@ -45,6 +48,8 @@ roi_reg$chromosome_name = paste("chr", roi_reg$chromosome_name, sep="")
 roi_reg = arrange(roi_reg, chromosome_name, chromosome_start, chromosome_end)
 
 roi_reg = makeGRangesFromDataFrame(roi_reg, keep.extra.columns=TRUE, start.field="chromosome_start", end.field="chromosome_end", seqnames.field="chromosome_name")
+roi_reg_annot = annotatePeak(roi_reg, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene, annoDb="org.Hs.eg.db")
+roi_reg = roi_reg_annot@anno
 save(roi_reg, file="data/roi_reg.RData")
 
 mart = useMart("ENSEMBL_MART_FUNCGEN", dataset="hsapiens_external_feature")
