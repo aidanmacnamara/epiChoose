@@ -60,10 +60,10 @@ for(i in 1:length(rld_list)) {
   rownames(sd_mat) = paste(rld_list[[i]]$Stimulus, rld_list[[i]]$Rep, sep ="_")
   colnames(sd_mat) = NULL
   colors = colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
-  png(paste0("hm_", i, ".png"), height=902, width=787)
+  png(paste0("hm_", i, ".png"), height=727, width=1052)
   pheatmap(sd_mat, clustering_distance_rows=sample_dists, clustering_distance_cols=sample_dists, col=colors, main=names(rld_list)[i])
   dev.off()
-  png(paste0("pc_", i, ".png"), height=902, width=787)
+  png(paste0("pc_", i, ".png"), height=624, width=1048)
   print(plotPCA(rld_list[[i]], intgroup=c("Stimulus")) + theme_thesis() + ggtitle(names(rld_list)[i]))
   dev.off()
   
@@ -80,12 +80,13 @@ for(i in 1:length(fpkm_list)) {
 # RNA RESPONSE ------------------------------------------------------------
 
 thp_diff = read_excel("z:/links/bix-analysis-stv/2016/CTTV/THP1/documents/AllGenes_THP1_U937_Altius_DE.xls")
+thp_diff$THP1_LPS_log2FoldChange = as.numeric(thp_diff$THP1_LPS_log2FoldChange) 
 thp_diff_filt = filter(thp_diff, THP1_LPS_padj<0.01, THP1_LPS_log2FoldChange>1.2) %>% arrange(desc(THP1_LPS_log2FoldChange))
 
-thp_rand = thp_diff[!thp_diff$gene %in% thp_diff_filt$gene & thp_diff$THP1_LPS_log2FoldChange!="NA",][
+thp_rand = thp_diff[!thp_diff$gene %in% thp_diff_filt$gene & !is.na(thp_diff$THP1_LPS_log2FoldChange) & abs(thp_diff$THP1_LPS_log2FoldChange)<0.5,][
   sample
   (
-    1:dim(thp_diff[!thp_diff$gene %in% thp_diff_filt$gene & thp_diff$THP1_LPS_log2FoldChange!="NA",])[1],
+    1:dim(thp_diff[!thp_diff$gene %in% thp_diff_filt$gene & !is.na(thp_diff$THP1_LPS_log2FoldChange) & abs(thp_diff$THP1_LPS_log2FoldChange)<0.5,])[1],
     dim(thp_diff_filt)[1],
     replace=FALSE
   ),]
@@ -93,7 +94,7 @@ thp_rand = thp_diff[!thp_diff$gene %in% thp_diff_filt$gene & thp_diff$THP1_LPS_l
 gene_model = data.frame(gene=c(thp_diff_filt$gene, thp_rand$gene), rna_lps=c(thp_diff_filt$THP1_LPS_log2FoldChange, thp_rand$THP1_LPS_log2FoldChange), H3K27ac=NA, H3K4me3=NA, H3K27me3=NA, CTCF=NA, ATAC=NA, H3K27ac_LPS=NA, H3K4me3_LPS=NA, H3K27me3_LPS=NA, CTCF_LPS=NA, ATAC_LPS=NA, Group=factor(c(rep("Significant",146), rep("Random",146))))
 
 for(i in 1:length(gene_model$gene)) {
-
+  
   h3k27ac_ix = which(grepl("Promoter|Enhancer", roi_reg$feature_type_name) & roi_reg$SYMBOL==gene_model$gene[i])
   gene_model$H3K27ac[i] = mean(fpkm_list$H3K27ac[h3k27ac_ix,7:8])
   gene_model$H3K27ac_LPS[i] = mean(fpkm_list$H3K27ac[h3k27ac_ix,5:6])
@@ -119,100 +120,86 @@ for(i in 1:length(gene_model$gene)) {
 gene_model_long = gather(gene_model, "Mark", "Mean FPKM", 3:12)
 gene_model_long$`Mean FPKM` = log(gene_model_long$`Mean FPKM`+0.1)
 gene_model_long$Mark = factor(gene_model_long$Mark)
-ggplot(gene_model_long, aes(Group, `Mean FPKM`)) + geom_boxplot() + theme_thesis() + facet_wrap(~Mark)
+ggplot(gene_model_long, aes(Group, `Mean FPKM`)) + geom_boxplot() + theme_thesis(20) + facet_wrap(~Mark)
+ggplot(gene_model, aes(x=Group, y=rna_lps)) + geom_boxplot() + theme_thesis()
 
 summary(lm(data=gene_model, formula=rna_lps~H3K27ac+H3K4me3+H3K27me3))
 summary(glm(data=gene_model, formula=Group~H3K27ac+H3K4me3+H3K27me3, family=binomial(link='logit')))
 
+# is this result consistent with signal data?
+load("data/dat_old.RData")
 
-# ANNOTATE ----------------------------------------------------------------
+gene_model_signal = gene_model[,c(1:2,13)]
+gene_model_signal[,4:6] = NA
+names(gene_model_signal)[4:6] = c("H3K27ac","H3K4me3","H3K27me3")
 
-annot_c = annotatePeak(consensus_reduce, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene, annoDb="org.Hs.eg.db")
-peak_anno_all = list()
-annot_filts = list()
+for(i in 1:length(gene_model_signal$gene)) {
+  gene_model_signal$H3K27ac[i] = log(mean(dat_all$tss$H3K27ac$res[c(198,204),which(gene_list_all$hgnc_symbol==gene_model_signal$gene[i])]))
+  gene_model_signal$H3K4me3[i] = log(mean(dat_all$tss$H3K4me3$res[c(198,204),which(gene_list_all$hgnc_symbol==gene_model_signal$gene[i])]))
+  gene_model_signal$H3K27me3[i] = log(mean(dat_all$max$H3K27me3$res[c(198,204),which(gene_list_all$hgnc_symbol==gene_model_signal$gene[i])]))
+}
 
-for(i in 1:length(res_all)) {
+gene_model_signal_long = gather(gene_model_signal, "Mark", "Mean Signal", 4:6)
+ggplot(gene_model_signal_long, aes(Group, `Mean Signal`)) + geom_boxplot() + theme_thesis(20) + facet_wrap(~Mark)
+
+y = data.frame(
+  Response = thp_diff$THP1_LPS_log2FoldChange,
+  H3K27me3 = 
+    log(apply(dat_old$H3K27me3$res[c(198,204),match(thp_diff$gene, gene_list_all$hgnc_symbol)], 2, mean)) / 
+    log(apply(dat_old$H3K27ac$res[c(198,204),match(thp_diff$gene, gene_list_all$hgnc_symbol)], 2, mean))
+)
+ggplot(y, aes(H3K27me3, Response)) + geom_point()
+
+par(mfrow=c(2,2))
+plot(gene_model$H3K27ac, gene_model_signal$H3K27ac)
+plot(gene_model$H3K4me3, gene_model_signal$H3K4me3)
+plot(gene_model$H3K27me3, gene_model_signal$H3K27me3)
+
+# pick 10 genes from each group to export to igv
+write_tsv(data.frame(gene=sample(gene_model[gene_model$Group=="Random"&!is.nan(gene_model$H3K27ac),'gene'], 40, replace=FALSE)), col_names=FALSE, "out.txt")
+
+
+# LOOK AT FULL MODEL AND RATIOS -------------------------------------------
+
+gene_model_full = data.frame(gene=thp_diff$gene, rna_lps=thp_diff$THP1_LPS_log2FoldChange, H3K27ac=NA, H3K4me3=NA, H3K27me3=NA, CTCF=NA, ATAC=NA, H3K27ac_LPS=NA, H3K4me3_LPS=NA, H3K27me3_LPS=NA, CTCF_LPS=NA, ATAC_LPS=NA)
+gene_model_full = gene_model_full[!is.na(gene_model_full$rna_lps),]
+gene_model_full = gene_model_full[sample(1:length(gene_model_full$gene), 1000, replace=FALSE),] # sample
+
+for(i in 1:length(gene_model_full$gene)) {
   
-  res = res_all[[i]]
-  summary(res)
+  print(i)
   
-  res = tbl_df(cbind(as.data.frame(annot_c), res))
-  p_ix = which(res$padj<=0.05 & res$log2FoldChange>0)
-  res_filt = tbl_df(as.data.frame(res)[p_ix,])
-  res_filt = res_filt[order(res_filt$log2FoldChange, decreasing=TRUE),]
+  h3k27ac_ix = which(grepl("Promoter|Enhancer", roi_reg$feature_type_name) & roi_reg$SYMBOL==gene_model_full$gene[i])
+  gene_model_full$H3K27ac[i] = mean(fpkm_list$H3K27ac[h3k27ac_ix,7:8])
+  gene_model_full$H3K27ac_LPS[i] = mean(fpkm_list$H3K27ac[h3k27ac_ix,5:6])
   
-  annot_filt = annotatePeak(consensus_reduce[p_ix], TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene, annoDb="org.Hs.eg.db")
-  print(upsetplot(annot_filt))
+  h3k4me3_ix = which(grepl("Promoter|Enhancer", roi_reg$feature_type_name) & roi_reg$SYMBOL==gene_model_full$gene[i])
+  gene_model_full$H3K4me3[i] = mean(fpkm_list$H3K4me3[h3k4me3_ix,7:8])
+  gene_model_full$H3K4me3_LPS[i] = mean(fpkm_list$H3K4me3[h3k4me3_ix,5:6])
   
-  annot_filts[[i]] = annot_filt
-  peak_anno_all[[i]] = res_filt
+  h3k27me3_ix = which(grepl("Promoter|Enhancer", roi_reg$feature_type_name) & roi_reg$SYMBOL==gene_model_full$gene[i])
+  gene_model_full$H3K27me3[i] = mean(fpkm_list$H3K27me3[h3k27me3_ix,7:8])
+  gene_model_full$H3K27me3_LPS[i] = mean(fpkm_list$H3K27me3[h3k27me3_ix,5:6])
+  
+  ctcf_ix = which(roi_reg$feature_type_name=="CTCF Binding Site" & roi_reg$SYMBOL==gene_model_full$gene[i])
+  gene_model_full$CTCF[i] = mean(fpkm_list$CTCF[ctcf_ix,7:8])
+  gene_model_full$CTCF_LPS[i] = mean(fpkm_list$CTCF[ctcf_ix,5:6])
+  
+  atac_ix = which(roi_reg$feature_type_name=="Open chromatin" & roi_reg$SYMBOL==gene_model_full$gene[i])
+  gene_model_full$ATAC[i] = mean(fpkm_list$ATAC[atac_ix,7:8])
+  gene_model_full$ATAC_LPS[i] = mean(fpkm_list$ATAC[atac_ix,5:6])
   
 }
 
-venn_func <- function(x) {
-  y = paste(as.character(unlist(x[1:3])), collapse="_")
-  return(y)
-}
-
-require(VennDiagram)
-venn.diagram(list(
-  hr_3 = apply(peak_anno_all[[1]], 1, venn_func),
-  hr_24 = apply(peak_anno_all[[2]], 1, venn_func),
-  hr_48 = apply(peak_anno_all[[3]], 1, venn_func)
-), filename = "out.tiff")
+ggplot(gene_model_full, aes(x=H3K27ac, y=rna_lps)) + geom_point() + theme_thesis()
+ggplot(gene_model_full, aes(x=H3K27me3, y=rna_lps)) + geom_point() + theme_thesis()
+ggplot(gene_model_full, aes(x=H3K27ac/H3K27me3, y=rna_lps)) + geom_point() + theme_thesis()
+ggplot(gene_model_full, aes(x=H3K27me3/H3K27ac, y=rna_lps)) + geom_point() + theme_thesis()
+ggplot(gene_model_full, aes(x=H3K27ac/H3K4me3, y=rna_lps)) + geom_point() + theme_thesis()
+ggplot(gene_model_full, aes(x=H3K27me3/H3K4me3, y=rna_lps)) + geom_point() + theme_thesis()
+ggplot(gene_model_full, aes(x=ATAC, y=rna_lps)) + geom_point() + theme_thesis()
 
 
 
-# ALL DATA SUMMARY --------------------------------------------------------
-
-df_1 = tbl_df(data.frame(Gene=colnames(start_data[[1]]$res), do.call("cbind", lapply(start_data[c(1:3)], function(x) t(x$res)))))
-df_rep_1 = dplyr::select(df_1, Gene, contains("BR1")) %>% mutate(Rep=1)
-df_rep_2 = dplyr::select(df_1, Gene, contains("BR2")) %>% mutate(Rep=2)
-
-names(df_rep_1) = str_replace_all(names(df_rep_1), "_BR[12]", "")
-names(df_rep_2) = str_replace_all(names(df_rep_2), "_BR[12]", "")
-
-df_1 = tbl_df(rbind(df_rep_1, df_rep_2))
-
-names(df_1) = str_replace(names(df_1), "\\.1$", "_H3K4me3")
-names(df_1) = str_replace(names(df_1), "\\.2$", "_H3K27me3")
-names(df_1) = str_replace(names(df_1), "\\.3$", "_RNA")
-
-df_1_summ = df_1 %>% group_by(Gene) %>% summarise(PMA_H3K27ac=mean(THP.1_PMA), PMA_H3K4me3=mean(THP.1_PMA_H3K4me3), PMA_H3K27me3=mean(THP.1_PMA_H3K27me3))
-
-df_1_summ[,-1] = log(df_1_summ[,-1]+1)
-df_1_summ = tbl_df(merge(df_1_summ, thp_res_df, by.x="Gene", by.y="Gene"))
-df_1_summ = arrange(df_1_summ, desc(log2FoldChange.x))
-
-# LPS GENE SET ------------------------------------------------------------
-
-load("../epiView/data/msig_go_bp.RData")
-m_up = read_tsv("c:/Downloads/tmp/otar_020_tmp/GSE3982_CTRL_VS_LPS_4H_MAC_UP.txt", skip=2, col_names=FALSE)
-m_down = read_tsv("c:/Downloads/tmp/otar_020_tmp/GSE3982_CTRL_VS_LPS_4H_MAC_DN.txt", skip=2, col_names=FALSE)
-
-gene_ix = which(df_1_summ$Gene %in% unique(c(m_up$X1, m_down$X1, unlist(msig_go_bp[grep("LIPOPOLYSACCHARIDE", names(msig_go_bp))]))))
-# gene_ix = which(df_1$Gene %in% unlist(m_down$X1))
-
-df_1_filtered = df_1_summ # [gene_ix,]
-
-# is there any difference in pma signature between up/non-regulated genes?
-
-df_1_filtered$rna_diff = ifelse(df_1_filtered$log2FoldChange > 0 & df_1_filtered$padj <= 0.01, "Yes", "No")
-ggplot(df_1_filtered, aes(x=rna_diff, y=PMA_H3K27ac)) + geom_boxplot() + theme_thesis(20)
-
-
-# COMBINATIONS ------------------------------------------------------------
-
-ggplot(df_1_filtered, aes(x=PMA_H3K27ac, y=log2FoldChange)) + geom_point(na.rm=TRUE) + theme_thesis(20) + xlab("PMA H3K27ac") + ylab("Expression Change") 
-
-ggplot(df_1_filtered, aes(x=PMA_H3K27ac/PMA_H3K27me3, y=log2FoldChange)) + geom_point(na.rm=TRUE) + theme_thesis(20) + xlab("PMA H3K27ac / PMA H3K27me3") + ylab("Expression Change")
-
-p_1 <- ggplot(df_1_filtered, aes(x=PMA_H3K4me3/PMA_H3K27me3, y=log2FoldChange, text=Gene)) + geom_point(na.rm=TRUE) + theme_thesis(20) + xlab("PMA H3K4me3 / PMA H3K27me3") + ylab("Expression Change")
-
-ggplot(df_1_filtered, aes(x=PMA_H3K27me3/PMA_H3K4me3, y=log2FoldChange)) + geom_point(na.rm=TRUE) + theme_thesis(20) + xlab("PMA H3K27me3 / PMA H3K4me3") + ylab("Expression Change")
-
-ggplotly(p_1, tooltip="Gene")
-
-arrange(df_1_filtered, desc(log2FoldChange))
-
+# END ---------------------------------------------------------------------
 
