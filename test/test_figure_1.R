@@ -23,10 +23,18 @@ load("data/roi_reg.RData")
 # for each data type, compare bam vs. auc clustering
 
 data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
+files_by_dt = c()
 marks = unique(data_gsk$Mark)[1:5]
-my_samples = sample(unique(str_replace(data_gsk$Label, "_BR[1-3]", "")), 10, replace=FALSE)
-files_by_dt = filter(data_gsk, str_replace(Label,  "_BR[1-3]", "") %in% my_samples, Mark %in% marks) %>% dplyr::select(Bam) %>% unlist() %>% as.character()  
-  
+
+for(i in 1:length(marks)) {
+  mark_filt = filter(data_gsk, file.exists(data_gsk$Bam), Mark==marks[i])
+  my_samples = sample(unique(str_replace(mark_filt$Label, "_BR[1-3]", "")), 10, replace=FALSE)
+  files_by_dt = c(
+    files_by_dt,
+    filter(mark_filt, str_replace(Label,  "_BR[1-3]", "") %in% my_samples) %>% dplyr::select(Bam) %>% unlist() %>% as.character() 
+  )
+}
+
 col_data = data_gsk[match(str_extract(files_by_dt, "[[:alnum:]\\._-]+$"), str_extract(data_gsk$Bam, "[[:alnum:]\\._-]+$")),] %>% dplyr::select(Cell, Mark, Rep, Stimulus)
 
 # get counts over reg regions
