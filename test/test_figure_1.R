@@ -1,4 +1,8 @@
 
+require(GenomicAlignments)
+require(BiocParallel)
+load("data/roi_reg.RData")
+
 # dat_all - 4 metrics:
 # max = largest peak across gene body (gene start/end -+ 2kb)
 # tss = largest peak +- 2kb of tss
@@ -20,14 +24,13 @@
 
 data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
 marks = unique(data_gsk$Mark)[1:5]
-names(files_by_dt) = marks
 my_samples = sample(unique(str_replace(data_gsk$Label, "_BR[1-3]", "")), 10, replace=FALSE)
 files_by_dt = filter(data_gsk, str_replace(Label,  "_BR[1-3]", "") %in% my_samples, Mark %in% marks) %>% dplyr::select(Bam) %>% unlist() %>% as.character()  
   
 col_data = data_gsk[match(str_extract(files_by_dt, "[[:alnum:]\\._-]+$"), str_extract(data_gsk$Bam, "[[:alnum:]\\._-]+$")),] %>% dplyr::select(Cell, Mark, Rep, Stimulus)
 
 # get counts over reg regions
-bamfiles <- BamFileList(files, yieldSize=2000000)
+bamfiles <- BamFileList(files_by_dt, yieldSize=2000000)
 lapply(bamfiles, seqinfo)
 register(MulticoreParam())
 se <- summarizeOverlaps(features=roi_reg, reads=bamfiles, mode="Union", ignore.strand=TRUE)
