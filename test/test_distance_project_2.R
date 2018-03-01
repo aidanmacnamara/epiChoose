@@ -200,6 +200,19 @@ ggplot(gene_model_full, aes(x=H3K27me3/H3K4me3, y=rna_lps)) + geom_point() + the
 ggplot(gene_model_full, aes(x=ATAC, y=rna_lps)) + geom_point() + theme_thesis()
 
 
+# RNA ABSOLUTE VALUES -----------------------------------------------------
 
-# END ---------------------------------------------------------------------
+thp1 = list.files("~/links/bix-analysis-stv/2016/CTTV/THP1/data/genecounts/")
+thp1_df = lapply(as.list(thp1), function(x) read_tsv(paste0("~/links/bix-analysis-stv/2016/CTTV/THP1/data/genecounts/", x), col_names=FALSE))
+# merge into sample per column
+my_names = thp1_df[[1]]$X1
+rna = data.frame(do.call("cbind", lapply(thp1_df, function(x) x$X2)))
+rna = cbind(my_names, rna)
+
+# get names
+sample_info = read_csv("z:/links/bix-analysis-stv/2016/CTTV/U937/data/sampleInfo.csv", col_names=FALSE)
+all_names = sample_info$X1[match(str_extract(thp1, "^[[:alnum:]]+"), sample_info$X32)]
+names(rna) = c("Gene Name", all_names)
+
+
 
