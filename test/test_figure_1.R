@@ -43,12 +43,6 @@ lapply(bamfiles, seqinfo)
 register(MulticoreParam())
 se <- summarizeOverlaps(features=roi_reg, reads=bamfiles, mode="Union", ignore.strand=TRUE)
 
-
-
-
-
-
-
 rownames(col_data) = rownames(colData(se))
 colData(se) <- DataFrame(col_data)
 
@@ -59,7 +53,7 @@ names(dds_list) = marks
 rld_list = dds_list
 
 for(i in 1:length(dds_list)) {
-  dds_list[[i]] <- DESeqDataSet(se_filt[,which(col_data$Mark==marks[i])], design=~Rep+Stimulus)
+  dds_list[[i]] <- DESeqDataSet(se_filt[,which(col_data$Mark==marks[i])])
   nrow(dds_list[[i]])
   dds_list[[i]] <- estimateSizeFactors(dds_list[[i]])
   
@@ -95,3 +89,4 @@ names(fpkm_list) = names(dds_list)
 for(i in 1:length(fpkm_list)) {
   fpkm_list[[i]] = fpkm(dds_list[[i]])
 }
+
