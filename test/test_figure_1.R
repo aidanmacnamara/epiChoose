@@ -22,6 +22,9 @@ load("data/roi_reg.RData")
 # pick 10*2(?) samples
 # for each data type, compare bam vs. auc clustering
 
+
+# GENERATE DATA -----------------------------------------------------------
+
 data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
 files_by_dt = c()
 marks = unique(data_gsk$Mark)[1:5]
@@ -64,29 +67,70 @@ for(i in 1:length(dds_list)) {
   dds_list[[i]] <- DESeq(dds_list[[i]])
 }
 
+
+# COMPARE WITH PCA/HEATMAPS -----------------------------------------------
+
 require("pheatmap")
 require("RColorBrewer")
 
 for(i in 1:length(rld_list)) {
   
-  sample_dists <- dist(t(assay(rld_list[[i]])))
-  sd_mat <- as.matrix(sample_dists)
-  rownames(sd_mat) = paste(rld_list[[i]]$Stimulus, rld_list[[i]]$Rep, sep ="_")
-  colnames(sd_mat) = NULL
-  colors = colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
-  png(paste0("hm_", i, ".png"), height=727, width=1052)
-  pheatmap(sd_mat, clustering_distance_rows=sample_dists, clustering_distance_cols=sample_dists, col=colors, main=names(rld_list)[i])
-  dev.off()
-  png(paste0("pc_", i, ".png"), height=624, width=1048)
-  print(plotPCA(rld_list[[i]], intgroup=c("Stimulus")) + theme_thesis() + ggtitle(names(rld_list)[i]))
-  dev.off()
+  print(names(rld_list)[i])
+  
+  # find the equivalent auc data
+  auc_ix = which(names(total_data)==names(rld_list[i]))
+  my_comp = list(
+    count = t(assay(rld_list[[i]])),
+    auc = total_data[[auc_ix]]$res[match(
+      paste(rld_list[[i]]$Cell, rld_list[[i]]$Stimulus, rld_list[[i]]$Rep, sep ="_"),
+      paste(total_data[[auc_ix]]$annot$Cell, total_data[[auc_ix]]$annot$Stimulus, total_data[[auc_ix]]$annot$Rep, sep="_")
+    ),]
+  )
+  
+  for(j in 1:length(my_comp)) {
+    
+    sample_dists <- dist(my_comp[[j]])
+    sd_mat <- as.matrix(sample_dists)
+    row_names = paste(rld_list[[i]]$Cell, rld_list[[i]]$Stimulus, rld_list[[i]]$Rep, sep ="_")
+    rownames(sd_mat) = row_names
+    colnames(sd_mat) = NULL
+    colors = colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+    
+    png(paste0("hm_", i, "_", j, ".png"), height=727, width=1052)
+    pheatmap(sd_mat, clustering_distance_rows=sample_dists, clustering_distance_cols=sample_dists, col=colors, main=names(rld_list)[i])
+    dev.off()
+    
+    plot_pca(my_comp[[j]], annot_1=row_names, annot_2=rld_list[[i]]$Cell, out_file=paste0("pc_", i, "_", j, ".png"))
+    print(plotPCA(rld_list[[i]], intgroup=c("Cell","Stimulus")) + theme_thesis() + ggtitle(names(rld_list)[i]))
+    
+  }
   
 }
 
-# get fpkms
-fpkm_list = vector("list", length(dds_list))
-names(fpkm_list) = names(dds_list)
-for(i in 1:length(fpkm_list)) {
-  fpkm_list[[i]] = fpkm(dds_list[[i]])
+
+# PART 2 - COMPARE COLLAPSE-TO-GENE METHODS -------------------------------
+
+# total_data
+# how much difference is there compared to the regulatory genome?
+
+# find dups
+dups = duplicated(str_replace(rownames(dat_all[[1]]$H3K27ac$res), "BR[12]_", "")) | duplicated(str_replace(rownames(dat_all[[1]]$H3K27ac$res), "BR[12]_", ""), fromLast=T)
+dups = split(which(dups), str_replace(rownames(dat_all[[1]]$H3K27ac$res), "BR[12]_", "")[dups])
+marks = names(dat_all[[1]])[1:5]
+dist_res = matrix(NA, ncol=length(marks), nrow=3)
+colnames(dist_res) = marks
+rownames(dist_res) = names(dat_all)[1:3]
+
+for(i in 1:length(marks)) {
+  
+  for(j in 1:3) { # try each metric
+    
+    y = dat_all[[j]][[i]]$res
+    y_dist = as.matrix(dist(y))
+    unlist(lapply(dups, function(x) y_dist[x[1],x[2]]))
+    dist_res[j,i] = mean(unlist(lapply(dups, function(x) y_dist[x[1],x[2]])) / mean(y_dist, na.rm=TRUE), na.rm=TRUE)
+    
+  }
 }
+
 
