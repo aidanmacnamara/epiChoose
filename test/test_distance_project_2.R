@@ -94,16 +94,23 @@ names(rna) = c("Gene Name", all_names)
 
 # RNA RESPONSE ------------------------------------------------------------
 
+thp_diff_filt = rna[apply(rna[,grep("CTR_RNA", names(rna))],1,mean)<5 & apply(rna[,grep("THP1_BR[12]_PMA_RNA", names(rna))],1,mean)>50,] %>% dplyr::select(`Gene Name`)
+
 # genes that are significantly upregulated: pma+lps vs. pma
 thp_diff = read_excel("z:/links/bix-analysis-stv/2016/CTTV/THP1/documents/AllGenes_THP1_U937_Altius_DE.xls")
 thp_diff$THP1_LPS_log2FoldChange = as.numeric(thp_diff$THP1_LPS_log2FoldChange) 
-thp_diff_filt = filter(thp_diff, THP1_LPS_padj<0.01, THP1_LPS_log2FoldChange>1.2) %>% arrange(desc(THP1_LPS_log2FoldChange))
+thp_diff_filt = filter(thp_diff, THP1_LPS_padj<0.05, THP1_LPS_log2FoldChange>1) %>% arrange(desc(THP1_LPS_log2FoldChange))
 
 # only pick genes that were low pre-lps?
 rna_pma = filter(rna, `Gene Name` %in% thp_diff_filt$gene) %>% dplyr::select(`Gene Name`, THP1_BR1_PMA_RNA, THP1_BR2_PMA_RNA) %>% dplyr::mutate(Average=(THP1_BR1_PMA_RNA+THP1_BR2_PMA_RNA)/2)
-no_expr = filter(rna_pma, Average==0) %>% dplyr::select(`Gene Name`) %>% unlist()
-thp_diff_filt = filter(thp_diff_filt, gene %in% no_expr)
 
+no_expr = filter(rna_pma, Average<5) %>% dplyr::select(`Gene Name`) %>% unlist()
+thp_diff_filt = filter(thp_diff_filt, gene %in% no_expr)
+rna_pma_to_lps = data.frame(
+  gene = no_expr,
+  PMA = rna[match(no_expr, rna$`Gene Name`),] %>% dplyr::select(THP1_BR1_PMA_RNA, THP1_BR2_PMA_RNA) %>% apply(1,mean),
+  `PMA+LPS` = rna[match(no_expr, rna$`Gene Name`),] %>% dplyr::select(`THP1_BR1_CTR+LPS_RNA`, `THP1_BR2_CTR+LPS_RNA`) %>% apply(1,mean)
+)
 
 thp_rand = thp_diff[!thp_diff$gene %in% thp_diff_filt$gene & !is.na(thp_diff$THP1_LPS_log2FoldChange) & abs(thp_diff$THP1_LPS_log2FoldChange)<0.5,][
   sample
@@ -113,7 +120,7 @@ thp_rand = thp_diff[!thp_diff$gene %in% thp_diff_filt$gene & !is.na(thp_diff$THP
     replace=FALSE
   ),]
 
-gene_model = data.frame(gene=c(thp_diff_filt$gene, thp_rand$gene), rna_lps=c(thp_diff_filt$THP1_LPS_log2FoldChange, thp_rand$THP1_LPS_log2FoldChange), H3K27ac=NA, H3K4me3=NA, H3K27me3=NA, CTCF=NA, ATAC=NA, H3K27ac_LPS=NA, H3K4me3_LPS=NA, H3K27me3_LPS=NA, CTCF_LPS=NA, ATAC_LPS=NA, Group=factor(c(rep("Significant",146), rep("Random",146))))
+gene_model = data.frame(gene=c(thp_diff_filt$gene, thp_rand$gene), rna_lps=c(thp_diff_filt$THP1_LPS_log2FoldChange, thp_rand$THP1_LPS_log2FoldChange), H3K27ac=NA, H3K4me3=NA, H3K27me3=NA, CTCF=NA, ATAC=NA, H3K27ac_LPS=NA, H3K4me3_LPS=NA, H3K27me3_LPS=NA, CTCF_LPS=NA, ATAC_LPS=NA, Group=factor(c(rep("Significant",11), rep("Random",11))))
 
 for(i in 1:length(gene_model$gene)) {
   

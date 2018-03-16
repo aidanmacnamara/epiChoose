@@ -73,6 +73,11 @@ for(i in 1:length(dds_list)) {
 require("pheatmap")
 require("RColorBrewer")
 
+marks = names(rld_list)
+dist_res = matrix(NA, ncol=length(marks), nrow=2)
+colnames(dist_res) = marks
+rownames(dist_res) = c("Counts","AUC")
+
 for(i in 1:length(rld_list)) {
   
   print(names(rld_list)[i])
@@ -87,24 +92,32 @@ for(i in 1:length(rld_list)) {
     ),]
   )
   
+  dups = duplicated(str_replace(rownames(my_comp[[2]]), "BR[12]_", "")) | duplicated(str_replace(rownames(my_comp[[2]]), "BR[12]_", ""), fromLast=T)
+  dups = split(which(dups), str_replace(rownames(my_comp[[2]]), "BR[12]_", "")[dups])
+  
   for(j in 1:length(my_comp)) {
     
-    sample_dists <- dist(my_comp[[j]])
-    sd_mat <- as.matrix(sample_dists)
-    row_names = paste(rld_list[[i]]$Cell, rld_list[[i]]$Stimulus, rld_list[[i]]$Rep, sep ="_")
-    rownames(sd_mat) = row_names
-    colnames(sd_mat) = NULL
-    colors = colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
-    
-    png(paste0("hm_", i, "_", j, ".png"), height=727, width=1052)
-    pheatmap(sd_mat, clustering_distance_rows=sample_dists, clustering_distance_cols=sample_dists, col=colors, main=names(rld_list)[i])
-    dev.off()
-    
-    plot_pca(my_comp[[j]], annot_1=row_names, annot_2=rld_list[[i]]$Cell, out_file=paste0("pc_", i, "_", j, ".png"))
-    print(plotPCA(rld_list[[i]], intgroup=c("Cell","Stimulus")) + theme_thesis() + ggtitle(names(rld_list)[i]))
-    
+    y = my_comp[[j]]
+    y_dist = as.matrix(dist(y))
+    unlist(lapply(dups, function(x) y_dist[x[1],x[2]]))
+    dist_res[j,i] = mean(unlist(lapply(dups, function(x) y_dist[x[1],x[2]])) / mean(y_dist, na.rm=TRUE), na.rm=TRUE)
+
+  #   sample_dists <- dist(my_comp[[j]])
+  #   sd_mat <- as.matrix(sample_dists)
+  #   row_names = paste(rld_list[[i]]$Cell, rld_list[[i]]$Stimulus, rld_list[[i]]$Rep, sep ="_")
+  #   rownames(sd_mat) = row_names
+  #   colnames(sd_mat) = NULL
+  #   colors = colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+  #   
+  #   png(paste0("hm_", i, "_", j, ".png"), height=727, width=1052)
+  #   pheatmap(sd_mat, clustering_distance_rows=sample_dists, clustering_distance_cols=sample_dists, col=colors, main=names(rld_list)[i])
+  #   dev.off()
+  #   
+  #   plot_pca(my_comp[[j]], annot_1=row_names, annot_2=rld_list[[i]]$Cell, out_file=paste0("pc_", i, "_", j, ".png"))
+  #   print(plotPCA(rld_list[[i]], intgroup=c("Cell","Stimulus")) + theme_thesis() + ggtitle(names(rld_list)[i]))
+
   }
-  
+ 
 }
 
 
