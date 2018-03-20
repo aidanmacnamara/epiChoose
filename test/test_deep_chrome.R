@@ -103,4 +103,54 @@ write_csv(rbind(pos_data[2001:3000,], neg_data[2001:3000,]), "tmp/valid.csv", co
 
 require(keras)
 
+dat_train = read_csv("tmp/train.csv", col_names=FALSE)
+dat_test = read_csv("tmp/test.csv", col_names=FALSE)
+y_train = matrix(0, nrow=20, ncol=2)
+y_train[1:10,1] = 1
+y_train[11:20,2] = 1
+y_test = y_train
+
+x_train = array(NA, dim=c(20,5,100))
+x_test = x_train
+c_ix = 1
+for(i in 1:dim(x_train)[1]) {
+  x_train[i,,] = t(dat_train[c_ix:(c_ix+99),3:7])
+  x_test[i,,] = t(dat_test[c_ix:(c_ix+99),3:7])
+  c_ix = c_ix+100
+}
+
+pheatmap(x_train[1,,], cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+
+pheatmap(x_train[11,,], cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+
+# model
+model = keras_model_sequential()
+my_v = 5 # or 100?
+
+model %>%
+  layer_conv_2d(filter=my_v, kernel_size=c(3,3), padding="same", input_shape=c(5,100)) %>%  
+  layer_activation("relu") %>%  
+  layer_conv_2d(filter=my_v ,kernel_size=c(3,3)) %>% layer_activation("relu") %>%
+  layer_max_pooling_2d(pool_size=c(2,2)) %>%  
+  layer_dropout(0.25) %>%
+  layer_conv_2d(filter=my_v , kernel_size=c(3,3), padding="same") %>% layer_activation("relu") %>%
+  layer_conv_2d(filter=my_v, kernel_size=c(3,3) ) %>% layer_activation("relu") %>%  
+  layer_max_pooling_2d(pool_size=c(2,2)) %>%  
+  layer_dropout(0.25) %>%
+  layer_flatten() %>%  
+  layer_dense(250) %>%  
+  layer_activation("relu") %>%  
+  layer_dropout(0.5) %>%  
+  layer_dense(2) %>%  
+  layer_activation("softmax") 
+
+
+opt = optimizer_adam(lr=0.0001, decay = 1e-6 )
+
+model %>% compile(loss="categorical_crossentropy", optimizer=opt, metrics="accuracy")
+summary(model)
+
+model %>%
+  fit(x_train, y_train, batch_size=32, epochs=80, validation_data = list(x_test, y_test), shuffle=TRUE)
+
 
