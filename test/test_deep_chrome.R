@@ -7,18 +7,21 @@ load("data/gene_list_all.RData")
 tss_win = gene_list_all
 start(tss_win) = tss_win$transcription_start_site - 5e3
 end(tss_win) = tss_win$transcription_start_site + (5e3+1)
-write_tsv(data.frame(tss_win)[,1:3], "y:/sandbox/tss_win.bed", col_names=FALSE)
+write_tsv(data.frame(tss_win)[,1:3], "y:/links/projects/bin_regions/tss_win.bed", col_names=FALSE)
 
 
 # IMPORT AND MUNGE DATA ---------------------------------------------------
 
-# y = read_tsv("y:/sandbox/bin_regions/otar_samples/thp_1_BR1.txt", col_names=FALSE)
+# run the code in links/projects/bin_regions
+
+# y = read_tsv("y:/links/projects/bin_regions/otar_samples/thp_1_BR1.txt", col_names=FALSE)
 # thp1_df = lapply(as.list(thp1), function(x) read_tsv(paste0("z:/links/bix-analysis-stv/2016/CTTV/THP1/data/genecounts/", x), col_names=FALSE))
 # y_2 = read_tsv("y:/sandbox/bin_regions/otar_samples/thp_1_BR1_atac.txt", col_names=FALSE)
 # y = cbind(y,y_2$X5)
 # names(y) = c("Seq","Start","End","Bin","H34K27ac","H3K4me3","CTCF","H3K27me3","ATAC")
 # y$Bin = rep(1:100, 18086)
 # y$Gene = rep(gene_list_all$hgnc_symbol, each=100)
+# saved as dc_example
 
 load("tmp/dc_example.RData")
 
@@ -55,6 +58,49 @@ validate_set = rbind(
   dc_example[dc_example$Gene %in% neg_genes[which(neg_sample==3)],]
 )
 
+write_csv(train_set[,c(10,4:9,11)], "tmp/train.csv", col_names=FALSE)
+write_csv(test_set[,c(10,4:9,11)], "tmp/test.csv", col_names=FALSE)
+write_csv(validate_set[,c(10,4:9,11)], "tmp/valid.csv", col_names=FALSE)
+
+# upload to drip and run deepchrome
+
+
 # ANALYSIS ----------------------------------------------------------------
+
+y = read_tsv("c:/Downloads/table.txt", col_names=FALSE)
+y = data.matrix(y)
+y[1:5,1:5]
+pheatmap(y, cluster_rows=FALSE, cluster_cols = FALSE)
+
+
+# MOCK EXAMPLE ------------------------------------------------------------
+
+# add in 3 signals across datatypes for positive
+hist(log(as.numeric(unlist(dc_example[,5:9]))))
+pos_data = data.frame()
+neg_data = data.frame()
+
+for(i in 1:30) { # 10 positive genes * 3
+  
+  dat_raw_pos = sample(as.numeric(unlist(dc_example[,5:9])), size=500, replace=TRUE)
+  dat_raw_neg = sample(as.numeric(unlist(dc_example[,5:9])), size=500, replace=TRUE)
+  # pheatmap(t(matrix(dat_raw, nrow=100, byrow=FALSE)), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+  
+  # add signal
+  dat_raw_pos[c(50:75,315:340)] = dat_raw_pos[c(50:75,315:340)]*100
+  # pheatmap(t(matrix(dat_raw, nrow=100, byrow=FALSE)), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+  pos_data = rbind(pos_data, cbind(i, 1:100, matrix(dat_raw_pos, nrow=100, byrow=FALSE), 1))
+  neg_data = rbind(neg_data, cbind(i+30, 1:100, matrix(dat_raw_neg, nrow=100, byrow=FALSE), 0))
+}
+names(pos_data)[1] = "V1"
+
+write_csv(rbind(pos_data[1:1000,], neg_data[1:1000,]), "tmp/train.csv", col_names=FALSE)
+write_csv(rbind(pos_data[1001:2000,], neg_data[1001:2000,]), "tmp/test.csv", col_names=FALSE)
+write_csv(rbind(pos_data[2001:3000,], neg_data[2001:3000,]), "tmp/valid.csv", col_names=FALSE)
+
+
+# TRY KERAS ---------------------------------------------------------------
+
+require(keras)
 
 
