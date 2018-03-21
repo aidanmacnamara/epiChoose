@@ -103,27 +103,41 @@ write_csv(rbind(pos_data[2001:3000,], neg_data[2001:3000,]), "tmp/valid.csv", co
 
 require(keras)
 
-dat_train = read_csv("tmp/train.csv", col_names=FALSE)
-dat_test = read_csv("tmp/test.csv", col_names=FALSE)
-y_train = matrix(0, nrow=20, ncol=2)
-y_train[1:10,1] = 1
-y_train[11:20,2] = 1
-y_test = y_train
+dat_training = read_csv("tmp/train.csv", col_names=FALSE)
+dat_testing = read_csv("tmp/test.csv", col_names=FALSE)
+y_training = matrix(0, nrow=20, ncol=2)
+y_training[1:10,1] = 1
+y_training[11:20,2] = 1
+y_testing = y_training
 
-x_train = array(NA, dim=c(20,5,100))
-x_test = x_train
+x_training = array(NA, dim=c(20,5,100))
+x_testing = x_training
 c_ix = 1
-for(i in 1:dim(x_train)[1]) {
-  x_train[i,,] = t(dat_train[c_ix:(c_ix+99),3:7])
-  x_test[i,,] = t(dat_test[c_ix:(c_ix+99),3:7])
+for(i in 1:dim(x_training)[1]) {
+  x_training[i,,] = t(dat_training[c_ix:(c_ix+99),3:7])
+  x_testing[i,,] = t(dat_testing[c_ix:(c_ix+99),3:7])
   c_ix = c_ix+100
 }
 
-pheatmap(x_train[1,,], cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+pheatmap(x_training[1,,], cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
 
-pheatmap(x_train[11,,], cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+pheatmap(x_training[11,,], cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
 
-# model
+# model 1
+
+x_training <- array_reshape(x_training, c(nrow(x_training), 500))
+x_testing <- array_reshape(x_testing, c(nrow(x_testing), 500))
+
+model <- keras_model_sequential() 
+model %>% 
+  layer_dense(units=256, activation='relu', input_shape=c(500)) %>% 
+  layer_dropout(rate=0.4) %>% 
+  layer_dense(units=128, activation='relu') %>%
+  layer_dropout(rate=0.3) %>%
+  layer_dense(units=2, activation='softmax')
+
+# model 2 
+
 model = keras_model_sequential()
 my_v = 5 # or 100?
 
@@ -151,6 +165,6 @@ model %>% compile(loss="categorical_crossentropy", optimizer=opt, metrics="accur
 summary(model)
 
 model %>%
-  fit(x_train, y_train, batch_size=32, epochs=80, validation_data = list(x_test, y_test), shuffle=TRUE)
+  fit(x_training, y_training, batch_size=32, epochs=80, validation_data = list(x_testing, y_testing), shuffle=TRUE)
 
 
