@@ -151,7 +151,7 @@ gen_images = image_data_generator(
   horizontal_flip=TRUE
 )
 
-gen_images %>% fit_image_data_generator(train_x)
+gen_images %>% fit_image_data_generator(x_training)
 
 model %>% fit_generator(
   flow_images_from_data(x_training, y_training, gen_images, batch_size=32, save_to_dir="images/"),
