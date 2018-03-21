@@ -140,7 +140,24 @@ model %>% compile(loss='categorical_crossentropy', optimizer=optimizer_rmsprop()
 history <- model %>% fit(x_training, y_training, epochs=30, batch_size=128, validation_split=0.2)
 plot(history)
 model %>% evaluate(x_testing, y_testing)
-model %>% predict_classes(x_testing)
+# model %>% predict_classes(x_testing) # getting error
+
+gen_images = image_data_generator(
+  featurewise_center=TRUE,
+  featurewise_std_normalization=TRUE,
+  rotation_range=20,
+  width_shift_range=0.30,
+  height_shift_range=0.30,
+  horizontal_flip=TRUE
+)
+
+gen_images %>% fit_image_data_generator(train_x)
+
+model %>% fit_generator(
+  flow_images_from_data(x_training, y_training, gen_images, batch_size=32, save_to_dir="images/"),
+  steps_per_epoch=as.integer(50000/32), epochs=80, validation_data=list(x_testing, y_testing)
+)
+
 
 # model 2 
 
