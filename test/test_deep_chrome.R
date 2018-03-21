@@ -136,6 +136,12 @@ model %>%
   layer_dropout(rate=0.3) %>%
   layer_dense(units=2, activation='softmax')
 
+model %>% compile(loss='categorical_crossentropy', optimizer=optimizer_rmsprop(), metrics=c('accuracy'))
+history <- model %>% fit(x_training, y_training, epochs=30, batch_size=128, validation_split=0.2)
+plot(history)
+model %>% evaluate(x_testing, y_testing)
+model %>% predict_classes(x_testing)
+
 # model 2 
 
 model = keras_model_sequential()
