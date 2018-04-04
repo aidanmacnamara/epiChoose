@@ -47,7 +47,7 @@ dist_mat <- function(tmp, comp_ix, labels, my_title="", font_size=15, label_size
     colnames(y) = rownames(x)
     rownames(y) = rownames(x)
     
-    if(!is_empty(complete_ix)) {
+    if(length(complete_ix)>1) {
       x = cor(t(x[complete_ix,]), use="pairwise.complete.obs")
       y[complete_ix,complete_ix] = x
     }
