@@ -58,6 +58,7 @@ dist_mat <- function(tmp, comp_ix, labels, my_title="", font_size=15, label_size
   
   all_dists = lapply(tmp_copy, get_dists)
   res = do.call("rbind", lapply(all_dists, function(x) 1-x[comp_ix[[1]], comp_target]))
+  if(is.null(colnames(res))) {colnames(res) = rownames(tmp_copy[[1]]$res)[comp_ix[[1]]]} # hack to stop name being dropped if n=1
   res_melt = melt(t(res))
   names(res_melt) = c("Cell", "Assay", "Distance")
   
