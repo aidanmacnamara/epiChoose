@@ -9,7 +9,7 @@ require(VennDiagram)
 require(TxDb.Hsapiens.UCSC.hg38.knownGene) # for peak to gene
 require(ChIPseeker) # for peak to gene
 require(org.Hs.eg.db) # for peak to gene
-load_all()
+require(epiChoose)
 
 
 # GENERATE ENSEMBL DATA ---------------------------------------------------
@@ -71,7 +71,14 @@ marks = c("H3K27ac","H3K4me3","H3K27me3","ATAC","CTCF")
 
 # BLUEPRINT DATA ----------------------------------------------------------
 
-blueprint_input = "inst/extdata/blueprint_parsed.csv"
+# this returns the metadata for samples that have all of H3K27ac, H3K4me3 and H3K27me3 available
+source("R/prep_blueprint_chip.R")
+blueprint_parsed = prep_blueprint_chip(blueprint_data="inst/extdata/blueprint_files.tsv", root="/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/BLUEPRINT/", out_file="inst/extdata//blueprint_parsed.csv")
+
+# which of these files also have rna-seq processed by expressionatlas?
+rna_annot = data.frame(read_tsv("data/rna/E-MTAB-3827.sdrf.txt"), check.names=TRUE)
+
+blueprint_input = "inst/extdata/blueprint_parsed.csv" # blueprint_parsed.csv produced by vignettes/blueprint.R
 
 require(BiocParallel)
 # blueprint_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(blueprint_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
@@ -152,7 +159,7 @@ p2_rna = tbl_df(p2_rna)
 
 p1_rna = read_tsv(system.file("extdata", "rna/E-MTAB-4101-query-results.fpkms.tsv", package="epiChoose"), skip=4)
 p3_rna = read_tsv(system.file("extdata", "rna/E-MTAB-4729-query-results.fpkms.tsv", package="epiChoose"), skip=4)
-# bp_rna = read_tsv(system.file("extdata", "rna/E-MTAB-3827-query-results.fpkms.tsv", package="epiChoose"), skip=4)
+bp_rna = read_tsv(system.file("extdata", "rna/E-MTAB-3827-query-results.fpkms.tsv", package="epiChoose"), skip=4)
 
 rna = tbl_df(merge(merge(p1_rna, p3_rna, all=TRUE), p2_rna, all=TRUE, by="Gene Name"))
 names(rna)[2] = "Gene ID"

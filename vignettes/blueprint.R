@@ -14,7 +14,7 @@ load("r_data/column_annotation/gene_list_all.RData")
 
 # ROI ---------------------------------------------------------------------
 
-# the regultory regions (2kb window around tsss)
+# the regulatory regions (2kb window around tsss)
 load("r_data/column_annotation/roi.RData")
 
 
