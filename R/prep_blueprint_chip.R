@@ -4,7 +4,7 @@
 #' @details What's this?
 #' @return TO ADD
 
-prep_blueprint_chip <- function(blueprint_data, assays=c("H3K27ac","H3K4me3","H3K27me3"), out_file, root) {
+prep_blueprint_chip <- function(blueprint_data, assays=c("H3K27ac","H3K4me3","H3K27me3"), out_file, root, rna_annot) {
   
   require(tidyverse)
   require(stringr)
@@ -21,6 +21,11 @@ prep_blueprint_chip <- function(blueprint_data, assays=c("H3K27ac","H3K4me3","H3
   
   # filter those that have all assays available
   chip_with_assays_filtered = filter(chip_with_assays, Data)
+  
+  # check if rna data is available
+  bp_rna_labels = paste(rna_annot$`Comment[donor ID]`, rna_annot$`Characteristics[cell type]`, sep="_")
+  chip_with_assays_filtered$has_rna = paste(chip_with_assays_filtered$Donor, chip_with_assays_filtered$`Cell type`, sep="_") %in% bp_rna_labels
+  chip_with_assays_filtered = filter(chip_with_assays_filtered, has_rna)
   
   out_dat = data.frame() # initialise output data frame
   
@@ -60,7 +65,7 @@ prep_blueprint_chip <- function(blueprint_data, assays=c("H3K27ac","H3K4me3","H3
   names(out_dat)[which(names(out_dat)=="Experiment")] = "Mark"
   
   write_csv(out_dat, out_file)
-  return(out_dat)
+  return(list(files=out_dat, samples=chip_with_assays_filtered))
   
 }
 

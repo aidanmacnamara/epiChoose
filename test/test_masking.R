@@ -9,7 +9,7 @@ require(VennDiagram)
 require(TxDb.Hsapiens.UCSC.hg38.knownGene) # for peak to gene
 require(ChIPseeker) # for peak to gene
 require(org.Hs.eg.db) # for peak to gene
-require(epiChoose)
+load_all()
 
 
 # GENERATE ENSEMBL DATA ---------------------------------------------------
@@ -71,20 +71,17 @@ marks = c("H3K27ac","H3K4me3","H3K27me3","ATAC","CTCF")
 
 # BLUEPRINT DATA ----------------------------------------------------------
 
-# this returns the metadata for samples that have all of H3K27ac, H3K4me3 and H3K27me3 available
-source("R/prep_blueprint_chip.R")
-blueprint_parsed = prep_blueprint_chip(blueprint_data="inst/extdata/blueprint_files.tsv", root="/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/BLUEPRINT/", out_file="inst/extdata//blueprint_parsed.csv")
+# this returns the metadata for samples that have all of H3K27ac, H3K4me3, H3K27me3 and rna available
+rna_annot = read_tsv("inst/extdata/rna/E-MTAB-3827.sdrf.txt") # get rna annotation to check against
+blueprint_parsed = prep_blueprint_chip(blueprint_data="inst/extdata/blueprint_files.tsv", root="z:/links/RD-Epigenetics-NetworkData/otar_020/BLUEPRINT/", out_file="inst/extdata/blueprint_parsed.csv", rna_annot=rna_annot)
 
-# which of these files also have rna-seq processed by expressionatlas?
-rna_annot = data.frame(read_tsv("data/rna/E-MTAB-3827.sdrf.txt"), check.names=TRUE)
-
-blueprint_input = "inst/extdata/blueprint_parsed.csv" # blueprint_parsed.csv produced by vignettes/blueprint.R
+blueprint_input = "inst/extdata/blueprint_parsed.csv"
 
 require(BiocParallel)
 # blueprint_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(blueprint_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
 blueprint_chip = vector("list", length=length(marks))
 for(i in 1:length(blueprint_chip)) {
-  blueprint_chip[[i]] = make_auc_matrix(blueprint_input, roi_reg, marks[i], "tmp/", quantile_norm=TRUE)
+  blueprint_chip[[i]] = make_auc_matrix(blueprint_input, roi_reg, marks[i], "tmp/", quantile_norm=FALSE)
 }
 
 # make sure rows are in the same order
@@ -94,7 +91,19 @@ blueprint_chip_filtered = prep_across_datatypes(blueprint_chip)
 # GSK DATA ----------------------------------------------------------------
 
 gsk_input = "inst/extdata/data_gsk.xlsx"
-gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi_reg, marks[x], "tmp/", quantile_norm=TRUE), BPPARAM=MulticoreParam(workers=5))
+
+# check for missing data
+data_gsk = read_excel(gsk_input)
+
+bw_missing = data_gsk[!file.exists(str_replace(data_gsk$Bigwig, "/GWD/bioinfo/projects", "z:/links")),]
+# bw_missing = data_gsk[!file.exists(data_gsk$Bigwig),]
+bw_missing$Label
+
+bam_missing = data_gsk[!file.exists(str_replace(data_gsk$Bam, "/GWD/bioinfo/projects", "z:/links")),]
+# bam_missing = data_gsk[!file.exists(data_gsk$Bam),]
+bam_missing$Label
+
+gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi_reg, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=5))
 gsk_chip_filtered = prep_across_datatypes(gsk_chip)
 
 
@@ -130,36 +139,15 @@ group_labels = c(
 
 # ADD RNA -----------------------------------------------------------------
 
-u937 = list.files("~/links/bix-analysis-stv/2016/CTTV/U937/data/Outputs/star/bam_files/genecounts/")
-thp1 = list.files("~/links/bix-analysis-stv/2016/CTTV/THP1/data/genecounts/")
+rna_dat = sapply(grep("fpkm", list.files("inst/extdata/rna/"), value=TRUE), function(x) read_tsv(paste0("inst/extdata/rna/",x)))
 
-u937_df = lapply(as.list(u937), function(x) read_tsv(paste0("~/links/bix-analysis-stv/2016/CTTV/U937/data/Outputs/star/bam_files/genecounts/", x), col_names=FALSE))
-thp1_df = lapply(as.list(thp1), function(x) read_tsv(paste0("~/links/bix-analysis-stv/2016/CTTV/THP1/data/genecounts/", x), col_names=FALSE))
+rna_annot = sapply(grep("sdrf", list.files("inst/extdata/rna/"), value=TRUE), function(x) read_tsv(paste0("inst/extdata/rna/",x)))
 
-# merge into sample per column
-my_names = u937_df[[1]]$X1
-p2_rna = data.frame(do.call("cbind", lapply(u937_df, function(x) x$X2)))
-p2_rna = cbind(NA, my_names, p2_rna)
-p2_rna = cbind(p2_rna, data.frame(do.call("cbind", lapply(thp1_df, function(x) x$X2[match(my_names, x$X1)]))))
+mart_1 = useMart("ensembl", dataset="hsapiens_gene_ensembl")
+mapping <- getBM(attributes=c("ensembl_gene_id","hgnc_symbol"), mart=mart_1)
+rownames_symbol = mapping$hgnc_symbol[match(rna_dat[[1]]$`Gene ID`, mapping$ensembl_gene_id)]
 
-# get names
-sample_info = read_csv("~/links/bix-analysis-stv/2016/CTTV/U937/data/sampleInfo.csv", col_names=FALSE)
 
-all_names = sample_info$X1[c(match(str_extract(u937, "^[[:alnum:]]+"), sample_info$X32), match(str_extract(thp1, "^[[:alnum:]]+"), sample_info$X32))]
-
-names(p2_rna) = c("Gene ID", "Gene Name", all_names)
-
-# change names so they match with epigenetic labels
-names(p2_rna) = str_replace(names(p2_rna), "THP1", "THP-1")
-names(p2_rna) = str_replace(names(p2_rna), "CTR", "Baseline")
-names(p2_rna) = str_replace(names(p2_rna), "_RNA", "")
-names(p2_rna) = str_replace(names(p2_rna), "Baseline\\+LPS", "LPS")
-
-p2_rna = tbl_df(p2_rna)
-
-p1_rna = read_tsv(system.file("extdata", "rna/E-MTAB-4101-query-results.fpkms.tsv", package="epiChoose"), skip=4)
-p3_rna = read_tsv(system.file("extdata", "rna/E-MTAB-4729-query-results.fpkms.tsv", package="epiChoose"), skip=4)
-bp_rna = read_tsv(system.file("extdata", "rna/E-MTAB-3827-query-results.fpkms.tsv", package="epiChoose"), skip=4)
 
 rna = tbl_df(merge(merge(p1_rna, p3_rna, all=TRUE), p2_rna, all=TRUE, by="Gene Name"))
 names(rna)[2] = "Gene ID"
