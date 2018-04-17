@@ -73,9 +73,9 @@ marks = c("H3K27ac","H3K4me3","H3K27me3","ATAC","CTCF")
 
 # this returns the metadata for samples that have all of H3K27ac, H3K4me3, H3K27me3 and rna available
 rna_annot = read_tsv("inst/extdata/rna/E-MTAB-3827.sdrf.txt") # get rna annotation to check against
-blueprint_parsed = prep_blueprint_chip(blueprint_data="inst/extdata/blueprint_files.tsv", root="z:/links/RD-Epigenetics-NetworkData/otar_020/BLUEPRINT/", out_file="inst/extdata/blueprint_parsed.csv", rna_annot=rna_annot)
+data_blueprint = prep_blueprint_chip(blueprint_data="inst/extdata/blueprint_files.tsv", root="/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/BLUEPRINT/", out_file="inst/extdata/data_blueprint.csv", rna_annot=rna_annot)
 
-blueprint_input = "inst/extdata/blueprint_parsed.csv"
+blueprint_input = "inst/extdata/data_blueprint.csv"
 
 require(BiocParallel)
 # blueprint_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(blueprint_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
@@ -95,12 +95,12 @@ gsk_input = "inst/extdata/data_gsk.xlsx"
 # check for missing data
 data_gsk = read_excel(gsk_input)
 
-bw_missing = data_gsk[!file.exists(str_replace(data_gsk$Bigwig, "/GWD/bioinfo/projects", "z:/links")),]
-# bw_missing = data_gsk[!file.exists(data_gsk$Bigwig),]
+# bw_missing = data_gsk[!file.exists(str_replace(data_gsk$Bigwig, "/GWD/bioinfo/projects", "z:/links")),]
+bw_missing = data_gsk[!file.exists(data_gsk$Bigwig),]
 bw_missing$Label
 
-bam_missing = data_gsk[!file.exists(str_replace(data_gsk$Bam, "/GWD/bioinfo/projects", "z:/links")),]
-# bam_missing = data_gsk[!file.exists(data_gsk$Bam),]
+# bam_missing = data_gsk[!file.exists(str_replace(data_gsk$Bam, "/GWD/bioinfo/projects", "z:/links")),]
+bam_missing = data_gsk[!file.exists(data_gsk$Bam),]
 bam_missing$Label
 
 gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi_reg, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=5))
@@ -143,22 +143,37 @@ rna_dat = sapply(grep("fpkm", list.files("inst/extdata/rna/"), value=TRUE), func
 
 rna_annot = sapply(grep("sdrf", list.files("inst/extdata/rna/"), value=TRUE), function(x) read_tsv(paste0("inst/extdata/rna/",x)))
 
+# merge data
+rna_dat_merge = rna_dat %>% Reduce(function(x, y) full_join(x, y, by="Gene ID"), .)
+rna_annot_merge = bind_rows(rna_annot)
+
+
+# LABEL DATA - NEEDS MANUAL EDITING ---------------------------------------
+
+# match data to annotation by run id
+sample_match = match(names(rna_dat_merge)[-1], rna_annot_merge$`Comment[ENA_RUN]`) # 2 samples missing annotation?
+
+# create blueprint labels first
+sample_labels = paste(rna_annot_merge$`Comment[donor ID]`[sample_match], rna_annot_merge$`Characteristics[cell type]`[sample_match], sep="_")
+
+# now gsk labels
+gsk_label_mapping = read_excel("inst/extdata/rna/rna_chip_mapping.xlsx")
+sample_labels[grep("^NA", sample_labels)] = rna_annot_merge$`Source Name`[sample_match[grep("^NA", sample_labels)]]
+sample_labels[sample_labels %in% gsk_label_mapping$rna_label] = gsk_label_mapping$chip_label[match(sample_labels[sample_labels %in% gsk_label_mapping$rna_label], gsk_label_mapping$rna_label)]
+names(rna_dat_merge)[-1] = sample_labels
+names(rna_dat_merge)[-1][is.na(names(rna_dat_merge)[-1])] = paste("Unknown", 1:length(names(rna_dat_merge)[-1][is.na(names(rna_dat_merge)[-1])]), sep="_")
+rna_dat_merge = rna_dat_merge[,!duplicated(names(rna_dat_merge))] # IS THIS CORRECT? some biological replicates still appearing twice in the data, removed here ...
+
+# / LABEL DATA / ----------------------------------------------------------
+
+
 mart_1 = useMart("ensembl", dataset="hsapiens_gene_ensembl")
 mapping <- getBM(attributes=c("ensembl_gene_id","hgnc_symbol"), mart=mart_1)
 rownames_symbol = mapping$hgnc_symbol[match(rna_dat[[1]]$`Gene ID`, mapping$ensembl_gene_id)]
+rna_dat_merge = tbl_df(cbind(rownames_symbol, rna_dat_merge))
+names(rna_dat_merge)[1] = "Gene Name"
 
-
-
-rna = tbl_df(merge(merge(p1_rna, p3_rna, all=TRUE), p2_rna, all=TRUE, by="Gene Name"))
-names(rna)[2] = "Gene ID"
-rna = rna[,-which(names(rna)=="Gene ID.y")]
-names(rna)[3:11] = paste0(names(rna)[3:11], "_BR1_Baseline")
-names(rna) = str_replace(names(rna), "-", "")
-names(rna) = str_replace(names(rna), "P1", "P-1")
-
-# rna_bp = prep_blueprint_rna() # leave this for the moment
-
-rna_add = prep_rna(rna, gene_list_all$hgnc_symbol, single_labels, names(rna)[-c(1,2)])
+rna_add = prep_rna(rna_dat_merge, gene_list_all$hgnc_symbol, single_labels, names(rna_dat_merge)[-c(1,2)], quantile_norm=FALSE)
 
 
 # EDIT NAMES --------------------------------------------------------------
