@@ -1,27 +1,40 @@
 
 load("data/gene_list_all.RData")
+data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
 
 
 # EXPORT COORDINATES ------------------------------------------------------
 
+# this section is making a bed file that splits each gene into 10kb windows with bins of 200bp
 tss_win = gene_list_all
 start(tss_win) = tss_win$transcription_start_site - 5e3
 end(tss_win) = tss_win$transcription_start_site + (5e3+1)
-write_tsv(data.frame(tss_win)[,1:3], "y:/links/projects/bin_regions/tss_win.bed", col_names=FALSE)
+write_tsv(data.frame(tss_win)[,1:3], "ml/tss_win.bed", col_names=FALSE)
+
+# run ml/make_binned_bed.sh
 
 
 # IMPORT AND MUNGE DATA ---------------------------------------------------
 
+my_label = "THP-1_BR1_Baseline"
+my_bams_1 = data_gsk %>% filter(Label==my_label, Mark!="Input", Mark!="ATAC") %>% dplyr::select(Bam) %>% unlist()
+my_bams_2 = data_gsk %>% filter(Label==my_label, Mark=="ATAC") %>% dplyr::select(Bam) %>% unlist()
+to_idx = !unlist(sapply(c(my_bams_1, my_bams_2), function(x) file.exists(paste(x, ".bai", collapse=" ", sep=""))))
+system(paste("ls", paste(c(my_bams_1, my_bams_2)[to_idx], collapse=" "), "| parallel samtools index '{}'"))
+my_cmd_1 = paste0("bedtools multicov -bams ", paste(my_bams_1, collapse=" "), " -bed ml/tss_win_binned.bed -f 0.4 > ", "ml/output/tmp_1.txt")
+my_cmd_2 = paste0("bedtools multicov -bams ", paste(my_bams_2, collapse=" "), " -bed ml/tss_win_binned.bed -f 0.4 > ", "ml/output/tmp_2.txt")
+system(my_cmd_1)
+system(my_cmd_2)
+
 # run the code in links/projects/bin_regions
 
-# y = read_tsv("y:/links/projects/bin_regions/otar_samples/thp_1_BR1.txt", col_names=FALSE)
-# thp1_df = lapply(as.list(thp1), function(x) read_tsv(paste0("z:/links/bix-analysis-stv/2016/CTTV/THP1/data/genecounts/", x), col_names=FALSE))
-# y_2 = read_tsv("y:/sandbox/bin_regions/otar_samples/thp_1_BR1_atac.txt", col_names=FALSE)
-# y = cbind(y,y_2$X5)
-# names(y) = c("Seq","Start","End","Bin","H34K27ac","H3K4me3","CTCF","H3K27me3","ATAC")
-# y$Bin = rep(1:100, 18086)
-# y$Gene = rep(gene_list_all$hgnc_symbol, each=100)
-# saved as dc_example
+tmp_1 = read_tsv("ml/output/tmp_1.txt", col_names=FALSE)
+tmp_2 = read_tsv("ml/output/tmp_2.txt", col_names=FALSE)
+tmp_all = cbind(tmp_1, tmp_2$X5)
+names(tmp_all) = c("Seq","Start","End","Bin","H34K27ac","H3K4me3","CTCF","H3K27me3","ATAC")
+tmp_all$Bin = rep(1:100, 18086)
+tmp_all$Gene = rep(gene_list_all$hgnc_symbol, each=100)
+
 
 load("tmp/dc_example.RData")
 
