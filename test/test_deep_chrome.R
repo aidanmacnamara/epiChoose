@@ -36,12 +36,15 @@ thp_diff_filt = filter(thp_diff, THP1_LPS_padj<0.05, THP1_LPS_log2FoldChange>1) 
 dc_example$rna[dc_example$Gene %in% thp_diff_filt$gene] = 1
 dc_example %>% group_by(Gene) %>% summarise(Status=mean(rna)) %>% dplyr::select(Status) %>% table()
 
-dc_data = matrix(NA, nrow=dim(dc_example)[1]/100, ncol=501)
+dc_example_norm = dc_example
+dc_example_norm[,5:9] = normalizeQuantiles(dc_example[,c(5:9)])
+
+dc_data = matrix(NA, nrow=dim(dc_example_norm)[1]/100, ncol=501)
 
 c_ix = 1
 for(i in 1:dim(dc_data)[1]) {
-  dc_data[i,1:500] = unlist(dc_example[c_ix:(c_ix+99),c(5:9)])
-  dc_data[i,501] = dc_example$rna[c_ix]
+  dc_data[i,1:500] = unlist(dc_example_norm[c_ix:(c_ix+99),c(5:9)])
+  dc_data[i,501] = dc_example_norm$rna[c_ix]
   c_ix = c_ix+100
 }
 
@@ -70,8 +73,17 @@ pred = predict(model, task=task, subset=test_set)
 performance(pred, measures=list(mmce, acc))
 
 fv = generateFilterValuesData(task, method="information.gain")
+# fv = generateFeatureImportanceData(task, learner=lrn)
 
 pheatmap(matrix(fv$data$information.gain, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE)
+
+av_pos = unlist(apply(filter(dc_data_sample, Y==1) %>% dplyr::select(-Y), 2, mean))
+av_neg = unlist(apply(filter(dc_data_sample, Y==0) %>% dplyr::select(-Y), 2, mean))
+av_range = range(c(av_pos, av_neg))
+
+pheatmap(matrix(av_pos, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+
+pheatmap(matrix(av_neg, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
 
 
 # TRY TOY EXAMPLE ---------------------------------------------------------
