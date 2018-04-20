@@ -19,8 +19,12 @@ write_tsv(data.frame(tss_win)[,1:3], "ml/tss_win.bed", col_names=FALSE)
 my_label = "THP-1_BR1_Baseline"
 my_bams_1 = data_gsk %>% filter(Label==my_label, Mark!="Input", Mark!="ATAC") %>% dplyr::select(Bam) %>% unlist()
 my_bams_2 = data_gsk %>% filter(Label==my_label, Mark=="ATAC") %>% dplyr::select(Bam) %>% unlist()
+
 to_idx = !unlist(sapply(c(my_bams_1, my_bams_2), function(x) file.exists(paste(x, ".bai", collapse=" ", sep=""))))
-system(paste("ls", paste(c(my_bams_1, my_bams_2)[to_idx], collapse=" "), "| parallel samtools index '{}'"))
+if(any(to_idx)) {
+  system(paste("ls", paste(c(my_bams_1, my_bams_2)[to_idx], collapse=" "), "| parallel samtools index '{}'"))
+}
+
 my_cmd_1 = paste0("bedtools multicov -bams ", paste(my_bams_1, collapse=" "), " -bed ml/tss_win_binned.bed -f 0.4 > ", "ml/output/tmp_1.txt")
 my_cmd_2 = paste0("bedtools multicov -bams ", paste(my_bams_2, collapse=" "), " -bed ml/tss_win_binned.bed -f 0.4 > ", "ml/output/tmp_2.txt")
 system(my_cmd_1)
@@ -34,52 +38,78 @@ tmp_all = cbind(tmp_1, tmp_2$X5)
 names(tmp_all) = c("Seq","Start","End","Bin","H34K27ac","H3K4me3","CTCF","H3K27me3","ATAC")
 tmp_all$Bin = rep(1:100, 18086)
 tmp_all$Gene = rep(gene_list_all$hgnc_symbol, each=100)
+assign(my_label, tmp_all)
+save(list=my_label, file=paste0("ml/output/", my_label, ".RData"))
 
 
-load("tmp/dc_example.RData")
+# RELOAD DATA -------------------------------------------------------------
+
+load("ml/output/THP-1_BR1_Baseline.RData")
+dat = `THP-1_BR1_Baseline`
+
+
+# GET RESPONSE (RNA) ------------------------------------------------------
+
+rna_dat = read_tsv("inst/extdata/rna/E-MTAB-5191.genes.fpkm.htseq2.tsv")
+mart_1 = useMart("ensembl", dataset="hsapiens_gene_ensembl")
+mapping <- getBM(attributes=c("ensembl_gene_id","hgnc_symbol"), mart=mart_1)
+rownames_symbol = mapping$hgnc_symbol[match(rna_dat$`Gene ID`, mapping$ensembl_gene_id)]
+
+rna_annot = read_tsv("inst/extdata/rna/E-MTAB-5191.sdrf.txt")
+my_samples = c("THP1 BR1 CTR_RNA","THP1 BR2 CTR_RNA","THP1 BR1 PMA_RNA","THP1 BR2 PMA_RNA")
+my_ids = rna_annot$`Comment[ENA_RUN]`[match(my_samples, rna_annot$`Source Name`)]
+rna_dat_filt = rna_dat[,match(my_ids, names(rna_dat))]
+names(rna_dat_filt) = my_samples
+rna_dat_filt = data.frame(Gene=rownames_symbol, rna_dat_filt)
+rna_dat_filt_long = gather(rna_dat_filt, "Sample", "FPKM", 2:(length(my_samples)+1))
+ggplot(rna_dat_filt_long, aes(x=FPKM, fill=Sample)) + geom_histogram(bins=2e4) + theme_thesis() + ylab("") + coord_cartesian(xlim=c(0,20))
+table(rna_dat_filt$FPKM<1)
+
+# what are the genes that are at 0 fpkm pre-stimulation and go high?
+stim_genes = rna_dat_filt[(rna_dat_filt$THP1.BR1.CTR_RNA<1 & rna_dat_filt$THP1.BR2.CTR_RNA<1) & (rna_dat_filt$THP1.BR1.PMA_RNA>3 & rna_dat_filt$THP1.BR2.PMA_RNA>3),]
+stim_genes_summ = data.frame(gene=stim_genes$Gene, diff=apply(stim_genes[,4:5]-stim_genes[,2:3], 1, mean, na.rm=TRUE))
+stim_genes_summ = arrange(stim_genes_summ, desc(diff))
+
+
+# ANALYSIS ----------------------------------------------------------------
 
 # add rna expression
-dc_example$rna = 0
+dat$rna = 0
+dat$rna[dat$Gene %in% stim_genes_summ$gene] = 1
+dat %>% group_by(Gene) %>% summarise(Status=mean(rna)) %>% dplyr::select(Status) %>% table()
 
-# genes that are significantly upregulated: pma+lps vs. pma
-thp_diff = read_excel("z:/links/bix-analysis-stv/2016/CTTV/THP1/documents/AllGenes_THP1_U937_Altius_DE.xls")
-thp_diff$THP1_LPS_log2FoldChange = as.numeric(thp_diff$THP1_LPS_log2FoldChange) 
-thp_diff_filt = filter(thp_diff, THP1_LPS_padj<0.05, THP1_LPS_log2FoldChange>1) %>% arrange(desc(THP1_LPS_log2FoldChange))
+# normalize?
+dat_norm = dat
+dat_norm[,5:9] = normalizeQuantiles(dat[,c(5:9)])
 
-dc_example$rna[dc_example$Gene %in% thp_diff_filt$gene] = 1
-dc_example %>% group_by(Gene) %>% summarise(Status=mean(rna)) %>% dplyr::select(Status) %>% table()
-
-dc_example_norm = dc_example
-dc_example_norm[,5:9] = normalizeQuantiles(dc_example[,c(5:9)])
-
-dc_data = matrix(NA, nrow=dim(dc_example_norm)[1]/100, ncol=501)
+dat_trans = matrix(NA, nrow=dim(dat_norm)[1]/100, ncol=501)
 
 c_ix = 1
-for(i in 1:dim(dc_data)[1]) {
-  dc_data[i,1:500] = unlist(dc_example_norm[c_ix:(c_ix+99),c(5:9)])
-  dc_data[i,501] = dc_example_norm$rna[c_ix]
+for(i in 1:dim(dat_trans)[1]) {
+  dat_trans[i,1:500] = unlist(dat_norm[c_ix:(c_ix+99),c(5:9)])
+  dat_trans[i,501] = dat_norm$rna[c_ix]
   c_ix = c_ix+100
 }
 
-dc_data = tbl_df(dc_data)
-names(dc_data)[1:500] = as.character(sapply(names(dc_example)[5:9], function(x) paste(x, 1:100, sep="_")))
-names(dc_data)[501] = "Y"
-dc_data$Y = factor(dc_data$Y)
+dat_trans = tbl_df(dat_trans)
+names(dat_trans)[1:500] = as.character(sapply(names(dat)[5:9], function(x) paste(x, 1:100, sep="_")))
+names(dat_trans)[501] = "Y"
+dat_trans$Y = factor(dat_trans$Y)
 
-pheatmap(matrix(as.numeric(dc_data[sample(which(dc_data$Y==1),1),-dim(dc_data)[2]]), nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+pheatmap(matrix(as.numeric(dat_trans[sample(which(dat_trans$Y==1),1),-dim(dat_trans)[2]]), nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
 
-dc_data_sample = rbind(
-  dc_data[dc_data$Y==1,],
-  dc_data[sample(which(dc_data$Y==0),500, replace=FALSE),]
+dat_trans_sample = rbind(
+  dat_trans[dat_trans$Y==1,],
+  dat_trans[sample(which(dat_trans$Y==0),500, replace=FALSE),]
 )
 
-task = makeClassifTask(data=dc_data_sample, target="Y")
+task = makeClassifTask(data=dat_trans_sample, target="Y")
 
 # lrn = makeLearner("classif.lda")
 lrn = makeLearner("classif.randomForest", predict.type="prob", fix.factors.prediction=TRUE)
 
-train_set = sort(c(sample(which(dc_data_sample$Y==1),100, replace=FALSE), sample(which(dc_data_sample$Y==0),250,replace=FALSE)))
-test_set = c(1:dim(dc_data_sample)[1])[-train_set]
+train_set = sort(c(sample(which(dat_trans_sample$Y==1),100, replace=FALSE), sample(which(dat_trans_sample$Y==0),250,replace=FALSE)))
+test_set = c(1:dim(dat_trans_sample)[1])[-train_set]
 
 model = train(lrn, task, subset=train_set)
 pred = predict(model, task=task, subset=test_set)
@@ -90,8 +120,8 @@ fv = generateFilterValuesData(task, method="information.gain")
 
 pheatmap(matrix(fv$data$information.gain, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE)
 
-av_pos = unlist(apply(filter(dc_data_sample, Y==1) %>% dplyr::select(-Y), 2, mean))
-av_neg = unlist(apply(filter(dc_data_sample, Y==0) %>% dplyr::select(-Y), 2, mean))
+av_pos = unlist(apply(filter(dat_trans_sample, Y==1) %>% dplyr::select(-Y), 2, mean))
+av_neg = unlist(apply(filter(dat_trans_sample, Y==0) %>% dplyr::select(-Y), 2, mean))
 av_range = range(c(av_pos, av_neg))
 
 pheatmap(matrix(av_pos, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
