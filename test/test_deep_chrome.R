@@ -108,7 +108,7 @@ task = makeClassifTask(data=dat_trans_sample, target="Y")
 # lrn = makeLearner("classif.lda")
 lrn = makeLearner("classif.randomForest", predict.type="prob", fix.factors.prediction=TRUE)
 
-train_set = sort(c(sample(which(dat_trans_sample$Y==1),100, replace=FALSE), sample(which(dat_trans_sample$Y==0),250,replace=FALSE)))
+train_set = sort(c(sample(which(dat_trans_sample$Y==1),60, replace=FALSE), sample(which(dat_trans_sample$Y==0),250,replace=FALSE)))
 test_set = c(1:dim(dat_trans_sample)[1])[-train_set]
 
 model = train(lrn, task, subset=train_set)
