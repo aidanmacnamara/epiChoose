@@ -46,36 +46,84 @@ save(list=my_label, file=paste0("ml/output/", my_label, ".RData"))
 
 load("ml/output/THP-1_BR1_Baseline.RData")
 dat = `THP-1_BR1_Baseline`
+rm(`THP-1_BR1_Baseline`)
 
 
 # GET RESPONSE (RNA) ------------------------------------------------------
 
-rna_dat = read_tsv("inst/extdata/rna/E-MTAB-5191.genes.fpkm.htseq2.tsv")
+# run deseq2 first and then filter on non-expressing baseline
+
+rna_dat = read_tsv("inst/extdata/rna/E-MTAB-5191.genes.raw.htseq2.tsv")
+rna_annot = read_tsv("inst/extdata/rna/E-MTAB-5191.sdrf.txt")
+my_ids = match(names(rna_dat)[-1], rna_annot$`Comment[ENA_RUN]`)
+col_data = rna_annot[my_ids,]
+col_data$label = col_data$`Source Name`
+col_data = separate(col_data, `Source Name`, c("Cell","Rep","Condition"), sep=" ")
+col_data$cell_cond = paste(col_data$Cell, col_data$Condition, sep="_")
+
+dds = DESeqDataSetFromMatrix(countData=rna_dat[,-1], colData=col_data, design=~cell_cond)
+dds = DESeq(dds)
+
+
+# PLOT --------------------------------------------------------------------
+
+rld = rlogTransformation(dds)
+
+sampleDists <- dist(t(assay(rld)))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- rld$label
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors)
+rld$cmpd = str_replace(rld$group, "_.+$", "")
+plotPCA(rld, intgroup=c("label"))
+
+
+# GET DIFFERENTIAL LIST ---------------------------------------------------
+
+# map ensembl ids to symbols
 mart_1 = useMart("ensembl", dataset="hsapiens_gene_ensembl")
 mapping <- getBM(attributes=c("ensembl_gene_id","hgnc_symbol"), mart=mart_1)
 rownames_symbol = mapping$hgnc_symbol[match(rna_dat$`Gene ID`, mapping$ensembl_gene_id)]
 
-rna_annot = read_tsv("inst/extdata/rna/E-MTAB-5191.sdrf.txt")
+res = results(dds, contrast=c('cell_cond','THP1_PMA_RNA','THP1_CTR_RNA'), alpha=0.01)
+res = tbl_df(res)
+res$ensembl = rna_dat$`Gene ID`
+res$symbol = rownames_symbol
+res_filt = res %>% filter(padj<1e-8, log2FoldChange>0) %>% arrange(desc(log2FoldChange))
+
+# get genes that have <1 fpkms in control reps
+rna_dat_fpkm = read_tsv("inst/extdata/rna/E-MTAB-5191.genes.fpkm.htseq2.tsv")
 my_samples = c("THP1 BR1 CTR_RNA","THP1 BR2 CTR_RNA","THP1 BR1 PMA_RNA","THP1 BR2 PMA_RNA")
 my_ids = rna_annot$`Comment[ENA_RUN]`[match(my_samples, rna_annot$`Source Name`)]
-rna_dat_filt = rna_dat[,match(my_ids, names(rna_dat))]
-names(rna_dat_filt) = my_samples
-rna_dat_filt = data.frame(Gene=rownames_symbol, rna_dat_filt)
-rna_dat_filt_long = gather(rna_dat_filt, "Sample", "FPKM", 2:(length(my_samples)+1))
-ggplot(rna_dat_filt_long, aes(x=FPKM, fill=Sample)) + geom_histogram(bins=2e4) + theme_thesis() + ylab("") + coord_cartesian(xlim=c(0,20))
-table(rna_dat_filt$FPKM<1)
 
-# what are the genes that are at 0 fpkm pre-stimulation and go high?
-stim_genes = rna_dat_filt[(rna_dat_filt$THP1.BR1.CTR_RNA<1 & rna_dat_filt$THP1.BR2.CTR_RNA<1) & (rna_dat_filt$THP1.BR1.PMA_RNA>3 & rna_dat_filt$THP1.BR2.PMA_RNA>3),]
-stim_genes_summ = data.frame(gene=stim_genes$Gene, diff=apply(stim_genes[,4:5]-stim_genes[,2:3], 1, mean, na.rm=TRUE))
-stim_genes_summ = arrange(stim_genes_summ, desc(diff))
+rna_dat_fpkm_filt = rna_dat_fpkm[,match(my_ids, names(rna_dat_fpkm))]
+names(rna_dat_fpkm_filt) = my_samples
+rna_dat_fpkm_filt = data.frame(Gene=rna_dat_fpkm$`Gene ID`, rna_dat_fpkm_filt)
+# rna_dat_fpkm_filt_long = gather(rna_dat_fpkm_filt, "Sample", "FPKM", 2:(length(my_samples)+1))
+# ggplot(rna_dat_fpkm_filt_long, aes(x=FPKM, fill=Sample)) + geom_histogram(bins=2e4) + theme_thesis() + ylab("") + coord_cartesian(xlim=c(0,20))
+# table(rna_dat_fpkm_filt_long$FPKM<1)
+
+# what are the genes that are at 0 fpkm pre-stimustim_genes_summ = data.frame(gene=stim_genes$Gene, diff=apply(stim_genes[,4:5]-stim_genes[,2:3], 1, mean, na.rm=TRUE))
+
+rna_dat_fpkm_filt_baseline = rna_dat_fpkm_filt[(rna_dat_fpkm_filt$THP1.BR1.CTR_RNA<1 & rna_dat_fpkm_filt$THP1.BR2.CTR_RNA<1),]
+res_filt = res_filt[res_filt$ensembl %in% rna_dat_fpkm_filt_baseline$Gene,]
+plot(
+  apply(rna_dat_fpkm_filt[match(res_filt$ensembl, rna_dat_fpkm_filt$Gene),2:3], 1, mean),
+  apply(rna_dat_fpkm_filt[match(res_filt$ensembl, rna_dat_fpkm_filt$Gene),4:5], 1, mean)
+)
+abline(h=1)
+test_gene = rna_dat_fpkm_filt$Gene[rna_dat_fpkm_filt$THP1.BR1.PMA_RNA<1 & rna_dat_fpkm_filt$THP1.BR2.PMA_RNA<1 & rna_dat_fpkm_filt$Gene %in% res_filt$ensembl][1]
+filter(res_filt, ensembl==test_gene)
+filter(rna_dat_fpkm_filt, Gene==test_gene)
+stim_genes = unique(res_filt$symbol)
 
 
 # ANALYSIS ----------------------------------------------------------------
 
 # add rna expression
 dat$rna = 0
-dat$rna[dat$Gene %in% stim_genes_summ$gene] = 1
+dat$rna[dat$Gene %in% stim_genes] = 1
 dat %>% group_by(Gene) %>% summarise(Status=mean(rna)) %>% dplyr::select(Status) %>% table()
 
 # normalize?
