@@ -100,13 +100,15 @@ my_ids = rna_annot$`Comment[ENA_RUN]`[match(my_samples, rna_annot$`Source Name`)
 rna_dat_fpkm_filt = rna_dat_fpkm[,match(my_ids, names(rna_dat_fpkm))]
 names(rna_dat_fpkm_filt) = my_samples
 rna_dat_fpkm_filt = data.frame(Gene=rna_dat_fpkm$`Gene ID`, rna_dat_fpkm_filt)
+
 # rna_dat_fpkm_filt_long = gather(rna_dat_fpkm_filt, "Sample", "FPKM", 2:(length(my_samples)+1))
 # ggplot(rna_dat_fpkm_filt_long, aes(x=FPKM, fill=Sample)) + geom_histogram(bins=2e4) + theme_thesis() + ylab("") + coord_cartesian(xlim=c(0,20))
 # table(rna_dat_fpkm_filt_long$FPKM<1)
 
-# what are the genes that are at 0 fpkm pre-stimustim_genes_summ = data.frame(gene=stim_genes$Gene, diff=apply(stim_genes[,4:5]-stim_genes[,2:3], 1, mean, na.rm=TRUE))
+# what are the genes that are at 0 fpkm pre-stimulus
+# stim_genes_summ = data.frame(gene=stim_genes$Gene, diff=apply(stim_genes[,4:5]-stim_genes[,2:3], 1, mean, na.rm=TRUE))
 
-rna_dat_fpkm_filt_baseline = rna_dat_fpkm_filt[(rna_dat_fpkm_filt$THP1.BR1.CTR_RNA<1 & rna_dat_fpkm_filt$THP1.BR2.CTR_RNA<1),]
+rna_dat_fpkm_filt_baseline = rna_dat_fpkm_filt[(rna_dat_fpkm_filt$THP1.BR1.CTR_RNA<1 & rna_dat_fpkm_filt$THP1.BR2.CTR_RNA<1 & rna_dat_fpkm_filt$THP1.BR1.PMA_RNA>1 & rna_dat_fpkm_filt$THP1.BR2.PMA_RNA>1),]
 res_filt = res_filt[res_filt$ensembl %in% rna_dat_fpkm_filt_baseline$Gene,]
 plot(
   apply(rna_dat_fpkm_filt[match(res_filt$ensembl, rna_dat_fpkm_filt$Gene),2:3], 1, mean),
@@ -156,7 +158,7 @@ task = makeClassifTask(data=dat_trans_sample, target="Y")
 # lrn = makeLearner("classif.lda")
 lrn = makeLearner("classif.randomForest", predict.type="prob", fix.factors.prediction=TRUE)
 
-train_set = sort(c(sample(which(dat_trans_sample$Y==1),60, replace=FALSE), sample(which(dat_trans_sample$Y==0),250,replace=FALSE)))
+train_set = sort(c(sample(which(dat_trans_sample$Y==1),141,replace=FALSE), sample(which(dat_trans_sample$Y==0),250,replace=FALSE)))
 test_set = c(1:dim(dat_trans_sample)[1])[-train_set]
 
 model = train(lrn, task, subset=train_set)
