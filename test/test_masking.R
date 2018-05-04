@@ -103,6 +103,12 @@ bw_missing$Label
 bam_missing = data_gsk[!file.exists(data_gsk$Bam),]
 bam_missing$Label
 
+# check bw == bam filenames
+table(
+  str_replace(data_gsk$Bigwig, "^.*/bigwig/(.*)\\.bw$", "\\1") ==
+    str_replace(data_gsk$Bam, "^.*/bam/(.*)\\.bam$", "\\1")
+)
+
 gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi_reg, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=5))
 gsk_chip_filtered = prep_across_datatypes(gsk_chip)
 
