@@ -190,7 +190,7 @@ for(i in 1:length(my_data_roots)) {
   print(names(my_data)[which(str_replace(names(my_data), "_BR[12]", "") == my_data_roots[i] & grepl("BR1", names(my_data)))])
   dat = my_data[[which(str_replace(names(my_data), "_BR[12]", "") == my_data_roots[i] & grepl("BR1", names(my_data)))]]
   dat_norm = dat
-  dat_norm[,5:9] = normalizeQuantiles(dat[,c(5:9)])
+  # dat_norm[,5:9] = normalizeQuantiles(dat[,c(5:9)])
   
   dat_trans = matrix(NA, nrow=dim(dat_norm)[1]/100, ncol=501)
   
@@ -210,9 +210,10 @@ for(i in 1:length(my_data_roots)) {
   
   # pheatmap(matrix(as.numeric(dat_trans[sample(which(dat_trans$Y==1),1),-dim(dat_trans)[2]]), nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
   
+  # should classes be balanced?
   dat_trans_sample = rbind(
     dat_trans[dat_trans$Y==1,],
-    dat_trans[sample(which(dat_trans$Y==0 & gene_list_all$hgnc_symbol %in% neg_genes[[i]]), dim(dat_trans[dat_trans$Y==1,])[1], replace=FALSE),]
+    dat_trans[sample(which(dat_trans$Y==0 & gene_list_all$hgnc_symbol %in% neg_genes[[i]]), 5000, replace=FALSE),]
   )
   
   task = makeClassifTask(data=dat_trans_sample, target="Y")
@@ -220,7 +221,7 @@ for(i in 1:length(my_data_roots)) {
   # lrn = makeLearner("classif.lda")
   lrn = makeLearner("classif.randomForest", predict.type="prob", fix.factors.prediction=TRUE)
   
-  train_set = sort(c(sample(which(dat_trans_sample$Y==1),round(length(which(dat_trans_sample$Y==1))/2),replace=FALSE), sample(which(dat_trans_sample$Y==0),round(length(which(dat_trans_sample$Y==1))/2),replace=FALSE)))
+  train_set = sort(c(sample(which(dat_trans_sample$Y==1),round(length(which(dat_trans_sample$Y==1))/2),replace=FALSE), sample(which(dat_trans_sample$Y==0),round(length(which(dat_trans_sample$Y==0))/2),replace=FALSE)))
   test_set = c(1:dim(dat_trans_sample)[1])[-train_set]
   
   model = train(lrn, task, subset=train_set)
