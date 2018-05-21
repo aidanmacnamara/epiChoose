@@ -66,6 +66,7 @@ names(my_data) = str_replace(my_files, "\\.RData", "")
 for(i in 1:length(my_data)) {
   my_data[[i]] = get(load(paste0("ml/output/", my_files[[i]])))
 }
+load("ml/output/my_data.RData")
 
 
 # GET RESPONSE (RNA) ------------------------------------------------------
@@ -105,12 +106,12 @@ mart_1 = useMart("ensembl", dataset="hsapiens_gene_ensembl")
 mapping <- getBM(attributes=c("ensembl_gene_id","hgnc_symbol"), mart=mart_1)
 rownames_symbol = mapping$hgnc_symbol[match(rna_dat$`Gene ID`, mapping$ensembl_gene_id)]
 
-res_all = vector("list", 4)
-names(res_all) = c("THP-1_Baseline","THP-1_PMA","U937_Baseline","U937_PMA")
-res_all[[1]] = results(dds, contrast=c('cell_cond','THP1_PMA_RNA','THP1_CTR_RNA'), alpha=0.01)
-res_all[[2]] = results(dds, contrast=c('cell_cond','THP1_PMA+LPS_RNA','THP1_PMA_RNA'), alpha=0.01)
-res_all[[3]] = results(dds, contrast=c('cell_cond','U937_PMA_RNA','U937_CTR_RNA'), alpha=0.01)
-res_all[[4]] = results(dds, contrast=c('cell_cond','U937_PMA+LPS_RNA','U937_PMA_RNA'), alpha=0.01)
+res_diff = vector("list", 4)
+names(res_diff) = c("THP-1_Baseline","THP-1_PMA","U937_Baseline","U937_PMA")
+res_diff[[1]] = results(dds, contrast=c('cell_cond','THP1_PMA_RNA','THP1_CTR_RNA'), alpha=0.01)
+res_diff[[2]] = results(dds, contrast=c('cell_cond','THP1_PMA+LPS_RNA','THP1_PMA_RNA'), alpha=0.01)
+res_diff[[3]] = results(dds, contrast=c('cell_cond','U937_PMA_RNA','U937_CTR_RNA'), alpha=0.01)
+res_diff[[4]] = results(dds, contrast=c('cell_cond','U937_PMA+LPS_RNA','U937_PMA_RNA'), alpha=0.01)
 
 # get fpkms
 rna_dat_fpkm = read_tsv("inst/extdata/rna/E-MTAB-5191.genes.fpkm.htseq2.tsv")
@@ -121,15 +122,15 @@ my_samples = list(
   c("U937 BR1 PMA_RNA","U937 BR2 PMA_RNA","U937 BR1 PMA+LPS_RNA","U937 BR2 PMA+LPS_RNA")
 )
 
-all_genes = vector("list", 4)
-names(all_genes) = names(res_all)
-neg_genes = all_genes
+pos_genes = vector("list", 4)
+names(pos_genes) = c("THP-1 PMA","THP-1 PMA+LPS","U937 PMA","U937 PMA+LPS")
+neg_genes = pos_genes
 
-for(i in 1:length(res_all)) {
+for(i in 1:length(res_diff)) {
   
   print(i)
   
-  res = tbl_df(res_all[[i]]) # 65217 rows
+  res = tbl_df(res_diff[[i]]) # 65217 rows
   res$ensembl = rna_dat$`Gene ID`
   res$symbol = rownames_symbol
   res_filt = res %>% filter(padj<1e-8, log2FoldChange>0) %>% arrange(desc(log2FoldChange))
@@ -142,37 +143,37 @@ for(i in 1:length(res_all)) {
   rna_dat_fpkm_filt_baseline = rna_dat_fpkm_filt[(rna_dat_fpkm_filt[,2]<1 & rna_dat_fpkm_filt[,3]<1 & rna_dat_fpkm_filt[,4]>1 & rna_dat_fpkm_filt[,5]>1),] # filter
   
   res_filt = res_filt[res_filt$ensembl %in% rna_dat_fpkm_filt_baseline$Gene,]
-  plot(
+  qplot(
     apply(rna_dat_fpkm_filt[match(res_filt$ensembl, rna_dat_fpkm_filt$Gene),2:3], 1, mean),
     apply(rna_dat_fpkm_filt[match(res_filt$ensembl, rna_dat_fpkm_filt$Gene),4:5], 1, mean)
-  )
-  abline(h=1)
+  ) + xlab("Pre-Stim") + ylab("Post-Stim") + theme_thesis(25) + geom_hline(yintercept=1, color=2)
   
   # get negative set
   neg_gene = unique(rna_dat_fpkm_filt[(rna_dat_fpkm_filt[,2]<1 & rna_dat_fpkm_filt[,3]<1 & rna_dat_fpkm_filt[,4]<1 & rna_dat_fpkm_filt[,5]<1),'Gene'])
   neg_gene = mapping$hgnc_symbol[match(neg_gene, mapping$ensembl_gene_id)]
-
+  
   # check values  
   # test_gene = rna_dat_fpkm_filt$Gene[rna_dat_fpkm_filt[,2]<1 & rna_dat_fpkm_filt[,3]<1 & rna_dat_fpkm_filt$Gene %in% res_filt$ensembl][1]
   # filter(res_filt, ensembl==test_gene)
   # filter(rna_dat_fpkm_filt, Gene==test_gene)
   
   stim_genes = unique(res_filt$symbol)
-  neg_genes[[i]] = neg_gene[!neg_gene %in% stim_genes]
-  all_genes[[i]] = stim_genes
   
   # match rna response to ml matrix
-  ml_ix = which(str_replace(names(my_data), "_BR[12]", "") == names(res_all)[i])
+  ml_ix = which(str_replace(names(my_data), "_BR[12]", "") == names(res_diff)[i])
   for(j in 1:length(ml_ix)) {
     my_data[[ml_ix[j]]]$rna = 0
     my_data[[ml_ix[j]]]$rna[my_data[[ml_ix[j]]]$Gene %in% stim_genes] = 1
     print(my_data[[ml_ix[j]]] %>% group_by(Gene) %>% summarise(Status=mean(rna)) %>% dplyr::select(Status) %>% table())
   }
   
+  pos_genes[[i]] = unique(gene_list_all$hgnc_symbol[gene_list_all$hgnc_symbol %in% stim_genes])
+  neg_genes[[i]] = unique(neg_gene[!neg_gene %in% stim_genes])
+  
 }
 
 require(eulerr)
-plot(euler(all_genes), quantities=TRUE)
+plot(euler(pos_genes), quantities=TRUE)
 
 
 # ANALYSIS ----------------------------------------------------------------
@@ -182,7 +183,9 @@ names(my_data)
 my_data_roots = unique(str_replace(names(my_data), "_BR[12]", ""))
 models = vector("list", length(my_data_roots))
 names(models) = my_data_roots
-training_data = models
+
+model_data = models
+sample_ixs = models
 
 for(i in 1:length(my_data_roots)) {
   
@@ -205,80 +208,62 @@ for(i in 1:length(my_data_roots)) {
   names(dat_trans)[1:500] = as.character(sapply(names(dat)[5:9], function(x) paste(x, 1:100, sep="_")))
   names(dat_trans)[501] = "Y"
   dat_trans$Y = factor(dat_trans$Y)
-  training_data[[i]] = dat_trans
+  
   # dat_trans = dat_trans[,301:501] # check ctcf and atac only
   
   # pheatmap(matrix(as.numeric(dat_trans[sample(which(dat_trans$Y==1),1),-dim(dat_trans)[2]]), nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
   
-  # should classes be balanced?
-  dat_trans_sample = rbind(
-    dat_trans[dat_trans$Y==1,],
-    dat_trans[sample(which(dat_trans$Y==0 & gene_list_all$hgnc_symbol %in% neg_genes[[i]]), 5000, replace=FALSE),]
-  )
+  # sample from genome data
+  sample_ixs[[i]] = c(which(dat_trans$Y==1), sample(which(dat_trans$Y==0 & gene_list_all$hgnc_symbol %in% neg_genes[[i]]), length(pos_genes[[i]]), replace=FALSE))
+  dat_trans_sample = dat_trans[sample_ixs[[i]],]
+  model_data[[i]] = dat_trans_sample
   
   task = makeClassifTask(data=dat_trans_sample, target="Y")
   
   # lrn = makeLearner("classif.lda")
   lrn = makeLearner("classif.randomForest", predict.type="prob", fix.factors.prediction=TRUE)
   
-  train_set = sort(c(sample(which(dat_trans_sample$Y==1),round(length(which(dat_trans_sample$Y==1))/2),replace=FALSE), sample(which(dat_trans_sample$Y==0),round(length(which(dat_trans_sample$Y==0))/2),replace=FALSE)))
+  train_set = sort(c(sample(which(dat_trans_sample$Y==1),round(length(which(dat_trans_sample$Y==1))*0.8),replace=FALSE), sample(which(dat_trans_sample$Y==0),round(length(which(dat_trans_sample$Y==0))*0.8),replace=FALSE)))
   test_set = c(1:dim(dat_trans_sample)[1])[-train_set]
   
   model = train(lrn, task, subset=train_set)
   models[[i]] = model
   pred = predict(model, task=task, subset=test_set)
-  png(paste0("image_",i,"_1.png"))
-  print(ggplot(data.frame(pred), aes(truth, prob.1)) + geom_boxplot() + theme_thesis() + xlab("Expression") + ylab("Score"))
-  dev.off()
-  print(performance(pred, measures=list(mmce, acc)))
-  
-  fv = generateFilterValuesData(task, method="information.gain")
-  # fv = generateFeatureImportanceData(task, learner=lrn)
-  
-  png(paste0("image_",i,"_2.png"), height=600, width=1000)
-  pheatmap(matrix(fv$data$information.gain, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE)
-  dev.off()
-  
-  av_pos = unlist(apply(filter(dat_trans_sample, Y==1) %>% dplyr::select(-Y), 2, mean))
-  av_neg = unlist(apply(filter(dat_trans_sample, Y==0) %>% dplyr::select(-Y), 2, mean))
-  av_range = range(c(av_pos, av_neg))
-  pheatmap(matrix(av_pos, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
-  pheatmap(matrix(av_neg, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
- 
+  write_tsv(data.frame(
+    gene=c(
+      gene_list_all$hgnc_symbol[sample_ixs[[i]][head(pred$data[order(pred$data$prob.1, decreasing=TRUE),'id'],10)]],
+      gene_list_all$hgnc_symbol[sample_ixs[[i]][tail(pred$data[order(pred$data$prob.1, decreasing=TRUE),'id'],10)]]
+    )), paste0("data_",i,".txt"))
+    
+    png(paste0("image_",i,"_1.png"))
+    print(ggplot(data.frame(pred), aes(truth, prob.1)) + geom_boxplot() + theme_thesis() + xlab("Expression") + ylab("Score"))
+    dev.off()
+    print(performance(pred, measures=list(mmce, acc)))
+    
+    fv = generateFilterValuesData(task, method="information.gain")
+    # fv = generateFeatureImportanceData(task, learner=lrn)
+    
+    png(paste0("image_",i,"_2.png"), height=600, width=1000)
+    pheatmap(matrix(fv$data$information.gain, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE)
+    dev.off()
+    
+    av_pos = unlist(apply(filter(dat_trans_sample, Y==1) %>% dplyr::select(-Y), 2, mean))
+    av_neg = unlist(apply(filter(dat_trans_sample, Y==0) %>% dplyr::select(-Y), 2, mean))
+    av_range = range(c(av_pos, av_neg))
+    pheatmap(matrix(av_pos, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+    pheatmap(matrix(av_neg, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+    
 }
 
 
-# TRY TOY EXAMPLE ---------------------------------------------------------
+# CHECK MODELS ACROSS CELL LINES ------------------------------------------
 
-require(mlr)
+# does the thp1 model predict u937 expression?
 
-dat_training = read_csv("tmp/train.csv", col_names=FALSE)
-dat_testing = read_csv("tmp/test.csv", col_names=FALSE)
+task = makeClassifTask(data=model_data$U937_Baseline, target="Y")
+pred = predict(models$`THP-1_Baseline`, task=task)
 
-x_training = matrix(NA, nrow=20, ncol=500)
-x_testing = x_training
-c_ix = 1
-for(i in 1:dim(x_training)[1]) {
-  x_training[i,] = unlist(dat_training[c_ix:(c_ix+99),3:7])
-  x_testing[i,] = unlist(dat_testing[c_ix:(c_ix+99),3:7])
-  c_ix = c_ix+100
-}
-x_training = tbl_df(x_training)
-x_testing = tbl_df(x_testing)
-x_training$Y = factor(rep(c(1,0), each=10))
-x_testing$Y = factor(rep(c(1,0), each=10))
 
-pheatmap(matrix(as.numeric(x_training[sample(which(x_training$Y==1),1),-dim(x_training)[2]]), nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
 
-pheatmap(matrix(as.numeric(x_training[sample(which(x_training$Y==0),1),-dim(x_training)[2]]), nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
 
-task = makeClassifTask(data=rbind(x_training, x_testing), target="Y")
-
-# lrn = makeLearner("classif.lda")
-lrn = makeLearner("classif.randomForest", predict.type="prob", fix.factors.prediction=TRUE)
-train_set = 1:20
-test_set = 21:40
-model = train(lrn, task, subset=train_set)
-pred = predict(model, task=task, subset=test_set)
-performance(pred, measures=list(mmce, acc))
 
