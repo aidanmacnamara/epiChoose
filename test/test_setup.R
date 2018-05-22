@@ -108,6 +108,7 @@ table(
   str_replace(data_gsk$Bigwig, "^.*/bigwig/(.*)\\.bw$", "\\1") ==
     str_replace(data_gsk$Bam, "^.*/bam/(.*)\\.bam$", "\\1")
 )
+# 5 files: project 1 ctcf where the bigwig file was not updated
 
 gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi_reg, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=5))
 gsk_chip_filtered = prep_across_datatypes(gsk_chip)
@@ -120,14 +121,21 @@ encode_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(encode_inpu
 encode_chip_filtered = prep_across_datatypes(encode_chip)
 
 
+# DEEP DATA ---------------------------------------------------------------
+
+deep_input = "inst/extdata/data_deep.xlsx"
+deep_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(deep_input, roi_reg, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
+deep_chip_filtered = prep_across_datatypes(deep_chip)
+
+
 # COMBINE -----------------------------------------------------------------
 
 total_data = vector("list", length(marks)) # number of data types
 for(i in 1:length(total_data)) {
-  total_data[[i]]$res = rbind(blueprint_chip_filtered[[i]]$res, gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res)
+  total_data[[i]]$res = rbind(blueprint_chip_filtered[[i]]$res, gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res, deep_chip_filtered[[i]]$res)
   # renormalize as we are multiple sources
   total_data[[i]]$res = quantile_norm(total_data[[i]]$res)
-  total_data[[i]]$annot = bind_rows(blueprint_chip_filtered[[i]]$annot, gsk_chip_filtered[[i]]$annot, encode_chip_filtered[[i]]$annot)
+  total_data[[i]]$annot = bind_rows(blueprint_chip_filtered[[i]]$annot, gsk_chip_filtered[[i]]$annot, encode_chip_filtered[[i]]$annot, deep_chip_filtered[[i]]$annot)
 }
 
 names(total_data) = marks
@@ -139,7 +147,8 @@ single_labels = rownames(total_data[[1]]$res)
 group_labels = c(
   rep("BLUEPRINT", dim(blueprint_chip_filtered[[1]]$res)[1]), 
   rep("GSK", dim(gsk_chip_filtered[[1]]$res)[1]), 
-  rep("ENCODE", dim(encode_chip_filtered[[1]]$res)[1])
+  rep("ENCODE", dim(encode_chip_filtered[[1]]$res)[1]),
+  rep("DEEP", dim(deep_chip_filtered[[1]]$res)[1])
 )
 
 
