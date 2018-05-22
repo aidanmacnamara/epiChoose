@@ -135,7 +135,9 @@ for(i in 1:length(total_data)) {
   total_data[[i]]$res = rbind(blueprint_chip_filtered[[i]]$res, gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res, deep_chip_filtered[[i]]$res)
   # renormalize as we are multiple sources
   total_data[[i]]$res = quantile_norm(total_data[[i]]$res)
-  deep_chip_filtered[[1]]$annot$Size = as.character(deep_chip_filtered[[1]]$annot$Size) # for error with data type conversion
+  if(length(deep_chip_filtered[[i]]$annot$Size)) {
+      deep_chip_filtered[[i]]$annot$Size = as.character(deep_chip_filtered[[i]]$annot$Size) # for error with data type conversion
+ }
   total_data[[i]]$annot = bind_rows(blueprint_chip_filtered[[i]]$annot, gsk_chip_filtered[[i]]$annot, encode_chip_filtered[[i]]$annot, deep_chip_filtered[[i]]$annot)
 }
 
