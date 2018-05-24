@@ -135,9 +135,9 @@ for(i in 1:length(total_data)) {
   total_data[[i]]$res = rbind(blueprint_chip_filtered[[i]]$res, gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res, deep_chip_filtered[[i]]$res)
   # renormalize as we are multiple sources
   total_data[[i]]$res = quantile_norm(total_data[[i]]$res)
-  if(length(deep_chip_filtered[[i]]$annot$Size)) {
-      deep_chip_filtered[[i]]$annot$Size = as.character(deep_chip_filtered[[i]]$annot$Size) # for error with data type conversion
- }
+  if(length(deep_chip_filtered[[i]]$annot$Size)) { # for error with data type conversion
+    deep_chip_filtered[[i]]$annot$Size = as.character(deep_chip_filtered[[i]]$annot$Size)
+  }
   total_data[[i]]$annot = bind_rows(blueprint_chip_filtered[[i]]$annot, gsk_chip_filtered[[i]]$annot, encode_chip_filtered[[i]]$annot, deep_chip_filtered[[i]]$annot)
 }
 
@@ -153,6 +153,17 @@ group_labels = c(
   rep("ENCODE", dim(encode_chip_filtered[[1]]$res)[1]),
   rep("DEEP", dim(deep_chip_filtered[[1]]$res)[1])
 )
+
+total_data_edit = total_data
+gsk_ix = which(group_labels=="BLUEPRINT" | total_data[[1]]$annot$Project %in% c(5,6))
+for(i in 1:length(total_data_edit)) {
+  total_data_edit[[i]]$res = total_data_edit[[i]]$res[gsk_ix,]  
+}
+
+plot_data = prep_for_plot(total_data_edit, annot_1=group_labels[gsk_ix], annot_2=single_labels[gsk_ix], marks=marks, plot_type="mds")
+pdf(file="out_3_mds.pdf", height=24, width=96)
+ggplot(plot_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=8, shape=17) + theme_thesis(50) + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
+dev.off()
 
 
 # ADD RNA -----------------------------------------------------------------

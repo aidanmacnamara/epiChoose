@@ -234,25 +234,25 @@ for(i in 1:length(my_data_roots)) {
       gene_list_all$hgnc_symbol[sample_ixs[[i]][head(pred$data[order(pred$data$prob.1, decreasing=TRUE),'id'],10)]],
       gene_list_all$hgnc_symbol[sample_ixs[[i]][tail(pred$data[order(pred$data$prob.1, decreasing=TRUE),'id'],10)]]
     )), paste0("data_",i,".txt"))
-    
-    png(paste0("image_",i,"_1.png"))
-    print(ggplot(data.frame(pred), aes(truth, prob.1)) + geom_boxplot() + theme_thesis() + xlab("Expression") + ylab("Score"))
-    dev.off()
-    print(performance(pred, measures=list(mmce, acc)))
-    
-    fv = generateFilterValuesData(task, method="information.gain")
-    # fv = generateFeatureImportanceData(task, learner=lrn)
-    
-    png(paste0("image_",i,"_2.png"), height=600, width=1000)
-    pheatmap(matrix(fv$data$information.gain, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE)
-    dev.off()
-    
-    av_pos = unlist(apply(filter(dat_trans_sample, Y==1) %>% dplyr::select(-Y), 2, mean))
-    av_neg = unlist(apply(filter(dat_trans_sample, Y==0) %>% dplyr::select(-Y), 2, mean))
-    av_range = range(c(av_pos, av_neg))
-    pheatmap(matrix(av_pos, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
-    pheatmap(matrix(av_neg, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
-    
+  
+  png(paste0("image_",i,"_1.png"))
+  print(ggplot(data.frame(pred), aes(truth, prob.1)) + geom_boxplot() + theme_thesis() + xlab("Expression") + ylab("Score"))
+  dev.off()
+  print(performance(pred, measures=list(mmce, acc)))
+  
+  fv = generateFilterValuesData(task, method="information.gain")
+  # fv = generateFeatureImportanceData(task, learner=lrn)
+  
+  png(paste0("image_",i,"_2.png"), height=600, width=1000)
+  pheatmap(matrix(fv$data$information.gain, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE)
+  dev.off()
+  
+  av_pos = unlist(apply(filter(dat_trans_sample, Y==1) %>% dplyr::select(-Y), 2, mean))
+  av_neg = unlist(apply(filter(dat_trans_sample, Y==0) %>% dplyr::select(-Y), 2, mean))
+  av_range = range(c(av_pos, av_neg))
+  pheatmap(matrix(av_pos, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+  pheatmap(matrix(av_neg, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+  
 }
 
 
@@ -260,10 +260,61 @@ for(i in 1:length(my_data_roots)) {
 
 # does the thp1 model predict u937 expression?
 
-task = makeClassifTask(data=model_data$U937_Baseline, target="Y")
-pred = predict(models$`THP-1_Baseline`, task=task)
+task = makeClassifTask(data=model_data$`THP-1_Baseline`, target="Y")
+pred = predict(models$U937_Baseline, task=task)
+print(performance(pred, measures=list(mmce, acc)))
 
 
+# HOW DOES SIGNAL DATA PERFORM? -------------------------------------------
 
+load("data/dat_all.RData")
+
+# take the gene sets for each model
+# create an input vector with 3 different signal metrics for each data type
+# check performance against binning counts
+
+for(i in 1:4) {
+  
+  s_ix = which(rownames(dat_all[[1]][[1]]$res) == str_replace(my_data_roots[i], "_", "_BR1_"))
+  pos_ix = match(pos_genes[[i]], gene_list_all$hgnc_symbol)
+  neg_genes_filt = neg_genes[[i]][neg_genes[[i]] %in% gene_list_all$hgnc_symbol]
+  neg_ix = match(sample(neg_genes_filt, length(pos_genes[[i]]), replace=FALSE), gene_list_all$hgnc_symbol)
+  
+  input_mat = matrix(0, nrow=length(pos_ix)+length(neg_ix), ncol=15)
+  colnames(input_mat) = as.character(sapply(names(dat_all[[1]])[1:5], function(x) paste(x, names(dat_all)[1:3], sep="_")))
+  rownames(input_mat) = gene_list_all$hgnc_symbol[c(pos_ix, neg_ix)]
+  
+  c_ix = 1
+  for(j in 1:5) { # cycle through data types
+    for(k in 1:3) { # cycle through collapse-to-gene methods
+      input_mat[,c_ix] = dat_all[[k]][[j]]$res[s_ix,c(pos_ix, neg_ix)]
+      c_ix = c_ix+1
+    }
+  }
+  
+  # input_mat = log(input_mat)
+  input_mat = as.data.frame(input_mat)
+  input_mat$Y = factor(c(rep(1,length(pos_ix)), rep(0,length(neg_ix))))
+  
+  input_mat = input_mat[!apply(input_mat, 1, function(x) any(is.na(x))),]
+  
+  train_set = sort(c(sample(which(input_mat$Y==1), round(length(which(input_mat$Y==1))*0.8), replace=FALSE), sample(which(input_mat$Y==0), round(length(which(input_mat$Y==0))*0.8), replace=FALSE)))
+  test_set = c(1:dim(input_mat)[1])[-train_set]
+  
+  task = makeClassifTask(data=input_mat, target="Y")
+  model = train(lrn, task, subset=train_set)
+  pred = predict(model, task=task, subset=test_set)
+  png(paste0("image_auc_",i,"_1.png"))
+  ggplot(data.frame(pred), aes(truth, prob.1)) + geom_boxplot() + theme_thesis() + xlab("Expression") + ylab("Score")
+  dev.off()
+  performance(pred, measures=list(mmce, acc))
+ 
+  fv = generateFilterValuesData(task, method="information.gain")
+  # fv = generateFeatureImportanceData(task, learner=lrn)
+  png(paste0("image_auc_",i,"_2.png"))
+  ggplot(fv$data, aes(name, information.gain)) + geom_bar(stat="identity") + theme_thesis(20) + xlab("") + ylab("Information")
+  dev.off()
+   
+}
 
 
