@@ -13,6 +13,21 @@ Project 3:
 	- https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-4729/
 	- https://www.ebi.ac.uk/gxa/experiments/E-MTAB-4729?ref=aebrowse
 	
+Project 4:
+
+	- https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-6870/
+	- TOADD
+	
+Project 5:
+
+	- https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-6869/
+	- TOADD
+	
+Project 6:
+
+	- https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-6867/
+	- TOADD
+	
 Blueprint (rRNA-depleted total RNA):
 
 	- http://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-3827/

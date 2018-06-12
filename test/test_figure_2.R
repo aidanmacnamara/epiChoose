@@ -1,33 +1,60 @@
-# comparison of basal cell state - monocyte (4 conditions), thp1, u937
+# comparison of monocytes/macrophages with u937/thp-1
 
-# 1. get the necessary files from blueprint
+# 1. establish the amount of paired samples in blueprint
+# 2. groups: monocytes, macrophages, u937, thp-1
+# 3. how to define dynamic regions?
+# 4. figure 4d for dynamic regions i.e. regions that differ between monocytes and macrophages and what they look like in u937/thp-1
+# 5. tf inference from deregulated sites (look at luz's review for methods)
 
+
+# PAIRED SAMPLES IN BLUEPRINT ---------------------------------------------
+
+# get the necessary files from blueprint
 bp <- read_tsv("inst/extdata/blueprint_files.tsv")
 bp[is.na(bp)] = "" # removes nas that affect dplyr selections
 
-# what are the monocyte/macrophage treatment groups in bp?
-table(grep("monocyte|macrophage", bp$`Sub-group`, value=TRUE))
-trmt_groups = unique(grep("monocyte|macrophage", bp$`Sub-group`, value=TRUE))
-bp_filt = bp %>% filter(`Sub-group` %in% trmt_groups, Format=="bigWig")
+# which donors have monocyte and macrophage samples?
+bp_tbl = bp %>% group_by(Donor) %>% summarise("Both"=(any(grepl("monocyte",`Sub-group`,ignore.case=TRUE))) & (any(grepl("macrophage",`Sub-group`,ignore.case=TRUE))))
+bp_filt = filter(bp, Donor %in% unlist(bp_tbl[bp_tbl$Both==TRUE, 'Donor']), Format=="bigWig")
+bp_filt %>% group_by(Donor) %>% summarise(Marks=all(c("H3K4me3","H3K27ac") %in% Experiment))
 
-# which of these has the 3 epi marks + rna?
-chip_assays = c("H3K27ac","H3K4me3","H3K27me3")
-all_assays = c("H3K27ac","H3K4me3","H3K27me3","RNA-Seq")
-group_vars = lapply(c("Group","Sub-group","Name","Sex","Cell type","Tissue","Cell line","Disease","Donor"), as.symbol)
 
-bp_with_assays = bp_filt %>% group_by_(.dots=group_vars) %>% summarise(
-  chip_assays = all(chip_assays %in% Experiment),
-  all_assays = all(all_assays %in% Experiment),
-  files = n(),
-  H3K27ac = length(Experiment[Experiment=="H3K27ac"]),
-  H3K4me3 = length(Experiment[Experiment=="H3K4me3"]),
-  H3K27me3 = length(Experiment[Experiment=="H3K27me3"]),
-  rna_seq = length(Experiment[Experiment=="RNA-Seq"])
+# DYNAMIC H3K27AC REGIONS -------------------------------------------------
+
+load("data/total_data.RData")
+load("data/dat_all.RData")
+
+dat = dat_all$tss$H3K27ac$res[grep("monocyte|macrophage", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE),]
+rownames(dat) = str_extract(rownames(dat), "[Mm]onocyte|[Mm]acrophage")
+rownames(dat) = tolower(rownames(dat))
+
+# pick high-variance regions
+head(order(apply(dat, 2, var), decreasing=TRUE))
+ggplot(data.frame(Type=names(dat[,6924]), AUC=dat[,6924]), aes(Type, AUC)) + geom_boxplot() + theme_thesis(20)
+dat_filt = dat[,head(order(apply(dat,2,var), decreasing=TRUE), 1000)]
+pheatmap(log(dat_filt), show_colnames=FALSE)
+
+# kmeans
+dat_filt_t = t(dat_filt)
+wss <- (nrow(dat_filt_t)-1) * sum(apply(dat_filt_t,2,var))
+for(i in 2:15) {
+  wss[i] <- sum(kmeans(dat_filt_t, centers=i)$withinss)
+}
+
+plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within-group sum-of-squares")
+fit <- kmeans(dat_filt_t, 10)
+
+pheatmap(log(dat_filt),
+         annotation_col = data.frame(Cluster=factor(fit$cluster)),
+         show_colnames=FALSE
 )
-table(bp_with_assays$`Sub-group`)
-table(bp_with_assays$all_assays)
-table(bp_with_assays$chip_assays)
 
-bp_with_assays_filt = filter(bp_with_assays, chip_assays) # 23 conditions with all epi + rna
-table(bp_with_assays_filt$`Sub-group`)
+to_plot = rbind(
+  data.frame(Type="Macrophage", AUC=as.numeric(dat_filt[rownames(dat_filt)=="macrophage",fit$cluster==2])),
+  data.frame(Type="Monocyte", AUC=as.numeric(dat_filt[rownames(dat_filt)=="monocyte",fit$cluster==2]))
+)
+ggplot(to_plot, aes(Type, log(AUC))) + geom_boxplot() + theme_thesis(20)
+
+
+
 

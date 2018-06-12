@@ -214,44 +214,81 @@ for(i in 1:length(my_data_roots)) {
   # pheatmap(matrix(as.numeric(dat_trans[sample(which(dat_trans$Y==1),1),-dim(dat_trans)[2]]), nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
   
   # sample from genome data
+  # should the design be balanced or unbalanced?
+  # https://machinelearningmastery.com/tactics-to-combat-imbalanced-classes-in-your-machine-learning-dataset/
+  
+  
+  # CHECK FEATURE STABILITY - UNDER-SAMPLING --------------------------------
+  
+  fv_mat = matrix(0, nrow=500, ncol=10)
+  colnames(fv_mat) = paste("Rep", 1:10)
+  
+  for(j in 1:10) {
+    
+    dat_trans_sample = dat_trans[c(which(dat_trans$Y==1), sample(which(dat_trans$Y==0 & gene_list_all$hgnc_symbol %in% neg_genes[[i]]), length(pos_genes[[i]]), replace=FALSE)),]
+
+    task = makeClassifTask(data=dat_trans_sample, target="Y")
+    lrn = makeLearner("classif.randomForest", predict.type="prob", fix.factors.prediction=TRUE)
+    
+    train_set = sort(c(sample(which(dat_trans_sample$Y==1),round(length(which(dat_trans_sample$Y==1))*0.8),replace=FALSE), sample(which(dat_trans_sample$Y==0),round(length(which(dat_trans_sample$Y==0))*0.8),replace=FALSE)))
+    test_set = c(1:dim(dat_trans_sample)[1])[-train_set]
+    
+    model = train(lrn, task, subset=train_set)
+    pred = predict(model, task=task, subset=test_set)
+    print(performance(pred, measures=list(mmce, acc)))
+    fv = generateFilterValuesData(task, method="information.gain")
+    fv_mat[,j] = fv$data$information.gain
+    
+  }
+  
+  png(paste0("image_",i,"_1.png"), height=600, width=1000)
+  pheatmap(fv_mat, cluster_rows=FALSE, cluster_cols=FALSE)
+  dev.off()
+  
+  # CHECK FEATURE STABILITY - UNDER-SAMPLING --------------------------------
+  
+  
+  # sample negative data
   sample_ixs[[i]] = c(which(dat_trans$Y==1), sample(which(dat_trans$Y==0 & gene_list_all$hgnc_symbol %in% neg_genes[[i]]), length(pos_genes[[i]]), replace=FALSE))
   dat_trans_sample = dat_trans[sample_ixs[[i]],]
   model_data[[i]] = dat_trans_sample
   
+  # set up model
   task = makeClassifTask(data=dat_trans_sample, target="Y")
-  
-  # lrn = makeLearner("classif.lda")
   lrn = makeLearner("classif.randomForest", predict.type="prob", fix.factors.prediction=TRUE)
   
+  # define training/testing sets
   train_set = sort(c(sample(which(dat_trans_sample$Y==1),round(length(which(dat_trans_sample$Y==1))*0.8),replace=FALSE), sample(which(dat_trans_sample$Y==0),round(length(which(dat_trans_sample$Y==0))*0.8),replace=FALSE)))
   test_set = c(1:dim(dat_trans_sample)[1])[-train_set]
   
+  # train
   model = train(lrn, task, subset=train_set)
   models[[i]] = model
   pred = predict(model, task=task, subset=test_set)
-  write_tsv(data.frame(
-    gene=c(
-      gene_list_all$hgnc_symbol[sample_ixs[[i]][head(pred$data[order(pred$data$prob.1, decreasing=TRUE),'id'],10)]],
-      gene_list_all$hgnc_symbol[sample_ixs[[i]][tail(pred$data[order(pred$data$prob.1, decreasing=TRUE),'id'],10)]]
-    )), paste0("data_",i,".txt"))
-  
-  png(paste0("image_",i,"_1.png"))
-  print(ggplot(data.frame(pred), aes(truth, prob.1)) + geom_boxplot() + theme_thesis() + xlab("Expression") + ylab("Score"))
-  dev.off()
   print(performance(pred, measures=list(mmce, acc)))
   
-  fv = generateFilterValuesData(task, method="information.gain")
-  # fv = generateFeatureImportanceData(task, learner=lrn)
+  # write_tsv(data.frame(
+  #   gene=c(
+  #     gene_list_all$hgnc_symbol[sample_ixs[[i]][head(pred$data[order(pred$data$prob.1, decreasing=TRUE),'id'],10)]],
+  #     gene_list_all$hgnc_symbol[sample_ixs[[i]][tail(pred$data[order(pred$data$prob.1, decreasing=TRUE),'id'],10)]]
+  #   )), paste0("data_",i,".txt"))
   
-  png(paste0("image_",i,"_2.png"), height=600, width=1000)
+  # plot scores
+  png(paste0("image_",i,"_2.png"))
+  print(ggplot(data.frame(pred), aes(truth, prob.1)) + geom_boxplot() + theme_thesis() + xlab("Expression") + ylab("Score"))
+  dev.off()
+  
+  # plot information gain
+  fv = generateFilterValuesData(task, method="information.gain")
+  png(paste0("image_",i,"_3.png"), height=600, width=1000)
   pheatmap(matrix(fv$data$information.gain, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE)
   dev.off()
   
-  av_pos = unlist(apply(filter(dat_trans_sample, Y==1) %>% dplyr::select(-Y), 2, mean))
-  av_neg = unlist(apply(filter(dat_trans_sample, Y==0) %>% dplyr::select(-Y), 2, mean))
-  av_range = range(c(av_pos, av_neg))
-  pheatmap(matrix(av_pos, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
-  pheatmap(matrix(av_neg, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+  # av_pos = unlist(apply(filter(dat_trans_sample, Y==1) %>% dplyr::select(-Y), 2, mean))
+  # av_neg = unlist(apply(filter(dat_trans_sample, Y==0) %>% dplyr::select(-Y), 2, mean))
+  # av_range = range(c(av_pos, av_neg))
+  # pheatmap(matrix(av_pos, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
+  # pheatmap(matrix(av_neg, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=av_range[1], to=av_range[2], by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
   
 }
 
@@ -308,13 +345,13 @@ for(i in 1:4) {
   ggplot(data.frame(pred), aes(truth, prob.1)) + geom_boxplot() + theme_thesis() + xlab("Expression") + ylab("Score")
   dev.off()
   performance(pred, measures=list(mmce, acc))
- 
+  
   fv = generateFilterValuesData(task, method="information.gain")
   # fv = generateFeatureImportanceData(task, learner=lrn)
   png(paste0("image_auc_",i,"_2.png"))
   ggplot(fv$data, aes(name, information.gain)) + geom_bar(stat="identity") + theme_thesis(20) + xlab("") + ylab("Information")
   dev.off()
-   
+  
 }
 
 
