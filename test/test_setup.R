@@ -234,7 +234,11 @@ for(i in 1:length(dat_sum_gb[1:5])) {
   dat_sum_gb[[i]]$res = convert_reg_matrix(dat_sum_gb[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="sum")
 }
 
-# dat_max_10_closest = total_data # max from 10 closest peaks (ctcf relevant)
+dat_max_10 = total_data # max from 10 closest peaks (ctcf relevant)
+for(i in 1:length(dat_max_10[1:5])) {
+  print(paste("Processing data type", names(dat_max_10)[i]))
+  dat_max_10[[i]]$res = convert_reg_matrix(dat_max_10[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="closest")
+}
 
 dat_all = list(dat_max_gb, dat_tss, dat_sum_gb, NA)
 names(dat_all) = c("max", "tss", "sum", "closest")

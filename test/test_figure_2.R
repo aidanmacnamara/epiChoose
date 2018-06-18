@@ -27,11 +27,18 @@ load("data/dat_all.RData")
 dat = dat_all$tss$H3K27ac$res[grep("monocyte|macrophage", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE),]
 rownames(dat) = str_extract(rownames(dat), "[Mm]onocyte|[Mm]acrophage")
 rownames(dat) = tolower(rownames(dat))
+rownames(dat) = str_replace(rownames(dat), "_BR[12]", "")
+
+# remove na columns
+dim(dat)
+dat = dat[,!apply(is.na(dat), 2, all)] # remove regions with no data
+# dat = dat[-which(apply(dat, 1, function(x) all(is.na(x)))),]  # remove samples with no data
+dim(dat)
 
 # pick high-variance regions
-head(order(apply(dat, 2, var), decreasing=TRUE))
-ggplot(data.frame(Type=names(dat[,6924]), AUC=dat[,6924]), aes(Type, AUC)) + geom_boxplot() + theme_thesis(20)
-dat_filt = dat[,head(order(apply(dat,2,var), decreasing=TRUE), 1000)]
+head(order(apply(dat, 2, var, na.rm=TRUE), decreasing=TRUE))
+ggplot(data.frame(Type=names(dat[,order(apply(dat, 2, var, na.rm=TRUE), decreasing=TRUE)[2]]), AUC=dat[,order(apply(dat, 2, var, na.rm=TRUE), decreasing=TRUE)[2]]), aes(Type, AUC)) + geom_boxplot() + theme_thesis(20)
+dat_filt = dat[,head(order(apply(dat,2,var,na.rm=TRUE), decreasing=TRUE), 1000)]
 pheatmap(log(dat_filt), show_colnames=FALSE)
 
 # kmeans
@@ -42,16 +49,19 @@ for(i in 2:15) {
 }
 
 plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within-group sum-of-squares")
-fit <- kmeans(dat_filt_t, 10)
+fit <- kmeans(dat_filt_t, 7)
+col_clust = hclust(dist(dat_filt_t))
 
 pheatmap(log(dat_filt),
          annotation_col = data.frame(Cluster=factor(fit$cluster)),
-         show_colnames=FALSE
+         cluster_cols = col_clust,
+         show_colnames = FALSE
 )
 
+which_clust = 6
 to_plot = rbind(
-  data.frame(Type="Macrophage", AUC=as.numeric(dat_filt[rownames(dat_filt)=="macrophage",fit$cluster==2])),
-  data.frame(Type="Monocyte", AUC=as.numeric(dat_filt[rownames(dat_filt)=="monocyte",fit$cluster==2]))
+  data.frame(Type="Macrophage", AUC=as.numeric(dat_filt[rownames(dat_filt)=="macrophage",fit$cluster==which_clust])),
+  data.frame(Type="Monocyte", AUC=as.numeric(dat_filt[rownames(dat_filt)=="monocyte",fit$cluster==which_clust]))
 )
 ggplot(to_plot, aes(Type, log(AUC))) + geom_boxplot() + theme_thesis(20)
 

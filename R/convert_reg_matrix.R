@@ -6,7 +6,7 @@
 #' @return TO ADD
 #' @export
 
-convert_reg_matrix <- function(dat, roi, gene_list, summ_method=c("mean","max","sum","window","tss"), tss_window=2e3, reg_window=2e3) {
+convert_reg_matrix <- function(dat, roi, gene_list, summ_method=c("mean","max","sum","tss","closest"), tss_window=2e3, reg_window=2e3) {
   
   summ_method = match.arg(summ_method)
   
@@ -43,6 +43,10 @@ convert_reg_matrix <- function(dat, roi, gene_list, summ_method=c("mean","max","
     if(summ_method=="sum") {
       # dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, function(x) {sum(x, na.rm=TRUE) / sum(width(roi[subjectHits(my_ol)[queryHits(my_ol)==i]]))})
       dat_out[,i] = apply(dat[,subjectHits(my_ol)[queryHits(my_ol)==i], drop=FALSE], 1, sum, na.rm=TRUE) 
+    }
+    if(summ_method=="closest") {
+      closest_ix = head(order(distance(gene_list[i], roi)), 10) # get the 10 closest regulatory regions around the tss
+      dat_out[,i] = apply(dat[,closest_ix,drop=FALSE], 1, max, na.rm=TRUE)
     }
   }
   

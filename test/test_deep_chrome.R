@@ -24,6 +24,7 @@ my_labels = c("THP-1_BR1_Baseline","THP-1_BR2_Baseline","THP-1_BR1_PMA","THP-1_B
 ml_generate <- function(x) {
   
   my_bams_1 = data_gsk %>% filter(Label==my_labels[x], Mark!="Input", Mark!="ATAC", Mark!="Control") %>% dplyr::select(Bam) %>% unlist()
+  
   # make sure files are ordered
   my_bams_1 = my_bams_1[match(marks, sapply(my_bams_1, function(x) str_extract(x, paste(marks, collapse="|"))))]
   my_bams_2 = data_gsk %>% filter(Label==my_labels[x], Mark=="ATAC") %>% dplyr::select(Bam) %>% unlist()
@@ -60,12 +61,12 @@ bplapply(seq(along=my_labels), ml_generate, BPPARAM=MulticoreParam(workers=lengt
 
 # RELOAD DATA -------------------------------------------------------------
 
-my_files = list.files("ml/output/")
-my_data = vector("list", length(my_files))
-names(my_data) = str_replace(my_files, "\\.RData", "")
-for(i in 1:length(my_data)) {
-  my_data[[i]] = get(load(paste0("ml/output/", my_files[[i]])))
-}
+# my_files = list.files("ml/output/")
+# my_data = vector("list", length(my_files))
+# names(my_data) = str_replace(my_files, "\\.RData", "")
+# for(i in 1:length(my_data)) {
+#   my_data[[i]] = get(load(paste0("ml/output/", my_files[[i]])))
+# }
 load("ml/output/my_data.RData")
 
 
@@ -73,14 +74,17 @@ load("ml/output/my_data.RData")
 
 # run deseq2 first and then filter on non-expressing baseline
 
-rna_dat = read_tsv("inst/extdata/rna/E-MTAB-5191.genes.raw.htseq2.tsv")
-rna_annot = read_tsv("inst/extdata/rna/E-MTAB-5191.sdrf.txt")
-my_ids = match(names(rna_dat)[-1], rna_annot$`Comment[ENA_RUN]`)
+rna_dat = read_tsv("inst/extdata/rna/E-MTAB-5191.genes.raw.htseq2.tsv") # get data
+rna_annot = read_tsv("inst/extdata/rna/E-MTAB-5191.sdrf.txt") # get annotation
+my_ids = match(names(rna_dat)[-1], rna_annot$`Comment[ENA_RUN]`) # match data/annotation ids
+
+# construct sample table
 col_data = rna_annot[my_ids,]
 col_data$label = col_data$`Source Name`
 col_data = separate(col_data, `Source Name`, c("Cell","Rep","Condition"), sep=" ")
 col_data$cell_cond = paste(col_data$Cell, col_data$Condition, sep="_")
 
+# run deseq2
 dds = DESeqDataSetFromMatrix(countData=rna_dat[,-1], colData=col_data, design=~cell_cond)
 dds = DESeq(dds)
 
@@ -209,8 +213,6 @@ for(i in 1:length(my_data_roots)) {
   names(dat_trans)[501] = "Y"
   dat_trans$Y = factor(dat_trans$Y)
   
-  # dat_trans = dat_trans[,301:501] # check ctcf and atac only
-  
   # pheatmap(matrix(as.numeric(dat_trans[sample(which(dat_trans$Y==1),1),-dim(dat_trans)[2]]), nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE, breaks=seq(from=0, to=100, by=10), color=colorRampPalette(rev(brewer.pal(n=7,name="RdYlBu")))(10))
   
   # sample from genome data
@@ -241,7 +243,7 @@ for(i in 1:length(my_data_roots)) {
     
   }
   
-  png(paste0("image_",i,"_1.png"), height=600, width=1000)
+  png(paste0("tmp/image_",i,"_1.png"), height=600, width=1000)
   pheatmap(fv_mat, cluster_rows=FALSE, cluster_cols=FALSE)
   dev.off()
   
@@ -267,20 +269,20 @@ for(i in 1:length(my_data_roots)) {
   pred = predict(model, task=task, subset=test_set)
   print(performance(pred, measures=list(mmce, acc)))
   
-  # write_tsv(data.frame(
-  #   gene=c(
-  #     gene_list_all$hgnc_symbol[sample_ixs[[i]][head(pred$data[order(pred$data$prob.1, decreasing=TRUE),'id'],10)]],
-  #     gene_list_all$hgnc_symbol[sample_ixs[[i]][tail(pred$data[order(pred$data$prob.1, decreasing=TRUE),'id'],10)]]
-  #   )), paste0("data_",i,".txt"))
+  write_tsv(data.frame(
+    gene=c(
+      gene_list_all$hgnc_symbol[sample_ixs[[i]][head(pred$data[order(pred$data$prob.1, decreasing=TRUE),'id'],10)]],
+      gene_list_all$hgnc_symbol[sample_ixs[[i]][tail(pred$data[order(pred$data$prob.1, decreasing=TRUE),'id'],10)]]
+    )), paste0("data_",i,".txt"))
   
   # plot scores
-  png(paste0("image_",i,"_2.png"))
+  png(paste0("tmp/image_",i,"_2.png"))
   print(ggplot(data.frame(pred), aes(truth, prob.1)) + geom_boxplot() + theme_thesis() + xlab("Expression") + ylab("Score"))
   dev.off()
   
   # plot information gain
   fv = generateFilterValuesData(task, method="information.gain")
-  png(paste0("image_",i,"_3.png"), height=600, width=1000)
+  png(paste0("tmp/image_",i,"_3.png"), height=600, width=1000)
   pheatmap(matrix(fv$data$information.gain, nrow=5, byrow=TRUE), cluster_rows=FALSE, cluster_cols=FALSE)
   dev.off()
   
@@ -342,16 +344,22 @@ for(i in 1:4) {
   model = train(lrn, task, subset=train_set)
   pred = predict(model, task=task, subset=test_set)
   png(paste0("image_auc_",i,"_1.png"))
-  ggplot(data.frame(pred), aes(truth, prob.1)) + geom_boxplot() + theme_thesis() + xlab("Expression") + ylab("Score")
+  print(ggplot(data.frame(pred), aes(truth, prob.1)) + geom_boxplot() + theme_thesis() + xlab("Expression") + ylab("Score"))
   dev.off()
   performance(pred, measures=list(mmce, acc))
   
   fv = generateFilterValuesData(task, method="information.gain")
   # fv = generateFeatureImportanceData(task, learner=lrn)
   png(paste0("image_auc_",i,"_2.png"))
-  ggplot(fv$data, aes(name, information.gain)) + geom_bar(stat="identity") + theme_thesis(20) + xlab("") + ylab("Information")
+  print(ggplot(fv$data, aes(name, information.gain)) + geom_bar(stat="identity") + theme_thesis(20) + xlab("") + ylab("Information"))
   dev.off()
   
 }
+
+
+# NEXT STEPS --------------------------------------------------------------
+
+# try different predictors
+
 
 
