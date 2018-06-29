@@ -31,14 +31,16 @@ rownames(dat) = str_replace(rownames(dat), "_BR[12]", "")
 
 # remove na columns
 dim(dat)
-dat = dat[,!apply(is.na(dat), 2, all)] # remove regions with no data
+na_ix = which(apply(is.na(dat), 2, all))
+dat = dat[,-na_ix] # remove regions with no data
 # dat = dat[-which(apply(dat, 1, function(x) all(is.na(x)))),]  # remove samples with no data
 dim(dat)
 
 # pick high-variance regions
 head(order(apply(dat, 2, var, na.rm=TRUE), decreasing=TRUE))
 ggplot(data.frame(Type=names(dat[,order(apply(dat, 2, var, na.rm=TRUE), decreasing=TRUE)[2]]), AUC=dat[,order(apply(dat, 2, var, na.rm=TRUE), decreasing=TRUE)[2]]), aes(Type, AUC)) + geom_boxplot() + theme_thesis(20)
-dat_filt = dat[,head(order(apply(dat,2,var,na.rm=TRUE), decreasing=TRUE), 1000)]
+col_ix = head(order(apply(dat,2,var,na.rm=TRUE), decreasing=TRUE), 1000)
+dat_filt = dat[,col_ix]
 pheatmap(log(dat_filt), show_colnames=FALSE)
 
 # kmeans
@@ -58,13 +60,51 @@ pheatmap(log(dat_filt),
          show_colnames = FALSE
 )
 
-which_clust = 6
+which_clust = 7
 to_plot = rbind(
   data.frame(Type="Macrophage", AUC=as.numeric(dat_filt[rownames(dat_filt)=="macrophage",fit$cluster==which_clust])),
   data.frame(Type="Monocyte", AUC=as.numeric(dat_filt[rownames(dat_filt)=="monocyte",fit$cluster==which_clust]))
 )
 ggplot(to_plot, aes(Type, log(AUC))) + geom_boxplot() + theme_thesis(20)
 
+# add thp-1 and u937
+dat_add = dat_all$tss$H3K27ac$res[grep("thp-1|u937", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE),]
+dim(dat_add)
+dat_add = dat_add[,-na_ix]
+dim(dat_add)[2] == dim(dat)[2]
+dat_add_filt = dat_add[,col_ix]
+dim(dat_add_filt)
+all(colnames(dat_filt) == colnames(dat_add_filt))
+dat_add_filt = dat_add_filt[-which(apply(dat_add_filt, 1, function(x) all(is.na(x)))),]
+dim(dat_add_filt)
 
+pheatmap(log(rbind(dat_filt, dat_add_filt)),
+         annotation_col = data.frame(Cluster=factor(fit$cluster)),
+         cluster_cols = col_clust,
+         show_colnames = FALSE
+)
+
+# what are the clusters?
+
+write_tsv(data.frame(names(which(fit$cluster==7))), "out_1.txt", col_names=FALSE) # monocyte high
+# http://amp.pharm.mssm.edu/Enrichr/enrich?dataset=42vf0
+
+write_tsv(data.frame(names(which(fit$cluster==5))), "out_2.txt", col_names=FALSE) # macrophage high
+# http://amp.pharm.mssm.edu/Enrichr/enrich?dataset=42vf4
+
+
+# APPLY T-TEST ------------------------------------------------------------
+
+p_res_g = rep(NA, dim(dat_filt)[2])
+for(i in 1:length(p_res_g)) {
+  p_res_g[i] = t.test(dat_filt[which(rownames(dat_filt)=="monocyte"),i], dat[which(rownames(dat_filt)=="macrophage"),i], alternative="g")$p.value
+}
+
+check_ix = 1
+to_plot = rbind(
+  data.frame(Type="Macrophage", AUC=as.numeric(dat_filt[rownames(dat_filt)=="macrophage", order(p_res_g)[check_ix]])),
+  data.frame(Type="Monocyte", AUC=as.numeric(dat_filt[rownames(dat_filt)=="monocyte", order(p_res_g)[check_ix]]))
+)
+ggplot(to_plot, aes(Type, log(AUC))) + geom_boxplot() + theme_thesis(20) + ggtitle(colnames(dat_filt)[order(p_res_g)[check_ix]])
 
 

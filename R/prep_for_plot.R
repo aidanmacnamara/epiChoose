@@ -15,6 +15,10 @@ prep_for_plot <- function(all_data, annot_1, annot_2, marks, plot_type=c("pca","
     
     dat = all_data[[i]]$res
     
+    if(all(is.na(dat))) {
+      next # there is no data for this data type - skip ...
+    }
+    
     remove_rows = which(apply(dat, 1, function(x) all(is.na(x)))) # remove samples with no data
     if(length(remove_rows)) {
       dat_na_rm = dat[-remove_rows,]

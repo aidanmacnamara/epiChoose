@@ -148,20 +148,24 @@ names(total_data) = marks
 
 single_labels = rownames(total_data[[1]]$res)
 group_labels = c(
-  rep("BLUEPRINT", dim(blueprint_chip_filtered[[1]]$res)[1]), 
-  rep("GSK", dim(gsk_chip_filtered[[1]]$res)[1]), 
-  rep("ENCODE", dim(encode_chip_filtered[[1]]$res)[1]),
-  rep("DEEP", dim(deep_chip_filtered[[1]]$res)[1])
+  # rep("BLUEPRINT", dim(blueprint_chip_filtered[[1]]$res)[1]), 
+  # rep("GSK", dim(gsk_chip_filtered[[1]]$res)[1]), 
+  # rep("ENCODE", dim(encode_chip_filtered[[1]]$res)[1]),
+  # rep("DEEP", dim(deep_chip_filtered[[1]]$res)[1])
+  rep("BLUEPRINT", 39), 
+  rep("GSK", 82), 
+  rep("ENCODE", 31),
+  rep("DEEP", 5)
 )
 
 total_data_edit = total_data
-gsk_ix = which(group_labels=="BLUEPRINT" | total_data[[1]]$annot$Project %in% c(5,6))
+gsk_ix = which(group_labels=="DEEP" | total_data[[1]]$annot$Project %in% c(4))
 for(i in 1:length(total_data_edit)) {
   total_data_edit[[i]]$res = total_data_edit[[i]]$res[gsk_ix,]  
 }
 
 plot_data = prep_for_plot(total_data_edit, annot_1=group_labels[gsk_ix], annot_2=single_labels[gsk_ix], marks=marks, plot_type="mds")
-pdf(file="out_3_mds.pdf", height=24, width=96)
+pdf(file="out_4_mds.pdf", height=24, width=96)
 ggplot(plot_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=8, shape=17) + theme_thesis(50) + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
 dev.off()
 
@@ -202,13 +206,14 @@ rownames_symbol = mapping$hgnc_symbol[match(rna_dat[[1]]$`Gene ID`, mapping$ense
 rna_dat_merge = tbl_df(cbind(rownames_symbol, rna_dat_merge))
 names(rna_dat_merge)[1] = "Gene Name"
 
-rna_add = prep_rna(rna_dat_merge, gene_list_all$hgnc_symbol, single_labels, names(rna_dat_merge)[-c(1,2)], quantile_norm=FALSE)
+rna_add = prep_rna(fpkm_table=rna_dat_merge, gene_list=gene_list_all$hgnc_symbol, chip_labels=single_labels, rna_labels=names(rna_dat_merge)[-c(1,2)], quantile_norm=TRUE)
 
 
 # EDIT NAMES --------------------------------------------------------------
 
 total_data[[1]]$annot$Project[which(group_labels=="BLUEPRINT")] = "BLUEPRINT"
 total_data[[1]]$annot$Project[which(group_labels=="ENCODE")] = "ENCODE"
+total_data[[1]]$annot$Project[which(group_labels=="DEEP")] = "DEEP"
 
 total_data[[6]] = rna_add
 names(total_data)[6] = "RNA"
@@ -240,7 +245,7 @@ for(i in 1:length(dat_max_10[1:5])) {
   dat_max_10[[i]]$res = convert_reg_matrix(dat_max_10[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="closest")
 }
 
-dat_all = list(dat_max_gb, dat_tss, dat_sum_gb, NA)
+dat_all = list(dat_max_gb, dat_tss, dat_sum_gb, dat_max_10)
 names(dat_all) = c("max", "tss", "sum", "closest")
 
 

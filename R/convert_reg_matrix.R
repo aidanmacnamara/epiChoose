@@ -46,7 +46,7 @@ convert_reg_matrix <- function(dat, roi, gene_list, summ_method=c("mean","max","
     }
     if(summ_method=="closest") {
       closest_ix = head(order(distance(gene_list[i], roi)), 10) # get the 10 closest regulatory regions around the tss
-      dat_out[,i] = apply(dat[,closest_ix,drop=FALSE], 1, max, na.rm=TRUE)
+      dat_out[,i] = apply(dat[,closest_ix,drop=FALSE], 1, sum, na.rm=TRUE)
     }
   }
   

@@ -22,6 +22,7 @@ prep_rna <- function(fpkm_table, gene_list, chip_labels, rna_labels, quantile_no
   fpkm_table = as.matrix(fpkm_table[,-c(1:col_skip)])
   
   rna_output = t(fpkm_table[col_ix,row_ix])
+  class(rna_output) = "numeric"
   colnames(rna_output) = gene_list
   rownames(rna_output) = chip_labels
   
