@@ -184,7 +184,7 @@ rna_annot_merge = bind_rows(rna_annot)
 # LABEL DATA - NEEDS MANUAL EDITING ---------------------------------------
 
 # match data to annotation by run id
-sample_match = match(names(rna_dat_merge)[-1], rna_annot_merge$`Comment[ENA_RUN]`) # 2 samples missing annotation?
+sample_match = match(names(rna_dat_merge)[-1], rna_annot_merge$`Comment[ENA_RUN]`)
 
 # create blueprint labels first
 sample_labels = paste(rna_annot_merge$`Comment[donor ID]`[sample_match], rna_annot_merge$`Characteristics[cell type]`[sample_match], sep="_")
