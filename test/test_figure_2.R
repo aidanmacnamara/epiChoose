@@ -110,52 +110,70 @@ ggplot(to_plot, aes(Type, log(AUC))) + geom_boxplot() + theme_thesis(20) + ggtit
 
 # LOG FOLD CHANGE CALCULATION ---------------------------------------------
 
-# get counts first
-
-data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
-bamfiles = filter(data_gsk, grepl("thp", Label, ignore.case=TRUE), Mark=="H3K27ac") %>% dplyr::select(Bam) %>% unlist()
-
-col_data = data_gsk[match(str_extract(bamfiles, "[[:alnum:]\\._-]+$"), str_extract(data_gsk$Bam, "[[:alnum:]\\._-]+$")),] %>% dplyr::select(Cell, Mark, Rep, Stimulus)
-
-# get counts over reg regions
-bamfiles <- BamFileList(bamfiles, yieldSize=2000000)
-lapply(bamfiles, seqinfo)
-register(MulticoreParam())
-se <- summarizeOverlaps(features=roi_reg, reads=bamfiles, mode="Union", ignore.strand=TRUE)
-
-rownames(col_data) = rownames(colData(se))
-colData(se) <- DataFrame(col_data)
-
-# construct object per mark
-marks = unique(col_data$Mark)
-dds_list = vector("list", length(marks))
-names(dds_list) = marks
-rld_list = dds_list
-
-for(i in 1:length(dds_list)) {
-  dds_list[[i]] <- DESeqDataSet(se_filt[,which(col_data$Mark==marks[i])])
-  nrow(dds_list[[i]])
-  dds_list[[i]] <- estimateSizeFactors(dds_list[[i]])
-  
-  # log convert to equalise variance across means (for plotting)  
-  rld_list[[i]] = rlog(dds_list[[i]], blind=FALSE)  
-  
-  # run dds
-  dds_list[[i]] <- DESeq(dds_list[[i]])
-}
-
-
-
-
-
+load("data/dat_all.RData")
 load("data/gene_list_all.RData")
 tss_window = 2e3
 tss_regions = gene_list_all
 start(tss_regions) = tss_regions$transcription_start_site - tss_window
 end(tss_regions) = tss_regions$transcription_start_site + tss_window
 
+
+# COUNTS ------------------------------------------------------------------
+
+data_gsk = read_excel("inst/extdata/data_gsk.xlsx")
+bamfiles = filter(data_gsk, grepl("thp", Label, ignore.case=TRUE), Mark=="H3K27ac") %>% dplyr::select(Bam) %>% unlist()
+
+col_data = data_gsk[match(str_extract(bamfiles, "[[:alnum:]\\._-]+$"), str_extract(data_gsk$Bam, "[[:alnum:]\\._-]+$")),] %>% dplyr::select(Cell, Mark, Rep, Stimulus)
+col_data = as.data.frame(col_data)
+
+bamfiles <- BamFileList(bamfiles, yieldSize=2000000)
+lapply(bamfiles, seqinfo)
+register(MulticoreParam())
+se <- summarizeOverlaps(features=tss_regions, reads=bamfiles, mode="Union", ignore.strand=TRUE)
+
+rownames(col_data) = rownames(colData(se))
+colData(se) <- DataFrame(col_data)
+
+dds = DESeqDataSet(se, design=~Stimulus)
+dds = DESeq(dds)
+rld = rlog(dds, blind=FALSE) 
+
+res = results(dds, contrast=c("Stimulus","PMA","Baseline"))
+res$hgnc_symbol = gene_list_all$hgnc_symbol
+res = tbl_df(res)
+res_filt = filter(res, padj < 0.05, abs(log2FoldChange) > 1.2) %>% arrange(desc(abs(log2FoldChange)))
+
+
+# AUC ---------------------------------------------------------------------
+
 # 1. start off with h3k27ac matrix
 dat_add = dat_all$tss$H3K27ac$res[grep("thp-1", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE),]
+dat_add[is.na(dat_add)] = 0
+dat_add = apply(dat_add, 2, as.integer)
+
+col_data_auc = col_data
+rownames(col_data_auc) = rownames(dat_add)
+dds_auc = DESeqDataSetFromMatrix(countData=t(dat_add), colData=col_data_auc, design=~Stimulus)
+
+dds_auc = DESeq(dds_auc)
+rld_auc = rlog(dds_auc, blind=FALSE) 
+
+res_auc = results(dds_auc, contrast=c("Stimulus","PMA","Baseline"))
+res_auc$hgnc_symbol = gene_list_all$hgnc_symbol
+res_auc = tbl_df(res_auc)
+res_auc_filt = filter(res_auc, padj < 0.05, abs(log2FoldChange) > 1.2) %>% arrange(desc(abs(log2FoldChange)))
+
+res_filt$auc_diff = res_auc$log2FoldChange[match(res_filt$hgnc_symbol,res_auc$hgnc_symbol)]
+plot(res_filt$log2FoldChange, res_auc_filt$log2FoldChange[match(res_filt$hgnc_symbol, res_auc_filt$hgnc_symbol)])
+plot(euler(list(AUC=res_auc_filt$hgnc_symbol, Counts=res_filt$hgnc_symbol)), quantities=TRUE)
+
+all_genes = unique(c(res_filt$hgnc_symbol, res_auc_filt$hgnc_symbol))
+plot(
+  res_filt$log2FoldChange[match(all_genes, res_filt$hgnc_symbol)],
+  res_auc_filt$log2FoldChange[match(all_genes, res_auc_filt$hgnc_symbol)]
+)
+
+
 
 # order samples for visualisation
 s_order = c(1,7,2,8,3,9,4,10,5,11,6,12)
@@ -165,12 +183,29 @@ dat_add = dat_add[s_order,]
 ctrl_ix = which(grepl("THP-1_BR[12]_Baseline", rownames(dat_add)))
 trmt_ix = which(grepl("THP-1_BR[12]_PMA$", rownames(dat_add)))
 
-trmt_mean = apply(dat_add[trmt_ix,], 2, mean, na.rm=TRUE)
-ctrl_mean = apply(dat_add[ctrl_ix,], 2, mean, na.rm=TRUE)
-mean_diff = trmt_mean - ctrl_mean
+res_auc = data.frame(p_value=rep(NA,length(gene_list_all)), fc=rep(NA,length(gene_list_all)), gene=gene_list_all$hgnc_symbol)
 
-log_fc = log((trmt_mean-ctrl_mean)/ctrl_mean, base=2)
-log_fc = log_fc[order(abs(log_fc), decreasing=TRUE)]
-log_fc = log_fc[-is.infinite(log_fc)]
+get_p_value <- function(x) {
+  if(any(is.na(c(x[trmt_ix],x[ctrl_ix]))) | any(c(x[trmt_ix],x[ctrl_ix])==0)) {
+    return(NA)
+  } else {
+    return(t.test(log(x[trmt_ix]+0.1),log(x[ctrl_ix]+0.1))$p.value)
+  }
+}
 
+get_fc <- function(x) {
+  if(any(is.na(c(x[trmt_ix],x[ctrl_ix])))) {
+    return(NA)
+  } else {
+    if(mean(x[trmt_ix]) > mean(x[ctrl_ix])) {
+      return(log(mean(x[trmt_ix])+0.1)-log(mean(x[ctrl_ix])+0.1))
+    } else {
+      return(-(log(mean(x[ctrl_ix])+0.1)-log(mean(x[trmt_ix])+0.1)))
+    }
+  }
+}  
+
+res_auc$p_value = apply(dat_add, 2, get_p_value)
+res_auc$fc = apply(dat_add, 2, get_fc)
+res_auc %>% arrange(desc(abs(fc))) %>% head
 
