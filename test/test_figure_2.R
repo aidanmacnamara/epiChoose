@@ -164,48 +164,71 @@ res_auc = tbl_df(res_auc)
 res_auc_filt = filter(res_auc, padj < 0.05, abs(log2FoldChange) > 1.2) %>% arrange(desc(abs(log2FoldChange)))
 
 res_filt$auc_diff = res_auc$log2FoldChange[match(res_filt$hgnc_symbol,res_auc$hgnc_symbol)]
-plot(res_filt$log2FoldChange, res_auc_filt$log2FoldChange[match(res_filt$hgnc_symbol, res_auc_filt$hgnc_symbol)])
+qplot(res_filt$log2FoldChange, res_auc_filt$log2FoldChange[match(res_filt$hgnc_symbol, res_auc_filt$hgnc_symbol)]) + theme_thesis() + xlab("LogFC Count") + ylab("LogFC AUC")
 plot(euler(list(AUC=res_auc_filt$hgnc_symbol, Counts=res_filt$hgnc_symbol)), quantities=TRUE)
 
 all_genes = unique(c(res_filt$hgnc_symbol, res_auc_filt$hgnc_symbol))
-plot(
-  res_filt$log2FoldChange[match(all_genes, res_filt$hgnc_symbol)],
-  res_auc_filt$log2FoldChange[match(all_genes, res_auc_filt$hgnc_symbol)]
+
+to_plot = data.frame(
+  genes = all_genes,
+  `LogFC Count` = res$log2FoldChange[match(all_genes, res$hgnc_symbol)],
+  `LogFC AUC` = res_auc$log2FoldChange[match(all_genes, res_auc$hgnc_symbol)],
+  Group = NA, check.names=FALSE
 )
 
+to_plot$Group[to_plot$genes %in% intersect(res_filt$hgnc_symbol, res_auc_filt$hgnc_symbol)] = "Both"
+to_plot$Group[to_plot$genes %in% setdiff(res_filt$hgnc_symbol, res_auc_filt$hgnc_symbol)] = "Count"
+to_plot$Group[to_plot$genes %in% setdiff(res_auc_filt$hgnc_symbol, res_filt$hgnc_symbol)] = "AUC"
+
+ggplot(to_plot, aes(x=`LogFC Count`, y=`LogFC AUC`, color=factor(Group))) + geom_point() + theme_thesis()
 
 
-# order samples for visualisation
-s_order = c(1,7,2,8,3,9,4,10,5,11,6,12)
-dat_add = dat_add[s_order,]
+# DEFINE ALL DYNAMIC REGIONS ----------------------------------------------
 
-# 2. establish dynamic regions
-ctrl_ix = which(grepl("THP-1_BR[12]_Baseline", rownames(dat_add)))
-trmt_ix = which(grepl("THP-1_BR[12]_PMA$", rownames(dat_add)))
+design(dds_auc)
+dds_auc = DESeq(dds_auc, test="LRT", reduced=~1)
+res = tbl_df(results(dds_auc))
+res$gene = rownames(results(dds_auc))
+# res = arrange(res, padj)
+res
 
-res_auc = data.frame(p_value=rep(NA,length(gene_list_all)), fc=rep(NA,length(gene_list_all)), gene=gene_list_all$hgnc_symbol)
-
-get_p_value <- function(x) {
-  if(any(is.na(c(x[trmt_ix],x[ctrl_ix]))) | any(c(x[trmt_ix],x[ctrl_ix])==0)) {
-    return(NA)
-  } else {
-    return(t.test(log(x[trmt_ix]+0.1),log(x[ctrl_ix]+0.1))$p.value)
-  }
+for(i in 1:10) {
+  plotCounts(dds_auc, gene=head(order(res$padj),10)[i], intgroup="Stimulus")
 }
 
-get_fc <- function(x) {
-  if(any(is.na(c(x[trmt_ix],x[ctrl_ix])))) {
-    return(NA)
-  } else {
-    if(mean(x[trmt_ix]) > mean(x[ctrl_ix])) {
-      return(log(mean(x[trmt_ix])+0.1)-log(mean(x[ctrl_ix])+0.1))
-    } else {
-      return(-(log(mean(x[ctrl_ix])+0.1)-log(mean(x[trmt_ix])+0.1)))
-    }
-  }
-}  
+# take the top 1000 hits
+d_genes = head(res$gene[order(res$padj)],1e3)
 
-res_auc$p_value = apply(dat_add, 2, get_p_value)
-res_auc$fc = apply(dat_add, 2, get_fc)
-res_auc %>% arrange(desc(abs(fc))) %>% head
+for_heatmap = assays(rld_auc)[[1]]
+colnames(for_heatmap) = col_data$Stimulus
+for_heatmap = as.data.frame(for_heatmap[match(d_genes,gene_list_all$hgnc_symbol),])
+pheatmap(for_heatmap)
+for_heatmap <- data.frame(
+  sapply(unique(names(for_heatmap)), # for each unique column name
+         function(col) rowMeans(for_heatmap[names(for_heatmap)==col]) # calculate row means
+  )
+)
+pheatmap(for_heatmap, show_rownames=FALSE)
+
+wss = (nrow(for_heatmap)-1) * sum(apply(for_heatmap,2,var))
+for(i in 2:15) {
+  wss[i] <- sum(kmeans(for_heatmap, centers=i)$withinss)
+}
+plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within-group sum-of-squares")
+fit <- kmeans(for_heatmap, 6)
+
+pheatmap(for_heatmap, fontsize_row=8,
+         annotation_row = data.frame(
+           K_Means = factor(fit$cluster),
+           row.names=rownames(for_heatmap)
+         ), show_rownames=FALSE
+)
+
+for_heatmap$Gene = rownames(for_heatmap)
+for_heatmap$Cluster = factor(fit$cluster)
+head(for_heatmap)
+for_heatmap = gather(for_heatmap, "Group","AUC",1:6)
+for_heatmap$Group = factor(for_heatmap$Group)
+ggplot(for_heatmap, aes(x=Group,y=AUC,group=Gene)) + geom_point(shape=17) + geom_line(alpha=0.1) + facet_wrap(~Cluster) + theme_thesis(10)
+
 
