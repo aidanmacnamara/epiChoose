@@ -336,11 +336,21 @@ pheatmap(for_heatmap, cluster_rows=FALSE, show_rownames=FALSE,
 for_heatmap$Gene = rownames(for_heatmap)
 for_heatmap$Cluster = factor(ifelse(for_heatmap$Gene %in% dg_genes, "Up", "Down"))
 head(for_heatmap)
-names(for_heatmap)[1:16] = paste(names(for_heatmap)[1:16],"_", 1:16, sep="")
-for_heatmap = gather(for_heatmap, "Group","AUC",1:16)
-for_heatmap$Group = factor(for_heatmap$Group)
-head(for_heatmap)
-for_heatmap$Group = str_replace(for_heatmap$Group, "_[0-9]+$", "")
-ggplot(for_heatmap, aes(x=Group,y=AUC)) + geom_boxplot() + facet_wrap(~Cluster) + theme_thesis(20)
 
-       
+# names(for_heatmap)[1:16] = paste(names(for_heatmap)[1:16],"_", 1:16, sep="")
+# for_heatmap = gather(for_heatmap, "Group","AUC",1:16)
+# for_heatmap$Group = factor(for_heatmap$Group)
+# head(for_heatmap)
+# for_heatmap$Group = str_replace(for_heatmap$Group, "_[0-9]+$", "")
+# ggplot(for_heatmap, aes(x=Group,y=AUC)) + geom_boxplot() + facet_wrap(~Cluster) + theme_thesis(20)
+
+for_heatmap$macrophage_mean = apply(for_heatmap[,names(for_heatmap)=="macrophage"], 1, mean)
+for_heatmap$macrophage_sd = apply(for_heatmap[,names(for_heatmap)=="macrophage"], 1, sd)
+for_heatmap$monocyte_mean = apply(for_heatmap[,names(for_heatmap)=="monocyte"], 1, mean)
+for_heatmap$monocyte_sd = apply(for_heatmap[,names(for_heatmap)=="monocyte"], 1, sd)
+
+to_plot = gather(for_heatmap[,17:22], "Group", "AUC", c(3,5))
+
+ggplot(to_plot, aes(x=Group,y=AUC,group=Gene)) + geom_point(shape=17) + geom_line(alpha=0.1) + facet_wrap(~Cluster) + theme_thesis(10)
+
+
