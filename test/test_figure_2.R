@@ -232,3 +232,115 @@ for_heatmap$Group = factor(for_heatmap$Group)
 ggplot(for_heatmap, aes(x=Group,y=AUC,group=Gene)) + geom_point(shape=17) + geom_line(alpha=0.1) + facet_wrap(~Cluster) + theme_thesis(10)
 
 
+# ADD BLUEPRINT DATA ------------------------------------------------------
+
+# construct matrix
+row_ix = which(grepl("thp-1", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) | grepl("monocyte", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) | grepl("macrophage", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) | grepl("u937", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE))
+col_data = dat_all$tss$H3K27ac$annot[row_ix,]
+col_data_filt = select(col_data, Label)
+col_data_filt$cell = tolower(str_extract(col_data_filt$Label, "[Mm]onocyte|macrophage|THP-1|U937"))
+col_data_filt$donor = str_extract(col_data_filt$Label, "^[CS][[:alnum:]]+")
+col_data_filt$condition = tolower(str_extract(col_data_filt$Label, "inflammatory|classical|alternatively activated|BR.*$"))
+col_data_filt$condition = str_replace(col_data_filt$condition, "br[12]_", "")
+col_data_filt$condition[is.na(col_data_filt$condition)] = "primary"
+
+dat_add = dat_all$tss$H3K27ac$res[row_ix,]
+dat_add[is.na(dat_add)] = 0
+dat_add = apply(dat_add, 2, as.integer)
+dim(dat_add)
+
+rownames(col_data_filt) = rownames(dat_add)
+dds_auc = DESeqDataSetFromMatrix(countData=t(dat_add), colData=col_data_filt, design=~condition)
+
+dds_auc = DESeq(dds_auc)
+rld_auc = rlog(dds_auc, blind=FALSE) 
+
+sampleDists <- dist(t(assay(rld_auc)))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- paste(rld_auc$cell, rld_auc$condition, sep="_")
+# colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors, show_colnames=FALSE)
+plotPCA(rld_auc, intgroup=c("cell"))
+
+
+# DEFINE ALL DYNAMIC REGIONS ----------------------------------------------
+
+design(dds_auc)
+dds_auc = DESeq(dds_auc, test="LRT", reduced=~1)
+res = tbl_df(results(dds_auc))
+res$gene = rownames(results(dds_auc))
+# res = arrange(res, padj)
+res
+
+for(i in 1:10) {
+  plotCounts(dds_auc, gene=head(order(res$padj),10)[i], intgroup="condition")
+}
+
+# take the top 1000 hits
+d_genes = head(res$gene[order(res$padj)],1e3)
+
+for_heatmap = assays(rld_auc)[[1]]
+colnames(for_heatmap) = col_data_filt$condition
+for_heatmap = as.data.frame(for_heatmap[match(d_genes,gene_list_all$hgnc_symbol),])
+dim(for_heatmap)
+pheatmap(for_heatmap)
+for_heatmap <- data.frame(
+  sapply(unique(names(for_heatmap)), # for each unique column name
+         function(col) rowMeans(for_heatmap[names(for_heatmap)==col]) # calculate row means
+  )
+)
+pheatmap(for_heatmap, show_rownames=FALSE)
+
+wss = (nrow(for_heatmap)-1) * sum(apply(for_heatmap,2,var))
+for(i in 2:15) {
+  wss[i] <- sum(kmeans(for_heatmap, centers=i)$withinss)
+}
+plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within-group sum-of-squares")
+fit <- kmeans(for_heatmap, 6)
+
+pheatmap(for_heatmap, fontsize_row=8,
+         annotation_row = data.frame(
+           K_Means = factor(fit$cluster),
+           row.names=rownames(for_heatmap)
+         ), show_rownames=FALSE
+)
+
+for_heatmap$Gene = rownames(for_heatmap)
+for_heatmap$Cluster = factor(fit$cluster)
+head(for_heatmap)
+for_heatmap = gather(for_heatmap, "Group","AUC",1:10)
+for_heatmap$Group = factor(for_heatmap$Group)
+ggplot(for_heatmap, aes(x=Group,y=AUC,group=Gene)) + geom_point(shape=17) + geom_line(alpha=0.1) + facet_wrap(~Cluster) + theme_thesis(10)
+
+
+# MONOCYTE/MACROPHAGE RELEVANT GENES --------------------------------------
+
+# pick the gene set from saeed/novakovic
+p_genes = read_excel("tmp/1-s2.0-S0092867416313162-mmc2.xlsx", sheet="Table S2B. Genes H3K27ac prom", skip=1)
+dg_genes = p_genes$Promoter_H3K27ac_Differentiation_gain; dg_genes = dg_genes[!is.na(dg_genes)]
+dl_genes = p_genes$Promoter_H3K27ac_Differentiation_loss; dl_genes = dl_genes[!is.na(dl_genes)]
+
+for_heatmap = assays(rld_auc)[[1]]
+colnames(for_heatmap) = col_data_filt$cell
+match_ix = match(c(dg_genes,dl_genes), gene_list_all$hgnc_symbol); match_ix = match_ix[!is.na(match_ix)]
+
+for_heatmap = as.data.frame(for_heatmap[match_ix,grepl("monocyte|macrophage", colnames(for_heatmap))])
+dim(for_heatmap)
+pheatmap(for_heatmap, cluster_rows=FALSE, show_rownames=FALSE)
+fit <- kmeans(for_heatmap, 2)
+pheatmap(for_heatmap, cluster_rows=FALSE, show_rownames=FALSE,
+         annotation_row = data.frame(K_Means=factor(fit$cluster), row.names=rownames(for_heatmap))
+)
+
+for_heatmap$Gene = rownames(for_heatmap)
+for_heatmap$Cluster = factor(ifelse(for_heatmap$Gene %in% dg_genes, "Up", "Down"))
+head(for_heatmap)
+names(for_heatmap)[1:16] = paste(names(for_heatmap)[1:16],"_", 1:16, sep="")
+for_heatmap = gather(for_heatmap, "Group","AUC",1:16)
+for_heatmap$Group = factor(for_heatmap$Group)
+head(for_heatmap)
+for_heatmap$Group = str_replace(for_heatmap$Group, "_[0-9]+$", "")
+ggplot(for_heatmap, aes(x=Group,y=AUC)) + geom_boxplot() + facet_wrap(~Cluster) + theme_thesis(20)
+
+       
