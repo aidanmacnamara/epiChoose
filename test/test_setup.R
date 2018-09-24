@@ -9,7 +9,7 @@ require(VennDiagram)
 require(TxDb.Hsapiens.UCSC.hg38.knownGene) # for peak to gene
 require(ChIPseeker) # for peak to gene
 require(org.Hs.eg.db) # for peak to gene
-load_all()
+require(epiChoose)
 
 
 # GENERATE ENSEMBL DATA ---------------------------------------------------
