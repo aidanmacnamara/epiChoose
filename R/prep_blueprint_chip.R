@@ -3,6 +3,7 @@
 #' @description This is a new line ...
 #' @details What's this?
 #' @return TO ADD
+#' @export
 
 prep_blueprint_chip <- function(blueprint_data, assays=c("H3K27ac","H3K4me3","H3K27me3"), out_file, root, rna_annot) {
   
