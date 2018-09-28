@@ -224,12 +224,19 @@ save(total_data, file="data/total_data.RData") # savepoint
 # REG TO GENE COLLAPSES ---------------------------------------------------
 
 dat_max_gb = total_data # max across gene body
+loc_max_gb = vector("list", length(total_data))
+names(loc_max_gb) = names(total_data)
+
 for(i in 1:length(dat_max_gb[1:5])) {
   print(paste("Processing data type", names(dat_max_gb)[i]))
-  dat_max_gb[[i]]$res = convert_reg_matrix(dat_max_gb[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="max")
+  my_data = convert_reg_matrix(dat_max_gb[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="max")
+  dat_max_gb[[i]]$res = my_data$data
+  loc_max_gb[[i]] = my_data$locations
 }
 
 dat_tss = total_data # tss sites only
+loc_max_gb = vector("list", length(total_data))
+names(loc_max_gb) = names(total_data)
 for(i in 1:length(dat_tss[1:5])) {
   print(paste("Processing data type", names(dat_tss)[i]))
   dat_tss[[i]]$res = convert_reg_matrix(dat_tss[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="tss")
