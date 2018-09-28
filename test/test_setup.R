@@ -39,7 +39,7 @@ names(newNames) = levels(seqnames(gene_list_all))
 gene_list_all = renameSeqlevels(gene_list_all, newNames)
 gene_list_all = gene_list_all[-1] # no hgnc symbol
 gene_list_all = sort(gene_list_all)
-save(gene_list_all, file="data/gene_list_all.RData")
+save(gene_list_all, file="data/gene_list_all.RData") # savepoint
 
 # regulatory build
 mart = useMart("ENSEMBL_MART_FUNCGEN", dataset="hsapiens_regulatory_feature")
@@ -50,7 +50,7 @@ roi_reg = arrange(roi_reg, chromosome_name, chromosome_start, chromosome_end)
 roi_reg = makeGRangesFromDataFrame(roi_reg, keep.extra.columns=TRUE, start.field="chromosome_start", end.field="chromosome_end", seqnames.field="chromosome_name")
 roi_reg_annot = annotatePeak(roi_reg, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene, annoDb="org.Hs.eg.db")
 roi_reg = roi_reg_annot@anno
-save(roi_reg, file="data/roi_reg.RData")
+save(roi_reg, file="data/roi_reg.RData") # savepoint
 
 mart = useMart("ENSEMBL_MART_FUNCGEN", dataset="hsapiens_external_feature")
 roi_reg_other = getBM(attributes=c("chromosome_name","chromosome_start","chromosome_end","feature_type","feature_type_class"), filters=list(chromosome_name=c(as.character(1:22), "X", "Y")), mart=mart)
@@ -58,7 +58,7 @@ roi_reg_other$chromosome_name = paste("chr", roi_reg_other$chromosome_name, sep=
 roi_reg_other = arrange(roi_reg_other, chromosome_name, chromosome_start, chromosome_end)
 
 roi_reg_other = makeGRangesFromDataFrame(roi_reg_other, keep.extra.columns=TRUE, start.field="chromosome_start", end.field="chromosome_end", seqnames.field="chromosome_name")
-save(roi_reg_other, file="data/roi_reg_other.RData")
+save(roi_reg_other, file="data/roi_reg_other.RData") # savepoint
 
 
 # ROI ---------------------------------------------------------------------
@@ -218,6 +218,8 @@ total_data[[1]]$annot$Project[which(group_labels=="DEEP")] = "DEEP"
 total_data[[6]] = rna_add
 names(total_data)[6] = "RNA"
 
+save(total_data, file="data/total_data.RData") # savepoint
+
 
 # REG TO GENE COLLAPSES ---------------------------------------------------
 
@@ -247,5 +249,15 @@ for(i in 1:length(dat_max_10[1:5])) {
 
 dat_all = list(dat_max_gb, dat_tss, dat_sum_gb, dat_max_10)
 names(dat_all) = c("max", "tss", "sum", "closest")
+
+save(dat_all, file="data/dat_all.RData") # savepoint
+
+
+# SAVE DATA TO EPIVIEW ----------------------------------------------------
+
+save(dat_all, file="../epiView/data/dat_all.RData") # savepoint
+save(gene_list_all, file="../epiView/data/gene_list_all.RData") # savepoint
+roi_reg_df = as.data.frame(roi_reg)[,1:3]
+save(roi_reg_df, file="../epiView/roi_reg_df.RData") # savepoint
 
 
