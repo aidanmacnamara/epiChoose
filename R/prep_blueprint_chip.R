@@ -29,7 +29,7 @@ prep_blueprint_chip <- function(blueprint_data, assays=c("H3K27ac","H3K4me3","H3
   chip_with_assays_filtered = filter(chip_with_assays_filtered, has_rna)
   
   # add back in novakovic data
-  bp_novakovic = filter(bp, grepl("SANQUIN", Name), Format=="bigWig", Experiment %in% marks)
+  bp_novakovic = filter(bp, grepl("SANQUIN", Name), Format=="bigWig", Experiment %in% assays)
   bp_novakovic_summ = bp_novakovic %>% group_by_(.dots=group_vars) %>% summarise (
     Data = all(assays %in% Experiment)
   )
