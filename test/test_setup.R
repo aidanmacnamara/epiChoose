@@ -87,7 +87,7 @@ marks = c("H3K27ac","H3K4me3","H3K27me3","ATAC","CTCF")
 
 # this returns the metadata for samples that have all of H3K27ac, H3K4me3, H3K27me3 and rna available
 rna_annot = read_tsv("inst/extdata/rna/E-MTAB-3827.sdrf.txt") # get rna annotation to check against
-data_blueprint = prep_blueprint_chip(blueprint_data="inst/extdata/blueprint_files.tsv", root="z:/links/RD-Epigenetics-NetworkData/otar_020/BLUEPRINT/", out_file="inst/extdata/data_blueprint.csv", rna_annot=rna_annot)
+data_blueprint = prep_blueprint_chip(blueprint_data="inst/extdata/blueprint_files.tsv", root="/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/BLUEPRINT/", out_file="inst/extdata/data_blueprint.csv", rna_annot=rna_annot)
 
 blueprint_input = "inst/extdata/data_blueprint.csv"
 
