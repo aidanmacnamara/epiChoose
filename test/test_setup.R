@@ -60,6 +60,20 @@ roi_reg_other = arrange(roi_reg_other, chromosome_name, chromosome_start, chromo
 roi_reg_other = makeGRangesFromDataFrame(roi_reg_other, keep.extra.columns=TRUE, start.field="chromosome_start", end.field="chromosome_end", seqnames.field="chromosome_name")
 save(roi_reg_other, file="data/roi_reg_other.RData") # savepoint
 
+roi_tss = gene_list_all
+tss_window = 2e3
+start(roi_tss) = roi_tss$transcription_start_site - tss_window
+end(roi_tss) = roi_tss$transcription_start_site + tss_window
+roi_tss_annot = annotatePeak(roi_tss, TxDb=TxDb.Hsapiens.UCSC.hg38.knownGene, annoDb="org.Hs.eg.db")
+roi_tss = roi_tss_annot@anno
+
+# roi_tss not ordered (despite 'sort')
+roi_tss = as.data.frame(roi_tss)
+roi_tss = arrange(roi_tss, as.character(seqnames), start, end)
+roi_tss = makeGRangesFromDataFrame(roi_tss, keep.extra.columns=TRUE)
+
+save(roi_tss, file="data/roi_tss.RData") # savepoint
+
 
 # ROI ---------------------------------------------------------------------
 
@@ -78,14 +92,20 @@ data_blueprint = prep_blueprint_chip(blueprint_data="inst/extdata/blueprint_file
 blueprint_input = "inst/extdata/data_blueprint.csv"
 
 require(BiocParallel)
+
 # blueprint_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(blueprint_input, roi, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
+
 blueprint_chip = vector("list", length=length(marks))
 for(i in 1:length(blueprint_chip)) {
   blueprint_chip[[i]] = make_auc_matrix(blueprint_input, roi_reg, marks[i], "tmp/", quantile_norm=FALSE)
 }
+blueprint_chip_filtered = prep_across_datatypes(blueprint_chip) # make sure rows are in the same order
 
-# make sure rows are in the same order
-blueprint_chip_filtered = prep_across_datatypes(blueprint_chip)
+blueprint_tsss = vector("list", length=length(marks))
+for(i in 1:length(blueprint_tsss)) {
+  blueprint_tsss[[i]] = make_auc_matrix(blueprint_input, roi_tss, marks[i], "tmp/", quantile_norm=FALSE)
+}
+blueprint_tsss_filtered = prep_across_datatypes(blueprint_tsss)
 
 
 # GSK DATA ----------------------------------------------------------------
@@ -113,19 +133,30 @@ table(
 gsk_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi_reg, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=5))
 gsk_chip_filtered = prep_across_datatypes(gsk_chip)
 
+gsk_tsss = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi_tss, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=5))
+gsk_tsss_filtered = prep_across_datatypes(gsk_tsss)
+
 
 # ENCODE DATA -------------------------------------------------------------
 
 encode_input = "inst/extdata/data_encode.csv"
+
 encode_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(encode_input, roi_reg, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
 encode_chip_filtered = prep_across_datatypes(encode_chip)
+
+encode_tsss = bplapply(seq(along=marks), function(x) make_auc_matrix(encode_input, roi_tss, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
+encode_tsss_filtered = prep_across_datatypes(encode_tsss)
 
 
 # DEEP DATA ---------------------------------------------------------------
 
 deep_input = "inst/extdata/data_deep.xlsx"
+
 deep_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(deep_input, roi_reg, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
 deep_chip_filtered = prep_across_datatypes(deep_chip)
+
+deep_tsss = bplapply(seq(along=marks), function(x) make_auc_matrix(deep_input, roi_tss, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
+deep_tsss_filtered = prep_across_datatypes(deep_tsss)
 
 
 # COMBINE -----------------------------------------------------------------
