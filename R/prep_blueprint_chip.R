@@ -63,6 +63,13 @@ prep_blueprint_chip <- function(blueprint_data, assays=c("H3K27ac","H3K4me3","H3
     out_dat = rbind(out_dat, to_add)
   }
   
+  # add stimulus conditions to novakovic data
+  out_dat$Label[grepl("SANQUIN", out_dat$Name)] =
+    paste(
+      out_dat$Donor[grepl("SANQUIN", out_dat$Name)],
+      out_dat$`Sub-group`[grepl("SANQUIN", out_dat$Name)], sep="_"
+    )
+  
   # what chip files are missing?
   files = list.files(root)
   new_dat = str_extract(out_dat$URL, "[[:alnum:]\\.\\_\\-]+$")
