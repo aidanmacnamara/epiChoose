@@ -43,6 +43,9 @@ convert_reg_matrix <- function(dat, roi, gene_list, summ_method=c("mean","max","
   }
   rownames(dat_out) = rownames(dat)
   
+  colnames(loc_out) = colnames(dat)
+  rownames(loc_out) = rownames(dat)
+  
   for(i in 1:dim(dat_out)[2]) {
     
     loc_ix = subjectHits(my_ol)[queryHits(my_ol)==i] # what are the regulatory indices associated with the gene

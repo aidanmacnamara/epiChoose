@@ -5,7 +5,7 @@ require(biomaRt)
 require(devtools)
 require(SummarizedExperiment)
 require(ggrepel)
-require(VennDiagram)
+require(readxl)
 require(TxDb.Hsapiens.UCSC.hg38.knownGene) # for peak to gene
 require(ChIPseeker) # for peak to gene
 require(org.Hs.eg.db) # for peak to gene
@@ -161,41 +161,52 @@ deep_tsss_filtered = prep_across_datatypes(deep_tsss)
 
 # COMBINE -----------------------------------------------------------------
 
-total_data = vector("list", length(marks)) # number of data types
-for(i in 1:length(total_data)) {
-  total_data[[i]]$res = rbind(blueprint_chip_filtered[[i]]$res, gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res, deep_chip_filtered[[i]]$res)
+total_reg = vector("list", length(marks)) # number of data types
+for(i in 1:length(total_reg)) {
+  total_reg[[i]]$res = rbind(blueprint_chip_filtered[[i]]$res, gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res, deep_chip_filtered[[i]]$res)
   # renormalize as we are multiple sources
-  total_data[[i]]$res = quantile_norm(total_data[[i]]$res)
+  total_reg[[i]]$res = quantile_norm(total_reg[[i]]$res)
   if(length(deep_chip_filtered[[i]]$annot$Size)) { # for error with data type conversion
     deep_chip_filtered[[i]]$annot$Size = as.character(deep_chip_filtered[[i]]$annot$Size)
   }
-  total_data[[i]]$annot = bind_rows(blueprint_chip_filtered[[i]]$annot, gsk_chip_filtered[[i]]$annot, encode_chip_filtered[[i]]$annot, deep_chip_filtered[[i]]$annot)
+  total_reg[[i]]$annot = bind_rows(blueprint_chip_filtered[[i]]$annot, gsk_chip_filtered[[i]]$annot, encode_chip_filtered[[i]]$annot, deep_chip_filtered[[i]]$annot)
 }
+names(total_reg) = marks
 
-names(total_data) = marks
+total_tss = vector("list", length(marks)) # number of data types
+for(i in 1:length(total_tss)) {
+  total_tss[[i]]$res = rbind(blueprint_tsss_filtered[[i]]$res, gsk_tsss_filtered[[i]]$res, encode_tsss_filtered[[i]]$res, deep_tsss_filtered[[i]]$res)
+  # renormalize as we are multiple sources
+  total_tss[[i]]$res = quantile_norm(total_tss[[i]]$res)
+  if(length(deep_tsss_filtered[[i]]$annot$Size)) { # for error with data type conversion
+    deep_tsss_filtered[[i]]$annot$Size = as.character(deep_tsss_filtered[[i]]$annot$Size)
+  }
+  total_tss[[i]]$annot = bind_rows(blueprint_tsss_filtered[[i]]$annot, gsk_tsss_filtered[[i]]$annot, encode_tsss_filtered[[i]]$annot, deep_tsss_filtered[[i]]$annot)
+}
+names(total_tss) = marks
 
 
 # GET LABELS --------------------------------------------------------------
 
-single_labels = rownames(total_data[[1]]$res)
+single_labels = rownames(total_reg[[1]]$res)
 group_labels = c(
-  # rep("BLUEPRINT", dim(blueprint_chip_filtered[[1]]$res)[1]), 
-  # rep("GSK", dim(gsk_chip_filtered[[1]]$res)[1]), 
+  # rep("BLUEPRINT", dim(blueprint_chip_filtered[[1]]$res)[1]),
+  # rep("GSK", dim(gsk_chip_filtered[[1]]$res)[1]),
   # rep("ENCODE", dim(encode_chip_filtered[[1]]$res)[1]),
   # rep("DEEP", dim(deep_chip_filtered[[1]]$res)[1])
-  rep("BLUEPRINT", 39), 
-  rep("GSK", 82), 
+  rep("BLUEPRINT", 82),
+  rep("GSK", 82),
   rep("ENCODE", 31),
   rep("DEEP", 5)
 )
 
-total_data_edit = total_data
-gsk_ix = which(group_labels=="DEEP" | total_data[[1]]$annot$Project %in% c(4))
-for(i in 1:length(total_data_edit)) {
-  total_data_edit[[i]]$res = total_data_edit[[i]]$res[gsk_ix,]  
+total_reg_edit = total_tss
+gsk_ix = which(group_labels=="DEEP" | total_reg[[1]]$annot$Project %in% c(4))
+for(i in 1:length(total_reg_edit)) {
+  total_reg_edit[[i]]$res = total_reg_edit[[i]]$res[gsk_ix,]  
 }
 
-plot_data = prep_for_plot(total_data_edit, annot_1=group_labels[gsk_ix], annot_2=single_labels[gsk_ix], marks=marks, plot_type="mds")
+plot_data = prep_for_plot(total_reg_edit, annot_1=group_labels[gsk_ix], annot_2=single_labels[gsk_ix], marks=marks, plot_type="mds")
 pdf(file="out_4_mds.pdf", height=24, width=96)
 ggplot(plot_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=8, shape=17) + theme_thesis(50) + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
 dev.off()
@@ -242,21 +253,21 @@ rna_add = prep_rna(fpkm_table=rna_dat_merge, gene_list=gene_list_all$hgnc_symbol
 
 # EDIT NAMES --------------------------------------------------------------
 
-total_data[[1]]$annot$Project[which(group_labels=="BLUEPRINT")] = "BLUEPRINT"
-total_data[[1]]$annot$Project[which(group_labels=="ENCODE")] = "ENCODE"
-total_data[[1]]$annot$Project[which(group_labels=="DEEP")] = "DEEP"
+total_reg[[1]]$annot$Project[which(group_labels=="BLUEPRINT")] = "BLUEPRINT"
+total_reg[[1]]$annot$Project[which(group_labels=="ENCODE")] = "ENCODE"
+total_reg[[1]]$annot$Project[which(group_labels=="DEEP")] = "DEEP"
 
-total_data[[6]] = rna_add
-names(total_data)[6] = "RNA"
+total_reg[[6]] = rna_add
+names(total_reg)[6] = "RNA"
 
-save(total_data, file="data/total_data.RData") # savepoint
+save(total_reg, file="data/total_reg.RData") # savepoint
 
 
 # REG TO GENE COLLAPSES ---------------------------------------------------
 
-dat_max_gb = total_data # max across gene body
-loc_max_gb = vector("list", length(total_data))
-names(loc_max_gb) = names(total_data)
+dat_max_gb = total_reg # max across gene body
+loc_max_gb = vector("list", length(total_reg))
+names(loc_max_gb) = names(total_reg)
 
 for(i in 1:length(dat_max_gb[1:5])) {
   print(paste("Processing data type", names(dat_max_gb)[i]))
@@ -265,21 +276,21 @@ for(i in 1:length(dat_max_gb[1:5])) {
   loc_max_gb[[i]] = my_data$locations
 }
 
-dat_tss = total_data # tss sites only
-loc_max_gb = vector("list", length(total_data))
-names(loc_max_gb) = names(total_data)
+dat_tss = total_tss # tss sites only
+loc_max_gb = vector("list", length(total_reg))
+names(loc_max_gb) = names(total_reg)
 for(i in 1:length(dat_tss[1:5])) {
   print(paste("Processing data type", names(dat_tss)[i]))
   dat_tss[[i]]$res = convert_reg_matrix(dat_tss[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="tss")
 }
 
-dat_sum_gb = total_data # normalised sum of aucs across gene body (h3k27me3 relevant)
+dat_sum_gb = total_reg # normalised sum of aucs across gene body (h3k27me3 relevant)
 for(i in 1:length(dat_sum_gb[1:5])) {
   print(paste("Processing data type", names(dat_sum_gb)[i]))
   dat_sum_gb[[i]]$res = convert_reg_matrix(dat_sum_gb[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="sum")
 }
 
-dat_max_10 = total_data # max from 10 closest peaks (ctcf relevant)
+dat_max_10 = total_reg # max from 10 closest peaks (ctcf relevant)
 for(i in 1:length(dat_max_10[1:5])) {
   print(paste("Processing data type", names(dat_max_10)[i]))
   dat_max_10[[i]]$res = convert_reg_matrix(dat_max_10[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="closest")
