@@ -190,26 +190,26 @@ names(total_tss) = marks
 
 single_labels = rownames(total_reg[[1]]$res)
 group_labels = c(
-  # rep("BLUEPRINT", dim(blueprint_chip_filtered[[1]]$res)[1]),
-  # rep("GSK", dim(gsk_chip_filtered[[1]]$res)[1]),
-  # rep("ENCODE", dim(encode_chip_filtered[[1]]$res)[1]),
-  # rep("DEEP", dim(deep_chip_filtered[[1]]$res)[1])
-  rep("BLUEPRINT", 82),
-  rep("GSK", 82),
-  rep("ENCODE", 31),
-  rep("DEEP", 5)
+  rep("BLUEPRINT", dim(blueprint_chip_filtered[[1]]$res)[1]),
+  rep("GSK", dim(gsk_chip_filtered[[1]]$res)[1]),
+  rep("ENCODE", dim(encode_chip_filtered[[1]]$res)[1]),
+  rep("DEEP", dim(deep_chip_filtered[[1]]$res)[1])
+  # rep("BLUEPRINT", 82),
+  # rep("GSK", 82),
+  # rep("ENCODE", 31),
+  # rep("DEEP", 5)
 )
 
-total_reg_edit = total_tss
-gsk_ix = which(group_labels=="DEEP" | total_reg[[1]]$annot$Project %in% c(4))
-for(i in 1:length(total_reg_edit)) {
-  total_reg_edit[[i]]$res = total_reg_edit[[i]]$res[gsk_ix,]  
-}
+# total_reg_edit = total_tss
+# gsk_ix = which(group_labels=="DEEP" | total_reg[[1]]$annot$Project %in% c(4))
+# for(i in 1:length(total_reg_edit)) {
+#   total_reg_edit[[i]]$res = total_reg_edit[[i]]$res[gsk_ix,]  
+# }
 
-plot_data = prep_for_plot(total_reg_edit, annot_1=group_labels[gsk_ix], annot_2=single_labels[gsk_ix], marks=marks, plot_type="mds")
-pdf(file="out_4_mds.pdf", height=24, width=96)
-ggplot(plot_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=8, shape=17) + theme_thesis(50) + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
-dev.off()
+# plot_data = prep_for_plot(total_reg_edit, annot_1=group_labels[gsk_ix], annot_2=single_labels[gsk_ix], marks=marks, plot_type="mds")
+# pdf(file="out_4_mds.pdf", height=24, width=96)
+# ggplot(plot_data, aes(x=x, y=y, color=annot_1)) + geom_point(size=8, shape=17) + theme_thesis(50) + geom_text_repel(aes(label=annot_2), fontface="bold", size=5, force=0.5) + facet_wrap(~mark, nrow=1)
+# dev.off()
 
 
 # ADD RNA -----------------------------------------------------------------
@@ -262,6 +262,12 @@ names(total_reg)[6] = "RNA"
 
 save(total_reg, file="data/total_reg.RData") # savepoint
 
+total_tss[[1]]$annot$Project[which(group_labels=="BLUEPRINT")] = "BLUEPRINT"
+total_tss[[1]]$annot$Project[which(group_labels=="ENCODE")] = "ENCODE"
+total_tss[[1]]$annot$Project[which(group_labels=="DEEP")] = "DEEP"
+
+save(total_tss, file="data/total_tss.RData") # savepoint
+
 
 # REG TO GENE COLLAPSES ---------------------------------------------------
 
@@ -276,24 +282,34 @@ for(i in 1:length(dat_max_gb[1:5])) {
   loc_max_gb[[i]] = my_data$locations
 }
 
-dat_tss = total_tss # tss sites only
-loc_max_gb = vector("list", length(total_reg))
-names(loc_max_gb) = names(total_reg)
+dat_tss = total_reg # tss sites only
+# loc_max_gb = vector("list", length(total_reg))
+# names(loc_max_gb) = names(total_reg)
 for(i in 1:length(dat_tss[1:5])) {
   print(paste("Processing data type", names(dat_tss)[i]))
-  dat_tss[[i]]$res = convert_reg_matrix(dat_tss[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="tss")
+  dat_tss[[i]]$res = total_tss[[i]]$res
 }
 
 dat_sum_gb = total_reg # normalised sum of aucs across gene body (h3k27me3 relevant)
+loc_sum_gb = vector("list", length(total_reg))
+names(loc_sum_gb) = names(total_reg)
+
 for(i in 1:length(dat_sum_gb[1:5])) {
   print(paste("Processing data type", names(dat_sum_gb)[i]))
-  dat_sum_gb[[i]]$res = convert_reg_matrix(dat_sum_gb[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="sum")
+  my_data = convert_reg_matrix(dat_sum_gb[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="sum")
+  dat_sum_gb[[i]]$res = my_data$data
+  loc_sum_gb[[i]] = my_data$locations 
 }
 
 dat_max_10 = total_reg # max from 10 closest peaks (ctcf relevant)
+loc_max_10 = vector("list", length(total_reg))
+names(loc_max_10) = names(total_reg)
+
 for(i in 1:length(dat_max_10[1:5])) {
   print(paste("Processing data type", names(dat_max_10)[i]))
-  dat_max_10[[i]]$res = convert_reg_matrix(dat_max_10[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="closest")
+  my_data = convert_reg_matrix(dat_max_10[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="closest")
+  dat_max_10[[i]]$res = my_data$data
+  loc_max_10[[i]] = my_data$locations
 }
 
 dat_all = list(dat_max_gb, dat_tss, dat_sum_gb, dat_max_10)
@@ -307,6 +323,6 @@ save(dat_all, file="data/dat_all.RData") # savepoint
 save(dat_all, file="../epiView/data/dat_all.RData") # savepoint
 save(gene_list_all, file="../epiView/data/gene_list_all.RData") # savepoint
 roi_reg_df = as.data.frame(roi_reg)[,1:3]
-save(roi_reg_df, file="../epiView/roi_reg_df.RData") # savepoint
+save(roi_reg_df, file="../epiView/data/roi_reg_df.RData") # savepoint
 
 
