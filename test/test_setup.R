@@ -9,7 +9,7 @@ require(readxl)
 require(TxDb.Hsapiens.UCSC.hg38.knownGene) # for peak to gene
 require(ChIPseeker) # for peak to gene
 require(org.Hs.eg.db) # for peak to gene
-require(epiChoose)
+load_all()
 
 
 # GENERATE ENSEMBL DATA ---------------------------------------------------
