@@ -177,7 +177,7 @@ ggplot(for_heatmap_long, aes(x=all_group,y=AUC)) + geom_boxplot() + facet_wrap(~
 row_ix = which(grepl("thp-1", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE))
 
 col_data = dat_all$tss$H3K27ac$annot[row_ix,]
-col_data_filt = data.frame(select(col_data, Label))
+col_data_filt = data.frame(dplyr::select(col_data, Label))
 col_data_filt$rep = str_extract(col_data_filt$Label, "BR[12]")
 col_data_filt$condition = str_extract(col_data_filt$Label, "[[:alnum:]+]+$")
 
@@ -303,7 +303,7 @@ for(i in 1:dim(go_res)[1]) {
   go_res$cor[i] = cor.test(dat$prim_fc[g_ix], dat$cell_fc[g_ix])$estimate  
 }
 
-View(arrange(go_res, desc(cor)))
+arrange(go_res, desc(cor)) %>% DT::datatable()
 
 g_ix = which(gene_list_all$hgnc_symbol %in% msig_go_bp[[which(names(msig_go_bp)=="REGULATION OF TYPE 2 IMMUNE RESPONSE")]])
 
