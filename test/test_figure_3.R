@@ -61,24 +61,12 @@ png(filename="c:/Users/am673712/Dropbox/OTAR020/images/sanquin_image_1.png", wid
 pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors, show_colnames=FALSE)
 dev.off()
 
-y = t(assays(rld_sanquin)[[1]])
-dim(y)
-y = y[,!apply(y, 2, function(x) sd(x)==0)] # remove regions with no variance
-dim(y)
-
-pca_res <- prcomp(y, scale=TRUE, center=TRUE)
-pca_res_summary = summary(pca_res)
-yy = data.frame(pca_res$x[,1:2])
-names(yy) = c("x","y")
-yy$annot_1 = paste(rld_sanquin$treatment, rld_sanquin$time, sep="_")
-yy$annot_2 = rld_sanquin$donor
-
 png(filename="c:/Users/am673712/Dropbox/OTAR020/images/sanquin_image_2.png", width=1000, height=600)
-ggplot(yy, aes(x=x, y=y, color=annot_2)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=5, force=0.5) + theme(legend.position="none")
+pca_and_plot(y)
 dev.off()
 
 
-# DIFFERENTIAL ANALYSIS ---------------------------------------------------
+# TOP N HITS --------------------------------------------------------------
 
 # novakovic criteria
 # fc 3
@@ -106,13 +94,7 @@ y = y[,colnames(y) %in% genes_top]
 y = y[,!apply(y, 2, function(x) sd(x)==0)] # remove regions with no variance
 dim(y)
 
-pca_res <- prcomp(y, scale=TRUE, center=TRUE)
-pca_res_summary = summary(pca_res)
-yy = data.frame(pca_res$x[,1:2])
-names(yy) = c("x","y")
-yy$annot_1 = paste(rld_sanquin$treatment, rld_sanquin$time, sep="_")
-yy$annot_2 = rld_sanquin$donor
-ggplot(yy, aes(x=x, y=y, color=annot_2)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=5, force=0.5) + theme(legend.position="none")
+pca_and_plot(y)
 
 for_heatmap = assays(rld_sanquin)[[1]]
 colnames(for_heatmap) = paste(col_data_filt$treatment, col_data_filt$time, col_data_filt$donor, sep="_")
@@ -173,7 +155,8 @@ ggplot(for_heatmap_long, aes(x=all_group,y=AUC)) + geom_boxplot() + facet_wrap(~
 
 # BRING IN THP-1 PMA VS. BASELINE -----------------------------------------
 
-# pick samples
+# PICK SAMPLES ------------------------------------------------------------
+
 row_ix = which(grepl("thp-1", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE))
 
 col_data = dat_all$tss$H3K27ac$annot[row_ix,]
@@ -181,7 +164,9 @@ col_data_filt = data.frame(dplyr::select(col_data, Label))
 col_data_filt$rep = str_extract(col_data_filt$Label, "BR[12]")
 col_data_filt$condition = str_extract(col_data_filt$Label, "[[:alnum:]+]+$")
 
-# run dds
+
+# RUN DDS -----------------------------------------------------------------
+
 dat_add = dat_all$tss$H3K27ac$res[row_ix,]
 # dat_add = total_reg$H3K27ac$res[row_ix,which(roi_reg$feature_type_name=="Enhancer")]
 dat_add[is.na(dat_add)] = 0
@@ -190,7 +175,9 @@ dim(dat_add)
 dds_thp = DESeqDataSetFromMatrix(countData=t(dat_add), colData=col_data_filt, design=~rep+condition)
 rld_thp = vst(dds_thp, blind=FALSE)
 
-# plot
+
+# PLOT RESULTS ------------------------------------------------------------
+
 sampleDists <- dist(t(assay(rld_thp)))
 sampleDistMatrix <- as.matrix(sampleDists)
 rownames(sampleDistMatrix) = paste(rld_thp$condition, rld_thp$rep, sep="_")
@@ -203,13 +190,10 @@ dim(y)
 y = y[,!apply(y, 2, function(x) sd(x)==0)] # remove regions with no variance
 dim(y)
 
-pca_res <- prcomp(y, scale=TRUE, center=TRUE)
-pca_res_summary = summary(pca_res)
-yy = data.frame(pca_res$x[,1:2])
-names(yy) = c("x","y")
-yy$annot_1 = rld_thp$condition
+pca_and_plot(y)
 
-ggplot(yy, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis()
+
+# DIFFERENTIAL PMA VS. BASELINE -------------------------------------------
 
 design(dds_thp)
 dds_thp = DESeq(dds_thp)
@@ -219,9 +203,10 @@ res_thp$symbol = gene_list_all$hgnc_symbol
 arrange(res_thp, padj)
 
 
-# SHOW THE OVERALL DISTANCE -----------------------------------------------
+# COMPARE THP1 AND SANQUIN TOGETHER ---------------------------------------
 
-# pick samples
+# PICK SAMPLES ------------------------------------------------------------
+
 row_ix = which(grepl("thp-1", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) | grepl("sanquin", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) & !is.na(dat_all$tss$H3K27ac$annot$Name))
 
 col_data = data.frame(label=rownames(dat_all$tss$H3K27ac$res)[row_ix])
@@ -275,14 +260,24 @@ dim(y)
 y = y[,!apply(y, 2, function(x) sd(x)==0)] # remove regions with no variance
 dim(y)
 
-pca_res <- prcomp(y, scale=TRUE, center=TRUE)
-pca_res_summary = summary(pca_res)
-yy = data.frame(pca_res$x[,1:2])
-names(yy) = c("x","y")
-yy$annot_1 = paste(rld_all$treatment, rld_all$time, sep="_")
-yy$annot_2 = rld_all$donor
+pca_and_plot(y)
 
-ggplot(yy, aes(x=x, y=y, color=annot_2)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=5, force=0.5) + theme(legend.position="none")
+
+# WHAT IS DRIVING PC1 DIFFERENCES? ----------------------------------------
+
+dat = data.frame(gene=gene_list_all$hgnc_symbol, loadings=pca_res$rotation[,1])
+ranks = deframe(dat)
+p = gmtPathways("../sp_140_follow_up/c2.cp.v6.2.symbols.gmt")
+
+res <- fgsea(pathways=p, stats=ranks, nperm=1000)
+res_tidy = res %>% as_tibble() %>% arrange(desc(NES))
+res_tidy %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj) %>% DT::datatable()
+
+print(ggplot(filter(res_tidy, padj<0.03), aes(reorder(pathway, NES), NES)) + geom_col(aes(fill=padj<0.03)) + coord_flip() + labs(x="Pathway", y="Normalized Enrichment Score") + theme_thesis(10))
+
+# remove the first pc and project again?
+y_rev = pca_res$x[,-1] %*% t(pca_res$rotation[,-1])
+pca_and_plot(y_rev) # still orthogonal, easier to look gene-by-gene
 
 # look across go terms for highest correlation
 design(dds_sanquin)
@@ -294,18 +289,20 @@ res_celline_diff = results(dds_thp, contrast=c("condition","PMA","Baseline"))
 dat = data.frame(prim_fc=res_primary_diff$log2FoldChange, cell_fc=res_celline_diff$log2FoldChange, gene=gene_list_all$hgnc_symbol)
 
 # get go lists
-load("../epiView/data/msig_go_bp.RData")
-go_res = data.frame(cor=rep(NA, length(msig_go_bp)), name=names(msig_go_bp))
+my_p = gmtPathways("tmp/c2.cp.reactome.v6.2.symbols.gmt")
+go_res = data.frame(cor=rep(NA, length(my_p)), name=names(my_p))
 
 for(i in 1:dim(go_res)[1]) {
-  g_ix = which(dat$gene %in% msig_go_bp[[i]])
+  g_ix = which(dat$gene %in% my_p[[i]])
   if(length(g_ix)<20) next
   go_res$cor[i] = cor.test(dat$prim_fc[g_ix], dat$cell_fc[g_ix])$estimate  
 }
 
 arrange(go_res, desc(cor)) %>% DT::datatable()
 
-g_ix = which(gene_list_all$hgnc_symbol %in% msig_go_bp[[which(names(msig_go_bp)=="REGULATION OF TYPE 2 IMMUNE RESPONSE")]])
+g_ix = which(gene_list_all$hgnc_symbol %in% my_p[[which(names(my_p)=="REACTOME_SIGNAL_TRANSDUCTION_BY_L1")]])
+qplot(dat$prim_fc[g_ix], dat$cell_fc[g_ix]) + theme_thesis()
+
 
 y = t(assays(dds_all)[[1]])
 y = y[,g_ix]
@@ -330,3 +327,22 @@ y = gather(data.frame(y),"Group","AUC", 1:36)
 y = filter(y, Group %in% c("Naive_6days","Naive_6days.1","Attached_1hr","Attached_1hr.1"))
 
 ggplot(y, aes(x=Group,y=AUC)) + geom_point(shape=17) + geom_line(alpha=0.1) + facet_wrap(~gene) + theme_thesis(15)
+
+
+# FUNCTIONS ---------------------------------------------------------------
+
+pca_and_plot <- function(y) {
+  
+  pca_res <- prcomp(y, scale=TRUE, center=TRUE)
+  pca_res_summary = summary(pca_res)
+  yy = data.frame(pca_res$x[,1:2])
+  names(yy) = c("x","y")
+  yy$annot_1 = paste(rld_all$treatment, rld_all$time, sep="_")
+  yy$annot_2 = rld_all$donor
+  
+  my_plot = ggplot(yy, aes(x=x, y=y, color=annot_2)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=5, force=0.5) + theme(legend.position="none")
+  return(my_plot)
+  
+}
+
+
