@@ -261,9 +261,13 @@ pca_and_plot(rld_all, annot_1=paste(rld_all$treatment, rld_all$time, sep="_"), a
 
 # WHAT IS DRIVING PC1 DIFFERENCES? ----------------------------------------
 
+y = t(assays(rld_all)[[1]])
+dim(y)
+pca_res <- prcomp(y, scale=TRUE, center=TRUE)
+
 dat = data.frame(gene=gene_list_all$hgnc_symbol, loadings=pca_res$rotation[,1])
 ranks = deframe(dat)
-p = gmtPathways("../sp_140_follow_up/c2.cp.v6.2.symbols.gmt")
+p = gmtPathways("tmp/c2.cp.v6.2.symbols.gmt")
 
 res <- fgsea(pathways=p, stats=ranks, nperm=1000)
 res_tidy = res %>% as_tibble() %>% arrange(desc(NES))
@@ -273,12 +277,13 @@ print(ggplot(filter(res_tidy, padj<0.03), aes(reorder(pathway, NES), NES)) + geo
 
 # remove the first pc and project again?
 y_rev = pca_res$x[,-1] %*% t(pca_res$rotation[,-1])
-pca_and_plot(y_rev) # still orthogonal, easier to look gene-by-gene
+dim(y_rev)
+# pca_and_plot(y_rev) # still orthogonal, easier to look gene-by-gene
 
 
 # SEARCH BY GENE SETS -----------------------------------------------------
 
-my_p = gmtPathways("tmp/c2.cp.reactome.v6.2.symbols.gmt")
+my_p = gmtPathways("tmp/c7.all.v6.2.symbols.gmt")
 
 
 # FC TABLE ----------------------------------------------------------------
@@ -286,6 +291,10 @@ my_p = gmtPathways("tmp/c2.cp.reactome.v6.2.symbols.gmt")
 # sanquin
 
 design(dds_sanquin)
+dds_sanquin$time_treatment = factor(paste(dds_sanquin$time, dds_sanquin$treatment, sep="_"))
+design(dds_sanquin) = formula(~time_treatment+donor)
+dds_sanquin = DESeq(dds_sanquin)
+
 trts_sanquin = as.character(unique(dds_sanquin$time_treatment)[-1])
 res_sanquin = data.frame(genes=gene_list_all$hgnc_symbol)
 for(i in 1:length(trts_sanquin)) {
@@ -325,16 +334,15 @@ all(names(res_all_p)==names(res_all_fc))
 s_annot = data.frame(Group=c(rep("GSK",5),rep("SANQUIN",12)), row.names=c(trts_thp,trts_sanquin))
 
 # store correlation between thp and sanquin
-cor_dat = vector("list", length(my_p))
-names(cor_dat) = names(my_p)
 thp_names = c("LPS","PMA","VD3","VD3+LPS","PMA+LPS")
 sanquin_names = c("5days_BG","6days_Naive","5days_LPS")
 res_template = matrix(NA, nrow=length(thp_names), ncol=length(sanquin_names))
 colnames(res_template) = sanquin_names
 rownames(res_template) = thp_names
+cor_dat = vector("list", length(my_p))
+names(cor_dat) = names(my_p)
 
-i=7
-for(i in 1:10) {
+for(i in 1:length(cor_dat)) {
   
   res_copy = res_template
   g_ix = which(rownames(res_all_fc) %in% my_p[[i]])
@@ -354,14 +362,49 @@ for(i in 1:10) {
   }
   
   cor_dat[[i]] = res_copy
-  # dat_tree = hclust(dist(t(dat_fc)))
   # pheatmap(dat_fc, annotation_col=s_annot, main=names(my_p)[i], fontsize_row=5)
-  # mix_dat$mixing[i] = all(c(1,2) %in% cutree(dat_tree, k=2)[s_annot$Group=="GSK"])
+  # dat_tree = hclust(dist(t(dat_fc)))
   
 }
 
-table(mix_dat$mixing)
-head(which(mix_dat$mixing))
+# make cor_dat long to look at correlation sets
+cor_dat_long = data.frame()
+my_labels = as.character(outer(thp_names, sanquin_names, paste, sep="_VS_"))
+for(i in 1:length(cor_dat)) {
+  print(i)
+  cor_dat_long = rbind(
+    cor_dat_long,
+    data.frame(
+      Cor = as.numeric(cor_dat[[i]]),
+      Label = my_labels,
+      Pathway = names(cor_dat)[i]
+    )
+  )
+}
+
+cor_dat_long %>% ggplot(aes(x=Cor)) + geom_histogram(binwidth=0.01, color="black") + theme_thesis()
+# shows a long negative tail in the immunology msigdb set
+# i.e. a significant negative correlation across some pathways
+# what are these pathways?
+
+cor_dat_long %>% filter(Cor < -0.5) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N))
+cor_dat_long %>% filter(Cor < -0.5) %>% group_by(Label) %>% summarise(N=n()) %>% arrange(desc(N))
+
+# signal dominated by lps vs. primary
+# i.e. a strong negative correlation between lps-stimulated pathways in thp-1 and primary 'macrophages'
+
+select_ps = cor_dat_long %>% filter(Cor < -0.5) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N)) %>% select(Pathway) %>% unlist %>% as.character()
+
+for(j in 1:length(select_ps)) {
+  
+  i = which(names(my_p)==select_ps[j])
+  cor_dat[[i]]
+  res_copy = res_template
+  g_ix = which(rownames(res_all_fc) %in% my_p[[i]])
+  dat_fc = res_all_fc[g_ix,]
+  pheatmap(dat_fc, annotation_col=s_annot, main=names(my_p)[i], fontsize_row=5)
+  
+}
 
 gsea_in = res_all_fc$`5days_LPS`
 names(gsea_in) = rownames(res_all_fc)
