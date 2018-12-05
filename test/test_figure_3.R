@@ -204,11 +204,12 @@ res_thp$symbol = gene_list_all$hgnc_symbol
 arrange(res_thp, padj)
 
 
-# COMPARE THP1 AND SANQUIN TOGETHER ---------------------------------------
+# COMPARE THP1/U937 AND SANQUIN TOGETHER ----------------------------------
 
 # PICK SAMPLES ------------------------------------------------------------
 
-row_ix = which(grepl("thp-1", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) | grepl("sanquin", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) & !is.na(dat_all$tss$H3K27ac$annot$Name))
+row_ix = which(grepl("thp-1|u937", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) | grepl("sanquin", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) & !is.na(dat_all$tss$H3K27ac$annot$Name))
+row_ix = c(row_ix, which(rownames(dat_all$tss$H3K27ac$res)=="Monocytes-CD14+_Broad"))
 
 col_data = data.frame(label=rownames(dat_all$tss$H3K27ac$res)[row_ix])
 my_time = str_extract_all(col_data$label, "[0-9]+(hr[s]*|days)")
@@ -229,14 +230,17 @@ col_data$treatment = str_replace(col_data$treatment, "RPMI_", "")
 col_data$donor = str_replace(col_data$label, "^.*mono_([0-9]+).*$", "\\1")
 col_data$treatment[col_data$treatment=="RPMI"] = "Naive"
 rownames(col_data) = rownames(dat_all$tss$H3K27ac$res)[row_ix]
+col_data[length(row_ix),2:5] = c("NA",0,"Naive","Broad")
 
 # remove challenge data
 c_ix = which(col_data$challenge==1)
 row_ix_filt = row_ix[-c_ix]
 col_data_filt = col_data[-c_ix,]
-col_data_filt$treatment[25:36] = str_extract(col_data_filt$label[25:36], "[[:alnum:]+]+$")
-col_data_filt$time[25:36] = "0days"
-col_data_filt$donor[25:36] = "None"
+col_data_filt$treatment[25:48] = str_extract(col_data_filt$label[25:48], "[[:alnum:]+]+$")
+col_data_filt$time[25:48] = "0days"
+col_data_filt$donor[25:48] = "None"
+col_data_filt$cell_type = str_extract(col_data_filt$label, "monocyte|THP-1|U937")
+col_data_filt$cell_type[dim(col_data_filt)[1]] = "monocyte"
 
 dat_add = dat_all$tss$H3K27ac$res[row_ix_filt,]
 # dat_add = total_reg$H3K27ac$res[row_ix_filt,which(roi_reg$feature_type_name=="Enhancer")]
@@ -251,12 +255,12 @@ rld_all = vst(dds_all, blind=FALSE)
 
 sampleDists <- dist(t(assay(rld_all)))
 sampleDistMatrix <- as.matrix(sampleDists)
-rownames(sampleDistMatrix) = paste(rld_all$treatment, rld_all$time, sep="_")
+rownames(sampleDistMatrix) = paste(rld_all$cell_type, rld_all$treatment, rld_all$time, sep="_")
 colors <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
 
 pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors, show_colnames=FALSE)
 
-pca_and_plot(rld_all, annot_1=paste(rld_all$treatment, rld_all$time, sep="_"), annot_2=rld_all$donor)
+pca_and_plot(rld_all, annot_1=paste(rld_all$cell_type, rld_all$treatment, rld_all$time, sep="_"), annot_2=factor(c(rep(1,48),2)))
 
 
 # WHAT IS DRIVING PC1 DIFFERENCES? ----------------------------------------
@@ -278,7 +282,7 @@ print(ggplot(filter(res_tidy, padj<0.03), aes(reorder(pathway, NES), NES)) + geo
 # remove the first pc and project again?
 y_rev = pca_res$x[,-1] %*% t(pca_res$rotation[,-1])
 dim(y_rev)
-# pca_and_plot(y_rev) # still orthogonal, easier to look gene-by-gene
+pca_and_plot(y_rev, annot_1=paste(rld_all$cell_type, rld_all$treatment, rld_all$time, sep="_"), annot_2=NA) # still orthogonal, easier to look gene-by-gene
 
 
 # SEARCH BY GENE SETS -----------------------------------------------------
@@ -355,8 +359,8 @@ for(i in 1:length(cor_dat)) {
         dat_fc[,which(names(dat_fc)==sanquin_names[k])]
       )
       # if(y$p.value<0.05) {
-        res_copy[j,k] = y$estimate
-        
+      res_copy[j,k] = y$estimate
+      
       # }
     }
   }
@@ -417,7 +421,12 @@ res_tidy %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj) %
 
 pca_and_plot <- function(rld, annot_1, annot_2) {
   
-  y = t(assays(rld)[[1]])
+  if(class(rld)=="matrix") {
+    y = rld
+  } else {
+    y = t(assays(rld)[[1]])
+  }
+  
   dim(y)
   y = y[,!apply(y, 2, function(x) sd(x)==0)] # remove regions with no variance
   dim(y)
