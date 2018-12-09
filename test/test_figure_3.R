@@ -366,26 +366,41 @@ sanquin_names = c("5days_BG","6days_Naive","5days_LPS")
 res_template = matrix(NA, nrow=length(cell_line_names), ncol=length(sanquin_names))
 colnames(res_template) = sanquin_names
 rownames(res_template) = cell_line_names
+
+# store the results for each pathway
 cor_dat = vector("list", length(my_p_filter))
 names(cor_dat) = names(my_p_filter)
 
 for(i in 1:length(cor_dat)) {
   
   res_copy = res_template
-  g_ix = which(rownames(res_all_fc) %in% my_p[[i]])
+  g_ix = which(rownames(res_all_fc) %in% my_p_filter[[i]]) # get the gene indices for the pathway
   if(is_empty(g_ix)) next
-  dat_fc = res_all_fc[g_ix,]
-  dat_p = res_all_p[g_ix,]
-  dat_fc[dat_p > 0.05] = NA
+  pathway_fc = res_all_fc[g_ix,] # get the fold changes
+  pathway_p = res_all_p[g_ix,]
+  # dat_fc[dat_p > 0.05] = NA # set non-significant (padj) to na
+  
   for(j in 1:10) {
     for(k in 1:3) {
-      y = cor.test(
-        dat_fc[,which(names(dat_fc)==cell_line_names[j])],
-        dat_fc[,which(names(dat_fc)==sanquin_names[k])]
+      
+      x = pathway_fc[,which(names(pathway_fc)==cell_line_names[j])]
+      y = pathway_fc[,which(names(pathway_fc)==sanquin_names[k])]
+      # plot(x,y)
+      
+      fisher_mat = matrix(
+        c(
+          sum(x>0 & y>0, na.rm=TRUE),
+          sum(x<0 & y>0, na.rm=TRUE),
+          sum(x>0 & y<0, na.rm=TRUE),
+          sum(x<0 & y<0, na.rm=TRUE)
+        ),
+        nrow=2,
+        dimnames=list(cell_line=c("up","down"),primary_cell=c("up","down"))
       )
-      # if(y$p.value<0.05) {
-      res_copy[j,k] = y$estimate
-      # }
+      
+      fisher_res = fisher.test(fisher_mat, alternative="greater")
+      res_copy[j,k] = fisher_res$p.value
+      
     }
   }
   
@@ -411,24 +426,17 @@ for(i in 1:length(cor_dat)) {
 }
 
 cor_dat_long %>% ggplot(aes(x=Cor)) + geom_histogram(binwidth=0.01, color="black") + theme_thesis()
-# shows a long negative tail in the immunology msigdb set
-# i.e. a significant negative correlation across some pathways
-# what are these pathways?
+cutoff = 0.05
+cor_dat_long %>% filter(Cor < cutoff) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N))
+cor_dat_long %>% filter(Cor < cutoff) %>% group_by(Label) %>% summarise(N=n()) %>% arrange(desc(N))
 
-cor_dat_long %>% filter(Cor > 0.7) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N))
-cor_dat_long %>% filter(Cor > 0.7) %>% group_by(Label) %>% summarise(N=n()) %>% arrange(desc(N))
-
-# signal dominated by lps vs. primary
-# i.e. a strong negative correlation between lps-stimulated pathways in thp-1 and primary 'macrophages'
-
-select_ps = cor_dat_long %>% filter(Cor > 0.7) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N)) %>% select(Pathway) %>% unlist %>% as.character()
+select_ps = cor_dat_long %>% filter(Cor < cutoff) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N)) %>% select(Pathway) %>% unlist %>% as.character()
 
 for(j in 1:length(select_ps)) {
   
-  i = which(names(my_p)==select_ps[j])
+  i = which(names(my_p_filter)==select_ps[j])
   cor_dat[[i]]
-  res_copy = res_template
-  g_ix = which(rownames(res_all_fc) %in% my_p[[i]])
+  g_ix = which(rownames(res_all_fc) %in% my_p_filter[[i]])
   dat_fc = res_all_fc[g_ix,]
   pheatmap(dat_fc, main=names(my_p)[i], fontsize_row=5)
   
