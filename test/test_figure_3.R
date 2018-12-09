@@ -159,16 +159,17 @@ for_heatmap_long$all_group = str_extract(for_heatmap_long$Group, "Group_[12]")
 ggplot(for_heatmap_long, aes(x=all_group,y=AUC)) + geom_boxplot() + facet_wrap(~Cluster) + theme_thesis(20)
 
 
-# BRING IN THP-1 PMA VS. BASELINE -----------------------------------------
+# BRING IN THP-1/U937 -----------------------------------------------------
 
 # PICK SAMPLES ------------------------------------------------------------
 
-row_ix = which(grepl("thp-1", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE))
+row_ix = which(grepl("thp-1|u937", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE))
 
 col_data = dat_all$tss$H3K27ac$annot[row_ix,]
 col_data_filt = data.frame(dplyr::select(col_data, Label))
 col_data_filt$rep = str_extract(col_data_filt$Label, "BR[12]")
 col_data_filt$condition = str_extract(col_data_filt$Label, "[[:alnum:]+]+$")
+col_data_filt$cell_line = str_extract(col_data_filt$Label, "^[[:alnum:]-]+")
 
 
 # RUN DDS -----------------------------------------------------------------
@@ -178,30 +179,30 @@ dat_add = dat_all$tss$H3K27ac$res[row_ix,]
 dat_add[is.na(dat_add)] = 0
 dat_add = apply(dat_add, 2, as.integer)
 dim(dat_add)
-dds_thp = DESeqDataSetFromMatrix(countData=t(dat_add), colData=col_data_filt, design=~rep+condition)
-rld_thp = vst(dds_thp, blind=FALSE)
+dds_cell_lines = DESeqDataSetFromMatrix(countData=t(dat_add), colData=col_data_filt, design=~rep+condition+cell_line)
+rld_cell_lines = vst(dds_cell_lines, blind=FALSE)
 
 
 # PLOT RESULTS ------------------------------------------------------------
 
-sampleDists <- dist(t(assay(rld_thp)))
+sampleDists <- dist(t(assay(rld_cell_lines)))
 sampleDistMatrix <- as.matrix(sampleDists)
-rownames(sampleDistMatrix) = paste(rld_thp$condition, rld_thp$rep, sep="_")
+rownames(sampleDistMatrix) = paste(rld_cell_lines$condition, rld_cell_lines$rep, sep="_")
 colors <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
 
 pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors, show_colnames=FALSE)
 
-pca_and_plot(rld_thp, annot_1=rld_thp$condition, annot_2=NA)
+pca_and_plot(rld_cell_lines, annot_1=rld_cell_lines$condition, annot_2=rld_cell_lines$cell_line)
 
 
 # DIFFERENTIAL PMA VS. BASELINE -------------------------------------------
 
-design(dds_thp)
-dds_thp = DESeq(dds_thp)
-res_thp = tbl_df(results(dds_thp, contrast=c("condition","PMA","Baseline")))
-res_thp$gene = rownames(res_thp)
-res_thp$symbol = gene_list_all$hgnc_symbol
-arrange(res_thp, padj)
+design(dds_cell_lines)
+dds_cell_lines = DESeq(dds_cell_lines)
+res_cell_lines = tbl_df(results(dds_cell_lines, contrast=c("condition","PMA","Baseline")))
+res_cell_lines$gene = rownames(res_cell_lines)
+res_cell_lines$symbol = gene_list_all$hgnc_symbol
+arrange(res_cell_lines, padj)
 
 
 # COMPARE THP1/U937 AND SANQUIN TOGETHER ----------------------------------
@@ -287,7 +288,15 @@ pca_and_plot(y_rev, annot_1=paste(rld_all$cell_type, rld_all$treatment, rld_all$
 
 # SEARCH BY GENE SETS -----------------------------------------------------
 
-my_p = gmtPathways("tmp/c7.all.v6.2.symbols.gmt")
+my_p = gmtPathways("tmp/c7.all.v6.2.symbols.gmt") # immune set
+my_p = gmtPathways("tmp/c5.bp.v6.2.symbols.gmt") # biological processes
+my_p_filter = my_p[grep("monocyte|macrophage", names(my_p), ignore.case=TRUE)]
+
+lapply(my_p_filter, length)
+my_p_filter_tbl = as.data.frame.matrix((table(stack(my_p_filter))))
+my_p_filter_tbl = cbind(rownames(my_p_filter_tbl), my_p_filter_tbl)
+rownames(my_p_filter_tbl) = NULL
+upset(my_p_filter_tbl, order.by="freq", nsets=20, text.scale=1.5)
 
 
 # FC TABLE ----------------------------------------------------------------
@@ -312,19 +321,33 @@ res_sanquin$group = str_replace(res_sanquin$group, "_[a-z]+$", "")
 
 # gsk
 
-design(dds_thp)
-trts_thp = as.character(unique(dds_thp$condition)[-1])
-res_thp = data.frame(genes=gene_list_all$hgnc_symbol)
-for(i in 1:length(trts_thp)) {
-  res = results(dds_thp, contrast=c("condition",trts_thp[i],"Baseline"))
-  res_thp = cbind(res_thp, res$log2FoldChange, res$padj)
-}
-names(res_thp)[-1] = paste(rep(trts_thp, each=2), c("fc","p"), sep="_")
-res_thp = gather(res_thp, "group","score", 2:dim(res_thp)[2])
-res_thp$type = str_extract(res_thp$group, "[a-z]+$")
-res_thp$group = str_replace(res_thp$group, "_[a-z]+$", "")
+design(dds_cell_lines)
+dds_cell_lines$cell_condition = factor(paste(dds_cell_lines$cell_line,dds_cell_lines$condition,sep="_"))
+design(dds_cell_lines) = formula(~cell_condition)
+design(dds_cell_lines)
 
-res_all = rbind(res_thp, res_sanquin) # fc and p values
+dds_cell_lines = DESeq(dds_cell_lines)
+trts_thp1 = unique(dds_cell_lines$cell_condition)[2:6] # pick out the treatment conditions
+trts_u937 = unique(dds_cell_lines$cell_condition)[8:12]
+res_cell_lines = data.frame(genes=gene_list_all$hgnc_symbol)
+
+# add contrasts across thp-1 and u937
+for(i in 1:length(trts_thp1)) {
+  res = results(dds_cell_lines, contrast=c("cell_condition",trts_thp1[i],"THP-1_Baseline"))
+  res_cell_lines = cbind(res_cell_lines, res$log2FoldChange, res$padj)
+}
+
+for(i in 1:length(trts_u937)) {
+  res = results(dds_cell_lines, contrast=c("cell_condition",trts_u937[i],"U937_Baseline"))
+  res_cell_lines = cbind(res_cell_lines, res$log2FoldChange, res$padj)
+}
+
+names(res_cell_lines)[-1] = paste(rep(c(trts_thp1,trts_u937), each=2), c("fc","p"), sep="_")
+res_cell_lines = gather(res_cell_lines, "group","score", 2:dim(res_cell_lines)[2])
+res_cell_lines$type = str_extract(res_cell_lines$group, "[a-z]+$")
+res_cell_lines$group = str_replace(res_cell_lines$group, "_[a-z]+$", "")
+
+res_all = rbind(res_cell_lines, res_sanquin) # fc and p values
 # split fc and p values to 2 data frames
 res_all_p = filter(res_all, type=="p") %>% dplyr::select(-type) %>% spread(group, score)
 res_all_fc = filter(res_all, type=="fc") %>% dplyr::select(-type) %>% spread(group, score)
@@ -335,16 +358,16 @@ res_all_fc = res_all_fc[,-1]
 all(names(res_all_p)==names(res_all_fc))
 
 # heatmap annotation
-s_annot = data.frame(Group=c(rep("GSK",5),rep("SANQUIN",12)), row.names=c(trts_thp,trts_sanquin))
+s_annot = data.frame(Group=c(rep("SANQUIN",12),rep("GSK",10)), row.names=c(trts_sanquin,trts_thp1,trts_u937))
 
 # store correlation between thp and sanquin
-thp_names = c("LPS","PMA","VD3","VD3+LPS","PMA+LPS")
+cell_line_names = c(trts_thp1, trts_u937)
 sanquin_names = c("5days_BG","6days_Naive","5days_LPS")
-res_template = matrix(NA, nrow=length(thp_names), ncol=length(sanquin_names))
+res_template = matrix(NA, nrow=length(cell_line_names), ncol=length(sanquin_names))
 colnames(res_template) = sanquin_names
-rownames(res_template) = thp_names
-cor_dat = vector("list", length(my_p))
-names(cor_dat) = names(my_p)
+rownames(res_template) = cell_line_names
+cor_dat = vector("list", length(my_p_filter))
+names(cor_dat) = names(my_p_filter)
 
 for(i in 1:length(cor_dat)) {
   
@@ -352,15 +375,16 @@ for(i in 1:length(cor_dat)) {
   g_ix = which(rownames(res_all_fc) %in% my_p[[i]])
   if(is_empty(g_ix)) next
   dat_fc = res_all_fc[g_ix,]
-  for(j in 1:5) {
+  dat_p = res_all_p[g_ix,]
+  dat_fc[dat_p > 0.05] = NA
+  for(j in 1:10) {
     for(k in 1:3) {
       y = cor.test(
-        dat_fc[,which(names(dat_fc)==thp_names[j])],
+        dat_fc[,which(names(dat_fc)==cell_line_names[j])],
         dat_fc[,which(names(dat_fc)==sanquin_names[k])]
       )
       # if(y$p.value<0.05) {
       res_copy[j,k] = y$estimate
-      
       # }
     }
   }
@@ -373,7 +397,7 @@ for(i in 1:length(cor_dat)) {
 
 # make cor_dat long to look at correlation sets
 cor_dat_long = data.frame()
-my_labels = as.character(outer(thp_names, sanquin_names, paste, sep="_VS_"))
+my_labels = as.character(outer(cell_line_names, sanquin_names, paste, sep="_VS_"))
 for(i in 1:length(cor_dat)) {
   print(i)
   cor_dat_long = rbind(
@@ -391,13 +415,13 @@ cor_dat_long %>% ggplot(aes(x=Cor)) + geom_histogram(binwidth=0.01, color="black
 # i.e. a significant negative correlation across some pathways
 # what are these pathways?
 
-cor_dat_long %>% filter(Cor < -0.5) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N))
-cor_dat_long %>% filter(Cor < -0.5) %>% group_by(Label) %>% summarise(N=n()) %>% arrange(desc(N))
+cor_dat_long %>% filter(Cor > 0.7) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N))
+cor_dat_long %>% filter(Cor > 0.7) %>% group_by(Label) %>% summarise(N=n()) %>% arrange(desc(N))
 
 # signal dominated by lps vs. primary
 # i.e. a strong negative correlation between lps-stimulated pathways in thp-1 and primary 'macrophages'
 
-select_ps = cor_dat_long %>% filter(Cor < -0.5) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N)) %>% select(Pathway) %>% unlist %>% as.character()
+select_ps = cor_dat_long %>% filter(Cor > 0.7) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N)) %>% select(Pathway) %>% unlist %>% as.character()
 
 for(j in 1:length(select_ps)) {
   
@@ -406,7 +430,7 @@ for(j in 1:length(select_ps)) {
   res_copy = res_template
   g_ix = which(rownames(res_all_fc) %in% my_p[[i]])
   dat_fc = res_all_fc[g_ix,]
-  pheatmap(dat_fc, annotation_col=s_annot, main=names(my_p)[i], fontsize_row=5)
+  pheatmap(dat_fc, main=names(my_p)[i], fontsize_row=5)
   
 }
 
