@@ -286,19 +286,6 @@ dim(y_rev)
 pca_and_plot(y_rev, annot_1=paste(rld_all$cell_type, rld_all$treatment, rld_all$time, sep="_"), annot_2=NA) # still orthogonal, easier to look gene-by-gene
 
 
-# SEARCH BY GENE SETS -----------------------------------------------------
-
-my_p = gmtPathways("tmp/c7.all.v6.2.symbols.gmt") # immune set
-my_p = gmtPathways("tmp/c5.bp.v6.2.symbols.gmt") # biological processes
-my_p_filter = my_p[grep("monocyte|macrophage", names(my_p), ignore.case=TRUE)]
-
-lapply(my_p_filter, length)
-my_p_filter_tbl = as.data.frame.matrix((table(stack(my_p_filter))))
-my_p_filter_tbl = cbind(rownames(my_p_filter_tbl), my_p_filter_tbl)
-rownames(my_p_filter_tbl) = NULL
-upset(my_p_filter_tbl, order.by="freq", nsets=20, text.scale=1.5)
-
-
 # FC TABLE ----------------------------------------------------------------
 
 # sanquin
@@ -357,11 +344,32 @@ res_all_p = res_all_p[,-1]
 res_all_fc = res_all_fc[,-1]
 all(names(res_all_p)==names(res_all_fc))
 
+
+# WHAT GENE SETS TO USE? --------------------------------------------------
+
+# my_p = gmtPathways("tmp/c7.all.v6.2.symbols.gmt") # immune set
+my_p = gmtPathways("tmp/c5.bp.v6.2.symbols.gmt") # biological processes
+my_p_filter = my_p[grep("monocyte|macrophage", names(my_p), ignore.case=TRUE)]
+my_p_filter = c(my_p_filter, my_p[grep("brain", names(my_p), ignore.case=TRUE)])
+my_p_annot = data.frame(name=names(my_p_filter), tissue=c(rep("myeloid",20),rep("brain",14)), mean_fc=NA, sig_fcs=NA)
+
+# my_p_filter = my_p_filter[1:20]
+# my_p_annot = my_p_annot[1:20,]
+
+lapply(my_p_filter, length)
+my_p_filter_tbl = as.data.frame.matrix((table(stack(my_p_filter))))
+my_p_filter_tbl = cbind(rownames(my_p_filter_tbl), my_p_filter_tbl)
+rownames(my_p_filter_tbl) = NULL
+upset(my_p_filter_tbl, order.by="freq", nsets=20, text.scale=1.5)
+
+# CORRELATION BETWEEN CELL LINES AND PRIMARY ------------------------------
+
 # heatmap annotation
 s_annot = data.frame(Group=c(rep("SANQUIN",12),rep("GSK",10)), row.names=c(trts_sanquin,trts_thp1,trts_u937))
 
 # store correlation between thp and sanquin
-cell_line_names = c(trts_thp1, trts_u937)
+# cell_line_names = c(trts_thp1, trts_u937)
+cell_line_names = c(trts_thp1, trts_u937, "5days_BG") # add control
 sanquin_names = c("5days_BG","6days_Naive","5days_LPS")
 res_template = matrix(NA, nrow=length(cell_line_names), ncol=length(sanquin_names))
 colnames(res_template) = sanquin_names
@@ -377,11 +385,13 @@ for(i in 1:length(cor_dat)) {
   g_ix = which(rownames(res_all_fc) %in% my_p_filter[[i]]) # get the gene indices for the pathway
   if(is_empty(g_ix)) next
   pathway_fc = res_all_fc[g_ix,] # get the fold changes
+  my_p_annot$mean_fc[i] = mean(as.numeric(unlist(pathway_fc)), na.rm=TRUE)
   pathway_p = res_all_p[g_ix,]
-  # dat_fc[dat_p > 0.05] = NA # set non-significant (padj) to na
+  # pathway_fc[pathway_p > 0.05] = NA # set non-significant (padj) to na
+  my_p_annot$sig_fcs[i] = sum(pathway_p<0.05, na.rm=TRUE) / length(unlist(pathway_p))
   
-  for(j in 1:10) {
-    for(k in 1:3) {
+  for(j in 1:length(cell_line_names)) {
+    for(k in 1:length(sanquin_names)) {
       
       x = pathway_fc[,which(names(pathway_fc)==cell_line_names[j])]
       y = pathway_fc[,which(names(pathway_fc)==sanquin_names[k])]
@@ -405,10 +415,13 @@ for(i in 1:length(cor_dat)) {
   }
   
   cor_dat[[i]] = res_copy
-  # pheatmap(dat_fc, annotation_col=s_annot, main=names(my_p)[i], fontsize_row=5)
+  # pheatmap(pathway_fc, annotation_col=s_annot, main=names(my_p)[i], fontsize_row=5)
   # dat_tree = hclust(dist(t(dat_fc)))
   
 }
+
+ggplot(my_p_annot, aes(x=tissue, y=mean_fc)) + geom_boxplot() + theme_thesis()
+ggplot(my_p_annot, aes(x=tissue, y=sig_fcs)) + geom_boxplot() + theme_thesis()
 
 # make cor_dat long to look at correlation sets
 cor_dat_long = data.frame()
@@ -424,8 +437,10 @@ for(i in 1:length(cor_dat)) {
     )
   )
 }
+cor_dat_long$tissue = my_p_annot$tissue[match(cor_dat_long$Pathway, my_p_annot$name)]
 
 cor_dat_long %>% ggplot(aes(x=Cor)) + geom_histogram(binwidth=0.01, color="black") + theme_thesis()
+cor_dat_long %>% filter(Label=="5days_BG_VS_6days_Naive") %>% ggplot(aes(x=tissue, y=Cor)) + geom_boxplot() + theme_thesis()
 cutoff = 0.05
 cor_dat_long %>% filter(Cor < cutoff) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N))
 cor_dat_long %>% filter(Cor < cutoff) %>% group_by(Label) %>% summarise(N=n()) %>% arrange(desc(N))
@@ -438,7 +453,7 @@ for(j in 1:length(select_ps)) {
   cor_dat[[i]]
   g_ix = which(rownames(res_all_fc) %in% my_p_filter[[i]])
   dat_fc = res_all_fc[g_ix,]
-  pheatmap(dat_fc, main=names(my_p)[i], fontsize_row=5)
+  pheatmap(dat_fc, main=names(my_p_filter)[i], fontsize_row=5)
   
 }
 
