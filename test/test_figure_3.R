@@ -370,7 +370,7 @@ s_annot = data.frame(Group=c(rep("SANQUIN",12),rep("GSK",10)), row.names=c(trts_
 # store correlation between thp and sanquin
 # cell_line_names = c(trts_thp1, trts_u937)
 cell_line_names = c(trts_thp1, trts_u937, "5days_BG") # add control
-sanquin_names = c("5days_BG","6days_Naive","5days_LPS")
+sanquin_names = c("5days_BG","6days_Naive","5days_LPS","24hrs_BG","24hrs_Naive","24hrs_LPS","4hrs_BG","4hrs_Naive","4hrs_LPS","1hr_BG","1hr_Naive","1hr_LPS")
 res_template = matrix(NA, nrow=length(cell_line_names), ncol=length(sanquin_names))
 colnames(res_template) = sanquin_names
 rownames(res_template) = cell_line_names
@@ -387,7 +387,7 @@ for(i in 1:length(cor_dat)) {
   pathway_fc = res_all_fc[g_ix,] # get the fold changes
   my_p_annot$mean_fc[i] = mean(as.numeric(unlist(pathway_fc)), na.rm=TRUE)
   pathway_p = res_all_p[g_ix,]
-  # pathway_fc[pathway_p > 0.05] = NA # set non-significant (padj) to na
+  pathway_fc[pathway_p > 0.05] = NA # set non-significant (padj) to na
   my_p_annot$sig_fcs[i] = sum(pathway_p<0.05, na.rm=TRUE) / length(unlist(pathway_p))
   
   for(j in 1:length(cell_line_names)) {
@@ -420,8 +420,8 @@ for(i in 1:length(cor_dat)) {
   
 }
 
-ggplot(my_p_annot, aes(x=tissue, y=mean_fc)) + geom_boxplot() + theme_thesis()
-ggplot(my_p_annot, aes(x=tissue, y=sig_fcs)) + geom_boxplot() + theme_thesis()
+ggplot(my_p_annot, aes(x=tissue, y=mean_fc)) + geom_boxplot() + theme_thesis(20) + xlab("Tissue") + ylab("Mean FC per Pathway")
+ggplot(my_p_annot, aes(x=tissue, y=sig_fcs)) + geom_boxplot() + theme_thesis(15) + xlab("Tissue") + ylab("Proportion significant FCs per Pathway")
 
 # make cor_dat long to look at correlation sets
 cor_dat_long = data.frame()
@@ -431,25 +431,34 @@ for(i in 1:length(cor_dat)) {
   cor_dat_long = rbind(
     cor_dat_long,
     data.frame(
-      Cor = as.numeric(cor_dat[[i]]),
+      `P-value` = as.numeric(cor_dat[[i]]),
       Label = my_labels,
-      Pathway = names(cor_dat)[i]
+      Pathway = names(cor_dat)[i], check.names=FALSE
     )
   )
 }
 cor_dat_long$tissue = my_p_annot$tissue[match(cor_dat_long$Pathway, my_p_annot$name)]
+cor_dat_long = tbl_df(cor_dat_long)
 
-cor_dat_long %>% ggplot(aes(x=Cor)) + geom_histogram(binwidth=0.01, color="black") + theme_thesis()
-cor_dat_long %>% filter(Label=="5days_BG_VS_6days_Naive") %>% ggplot(aes(x=tissue, y=Cor)) + geom_boxplot() + theme_thesis()
+# WHAT ARE THE HITS? ------------------------------------------------------
+
+# the overall distribution of fisher exact test p-values
+cor_dat_long %>% ggplot(aes(x=`P-value`)) + geom_histogram(binwidth=0.01, color="black") + theme_thesis()
+
+# are related primary cells more highly correlated across myeloid pathways compared to brain pathways?
+cor_dat_long %>% filter(Label=="5days_BG_VS_6days_Naive") %>% ggplot(aes(x=tissue, y=`P-value`)) + geom_boxplot() + theme_thesis()
+
 cutoff = 0.05
-cor_dat_long %>% filter(Cor < cutoff) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N))
-cor_dat_long %>% filter(Cor < cutoff) %>% group_by(Label) %>% summarise(N=n()) %>% arrange(desc(N))
+cor_dat_long %>% filter(`P-value` < cutoff) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N))
+cor_dat_long %>% filter(`P-value` < cutoff) %>% group_by(Label) %>% summarise(N=n()) %>% arrange(desc(N))
+cor_dat_long %>% filter(`P-value` < cutoff, grepl("U937", Label), tissue=="myeloid")
 
-select_ps = cor_dat_long %>% filter(Cor < cutoff) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N)) %>% select(Pathway) %>% unlist %>% as.character()
+select_ps = cor_dat_long %>% filter(`P-value` < cutoff, grepl("THP-1|U937",Label)) %>% group_by(Pathway) %>% summarise(N=n()) %>% arrange(desc(N)) %>% select(Pathway) %>% unlist %>% as.character()
 
 for(j in 1:length(select_ps)) {
   
   i = which(names(my_p_filter)==select_ps[j])
+  i = which(names(my_p_filter)=="GO_MONOCYTE_CHEMOTAXIS")
   cor_dat[[i]]
   g_ix = which(rownames(res_all_fc) %in% my_p_filter[[i]])
   dat_fc = res_all_fc[g_ix,]
