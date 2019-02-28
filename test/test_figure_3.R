@@ -297,11 +297,22 @@ dds_sanquin = DESeq(dds_sanquin)
 
 trts_sanquin = as.character(unique(dds_sanquin$time_treatment)[-1])
 res_sanquin = data.frame(genes=gene_list_all$hgnc_symbol)
+res_sanquin_plot = data.frame(trmt=NULL, fc=NULL, p=NULL)
+
 for(i in 1:length(trts_sanquin)) {
   res = results(dds_sanquin, contrast=c("time_treatment",trts_sanquin[i],"1hr_Attached"))
   res_sanquin = cbind(res_sanquin, res$log2FoldChange, res$padj)
+  res_sanquin_plot = rbind(res_sanquin_plot, data.frame(trmt=trts_sanquin[i], fc=res$log2FoldChange, p=res$padj))
 }
+
+res_sanquin_plot$gene = rep(gene_list_all$hgnc_symbol, each=12)
 names(res_sanquin)[-1] = paste(rep(trts_sanquin, each=2), c("fc","p"), sep="_")
+
+# try to replicate figure 1b from novakovic here
+# filter for dynamic regions across all conditions
+dyn_genes = filter(res_sanquin_plot, p <= 0.05, abs(fc) >= 3) %>% dplyr::select(gene) %>% unlist() %>% as.character()
+pca_and_plot(rld_sanquin[which(gene_list_all$hgnc_symbol %in% dyn_genes)], annot_1=paste(rld_sanquin$treatment, rld_sanquin$time, sep="_"), annot_2=rld_sanquin$donor)
+
 res_sanquin = gather(res_sanquin, "group","score", 2:dim(res_sanquin)[2])
 res_sanquin$type = str_extract(res_sanquin$group, "[a-z]+$")
 res_sanquin$group = str_replace(res_sanquin$group, "_[a-z]+$", "")
