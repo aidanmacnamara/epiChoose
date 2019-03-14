@@ -94,6 +94,14 @@ for(i in 1:length(trts_sanquin)) {
 res_sanquin_plot$gene = rep(gene_list_all$hgnc_symbol, each=12)
 names(res_sanquin)[-1] = paste(rep(trts_sanquin, each=2), c("fc","p"), sep="_")
 
+
+# CONDITION ENRICHMENT ----------------------------------------------------
+
+# run condition enrichment here lines 140-227
+
+
+# \ CONDITIION ENRICHMENT -------------------------------------------------
+
 # try to replicate figure 1b from novakovic here
 # filter for dynamic regions across all conditions
 dyn_genes = filter(res_sanquin_plot, p <= 0.05, abs(fc) >= 3) %>% dplyr::select(gene) %>% unlist() %>% as.character()
@@ -133,13 +141,19 @@ names(res_cell_lines)[-1] = paste(rep(c(trts_thp1,trts_u937), each=2), c("fc","p
 
 # what is the enrichment for a condition, e.g. thp1 + pma
 
-conds = c(trts_thp1,trts_u937)
+conds = c(trts_thp1,trts_u937) # *** trts_sanquin or c(trts_thps1,trts_u937)
+# conds = conds[c(9,7,6,12,1,3,2,10,4,8,5,11)]
+res_in = res_cell_lines # *** res_cell_lines or res_sanquin
+
 conds_list = vector("list", length(conds))
 names(conds_list) = conds
 
+tfs_list =  vector("list", length(conds))
+names(tfs_list) = conds
+
 for(i in 1:length(conds)) {
   
-  my_cond = res_cell_lines[,c(1, which(str_replace(names(res_cell_lines), "_[pfc]+$", "") %in% conds[i]))]
+  my_cond = res_in[,c(1, which(str_replace(names(res_in), "_[pfc]+$", "") %in% conds[i]))]
   my_cond = my_cond[my_cond[,3] < 0.05,]
   my_cond = my_cond[order(-my_cond[,2]),]
   my_cond = my_cond[!is.na(my_cond$genes),]
@@ -155,7 +169,7 @@ for(i in 1:length(conds)) {
   
 }
 
-gene_lists = lapply(conds_list, function(x) as.character(x[x[,2]>2, 'genes']))
+gene_lists = lapply(conds_list, function(x) as.character(x[x[,2]>2, 'genes'])) # take everything with a fc > 2
 
 # import motif-gene rankings
 # how is this ranking performed?
@@ -171,25 +185,66 @@ motif_enrichment <- cisTarget(gene_lists, motif_rankings, motifAnnot=motifAnnota
 
 for(j in 1:length(gene_lists)) { # visualise
   
+  print(j)
+  
   # get the significant motifs
   # can also apply motif-tf  mapping threshold here
-  sig_motifs = filter(motif_enrichment, geneSet==conds[j], NES>=10) %>% select(motif) %>% unlist()
+  sig_motifs = filter(motif_enrichment, geneSet==conds[j], NES>=4)
   
   # get all interactions between significant tfs and regulated genes
-  inc_mat <- getSignificantGenes(gene_lists[[j]], motif_rankings, signifRankingNames=sig_motifs, plotCurve=FALSE, maxRank=5000-20, genesFormat="incidMatrix", method="aprox")$incidMatrix
+  # this is also identifying the significant regulated genes
+  inc_mat = getSignificantGenes(gene_lists[[j]], motif_rankings, signifRankingNames=sig_motifs$motif, plotCurve=FALSE, maxRank=5000-20, genesFormat="incidMatrix", method="aprox")$incidMatrix
+  
+  # collapse from motifs to tfs
+  tfs = str_extract(sig_motifs$TF_highConf, "^[[:alnum:]]+")
+  tfs_unique = unique(tfs)
+  tfs_unique = sort(tfs_unique[!is.na(tfs_unique)])
+  
+  inc_mat_collapse = data.frame(matrix(ncol=dim(inc_mat)[2], nrow=0))
+  colnames(inc_mat_collapse) <- colnames(inc_mat)
+  
+  tf_df = data.frame(tf=c(tfs_unique, "All"), frac_binding_genes=NA, mean_nes=NA, mean_auc=NA)
+  
+  for(i in 1:length(tfs_unique)) {
+    
+    t_ix = which(tfs==tfs_unique[i])
+    tf_df$mean_nes[i] = mean(sig_motifs$NES[t_ix])
+    tf_df$mean_auc[i] = mean(sig_motifs$AUC[t_ix])
+    tf_df$frac_binding_genes[i] = length(unique(unlist(sapply(sig_motifs$enrichedGenes[t_ix], function(x) str_split(x, ";"))))) / length(gene_lists[[j]])
+    
+    if(length(t_ix) > 1) {
+    to_add = apply(inc_mat[t_ix,], 2, function(x) round(sum(x)/length(x)))
+    inc_mat_collapse = rbind(inc_mat_collapse, t(data.frame(to_add)))
+    } else {
+      inc_mat_collapse = rbind(inc_mat_collapse, t(as.data.frame(inc_mat[t_ix,])))
+    }
+  }
+  
+  rownames(inc_mat_collapse) = tfs_unique
+  tf_df$frac_binding_genes[tf_df$tf=="All"] = sum(apply(inc_mat_collapse, 2, function(x) any(x==1))) / length(gene_lists[[j]])
   
   # construct network  
-  edges <- melt(inc_mat)
-  edges <- edges[which(edges[,3]==1),1:2]
-  colnames(edges) <- c("from","to")
-  motifs <- unique(as.character(edges[,1]))
-  genes <- unique(as.character(edges[,2]))
-  nodes <- data.frame(id=c(motifs, genes), label=c(motifs, genes), title=c(motifs, genes), shape=c(rep("diamond", length(motifs)), rep("elypse", length(genes))), color=c(rep("purple", length(motifs)), rep("skyblue", length(genes))))
+  edges = melt(as.matrix(inc_mat_collapse))
+  edges = edges[which(edges[,3]==1),1:2]
+  colnames(edges) = c("from","to")
+  tfs = unique(as.character(edges[,1]))
+  genes = unique(as.character(edges[,2]))
+  nodes = data.frame(id=c(tfs, genes), label=c(tfs, genes), title=c(tfs, genes), shape=c(rep("diamond", length(tfs)), rep("elypse", length(genes))), color=c(rep("purple", length(tfs)), rep("skyblue", length(genes))))
+  nodes = nodes[!duplicated(nodes$id),]
   
   # visualise
-  visNetwork(nodes, edges) %>% visOptions(highlightNearest=TRUE, nodesIdSelection=TRUE) %>% visPhysics(enabled=FALSE)
+  # visNetwork(nodes, edges, main=conds[j]) %>% visOptions(highlightNearest=TRUE, nodesIdSelection=TRUE) %>% visPhysics(enabled=FALSE)
+  
+  # populate tf information for tfs_list
+  tfs_list[[j]] = tf_df
   
 }
+
+all_data = lapply(c(tfs_list_sanquin,tfs_list), function(x) as.character(x$tf))
+all_data_tbl = as.data.frame.matrix((table(stack(all_data))))
+all_data_tbl = cbind(rownames(all_data_tbl), all_data_tbl)
+rownames(all_data_tbl) = NULL
+upset(all_data_tbl, order.by="freq", nsets=20)
 
 
 # \ CONDITION ENRICHMENT --------------------------------------------------

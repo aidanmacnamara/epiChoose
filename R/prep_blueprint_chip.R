@@ -34,7 +34,22 @@ prep_blueprint_chip <- function(blueprint_data, assays=c("H3K27ac","H3K4me3","H3
     Data = all(assays %in% Experiment)
   )
   
+  # add back saeed data
+  # saeed donors
+  saeed_donors = c(
+    "N00031318490130",
+    "N00031319896021",
+    "N00031401639721",
+    "N00031406634921",
+    "N00031406635321"
+  )
+  bp_saeed = filter(bp, (Donor %in% saeed_donors), Format=="bigWig", Experiment %in% assays)
+  bp_saeed_summ = bp_saeed %>% group_by_(.dots=group_vars) %>% summarise (
+    Data = all(assays %in% Experiment)
+  )
+  
   chip_with_assays_filtered = full_join(chip_with_assays_filtered, bp_novakovic_summ)
+  chip_with_assays_filtered = full_join(chip_with_assays_filtered, bp_saeed_summ)
   
   out_dat = data.frame() # initialise output data frame
   
@@ -63,11 +78,11 @@ prep_blueprint_chip <- function(blueprint_data, assays=c("H3K27ac","H3K4me3","H3
     out_dat = rbind(out_dat, to_add)
   }
   
-  # add stimulus conditions to novakovic data
-  out_dat$Label[grepl("SANQUIN", out_dat$Name)] =
+  # add stimulus conditions to novakovic and saeed data
+  out_dat$Label[grepl("(SANQUIN|N00031)", out_dat$Name)] =
     paste(
-      out_dat$Donor[grepl("SANQUIN", out_dat$Name)],
-      out_dat$`Sub-group`[grepl("SANQUIN", out_dat$Name)], sep="_"
+      out_dat$Donor[grepl("(SANQUIN|N00031)", out_dat$Name)],
+      out_dat$`Sub-group`[grepl("(SANQUIN|N00031)", out_dat$Name)], sep="_"
     )
   
   # what chip files are missing?
