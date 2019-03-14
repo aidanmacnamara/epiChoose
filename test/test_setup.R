@@ -107,6 +107,9 @@ for(i in 1:length(blueprint_tsss)) {
 }
 blueprint_tsss_filtered = prep_across_datatypes(blueprint_tsss)
 
+save(blueprint_chip_filtered, file="data/blueprint_chip_filtered.RData") # savepoint
+save(blueprint_tsss_filtered, file="data/blueprint_tsss_filtered.RData") # savepoint
+
 
 # GSK DATA ----------------------------------------------------------------
 
@@ -136,6 +139,9 @@ gsk_chip_filtered = prep_across_datatypes(gsk_chip)
 gsk_tsss = bplapply(seq(along=marks), function(x) make_auc_matrix(gsk_input, roi_tss, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=5))
 gsk_tsss_filtered = prep_across_datatypes(gsk_tsss)
 
+save(gsk_chip_filtered, file="data/gsk_chip_filtered.RData") # savepoint
+save(gsk_tsss_filtered, file="data/gsk_tsss_filtered.RData") # savepoint
+
 
 # ENCODE DATA -------------------------------------------------------------
 
@@ -147,6 +153,9 @@ encode_chip_filtered = prep_across_datatypes(encode_chip)
 encode_tsss = bplapply(seq(along=marks), function(x) make_auc_matrix(encode_input, roi_tss, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
 encode_tsss_filtered = prep_across_datatypes(encode_tsss)
 
+save(encode_chip_filtered, file="data/encode_chip_filtered.RData") # savepoint
+save(encode_tsss_filtered, file="data/encode_tsss_filtered.RData") # savepoint
+
 
 # DEEP DATA ---------------------------------------------------------------
 
@@ -157,6 +166,9 @@ deep_chip_filtered = prep_across_datatypes(deep_chip)
 
 deep_tsss = bplapply(seq(along=marks), function(x) make_auc_matrix(deep_input, roi_tss, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
 deep_tsss_filtered = prep_across_datatypes(deep_tsss)
+
+save(deep_chip_filtered, file="data/deep_chip_filtered.RData") # savepoint
+save(deep_tsss_filtered, file="data/deep_tsss_filtered.RData") # savepoint
 
 
 # COMBINE -----------------------------------------------------------------
