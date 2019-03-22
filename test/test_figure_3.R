@@ -1,6 +1,5 @@
 
 # look at specific comparisons
-# start with thp-1 pma vs. baseline vs. sanquin primary data
 
 # LOAD --------------------------------------------------------------------
 
@@ -8,17 +7,22 @@ require(tidyverse)
 require(RColorBrewer)
 require(ggrepel)
 require(RcisTarget)
+require(DESeq2)
+require(d3heatmap)
 
-loadload("data/total_reg.RData")
 load("data/dat_all.RData")
 load("data/roi_reg.RData")
 load("data/gene_list_all.RData")
 
-load("tmp/dds_sanquin.RData")
 load("tmp/dds_cell_lines.RData")
+load("tmp/dds_saeed.RData")
+load("tmp/dds_novakovic.RData")
 
-load("tmp/rld_sanquin.RData")
 load("tmp/rld_cell_lines.RData")
+load("tmp/rld_saeed.RData")
+load("tmp/rld_novakovic.RData")
+
+load("tmp/rld_all.RData")
 
 
 # FUNCTIONS ---------------------------------------------------------------
@@ -72,78 +76,83 @@ rownames(my_p_filter_tbl) = NULL
 upset(my_p_filter_tbl, order.by="freq", nsets=20, text.scale=1.5)
 
 
-# FC TABLE ----------------------------------------------------------------
+# GET FOLD CHANGES --------------------------------------------------------
 
-# sanquin
+novakovic = as.character(unique(dds_novakovic$time_treatment)[-1])
+novakovic = novakovic[!grepl("^1hr", novakovic)]
 
-design(dds_sanquin)
-dds_sanquin$time_treatment = factor(paste(dds_sanquin$time, dds_sanquin$treatment, sep="_"))
-design(dds_sanquin) = formula(~time_treatment+donor)
-dds_sanquin = DESeq(dds_sanquin)
+trts = list(
+  novakovic = novakovic,
+  saeed = as.character(unique(dds_saeed$time_treatment))[1:3],
+  cell_lines = c(
+    as.character(unique(dds_cell_lines$cell_condition)[2:6]), # pick out the treatment conditions
+    as.character(unique(dds_cell_lines$cell_condition)[8:12])
+  )
+)
 
-trts_sanquin = as.character(unique(dds_sanquin$time_treatment)[-1])
-res_sanquin = data.frame(genes=gene_list_all$hgnc_symbol)
-res_sanquin_plot = data.frame(trmt=NULL, fc=NULL, p=NULL)
+fc_res = data.frame(genes=gene_list_all$hgnc_symbol)
+fc_res_long = data.frame(trmt=NULL, fc=NULL, p=NULL, group=NULL)
 
-for(i in 1:length(trts_sanquin)) {
-  res = results(dds_sanquin, contrast=c("time_treatment",trts_sanquin[i],"1hr_Attached"))
-  res_sanquin = cbind(res_sanquin, res$log2FoldChange, res$padj)
-  res_sanquin_plot = rbind(res_sanquin_plot, data.frame(trmt=trts_sanquin[i], fc=res$log2FoldChange, p=res$padj))
+for(i in 1:length(trts)) {
+  for(j in 1:length(trts[[i]])) {
+    
+    if(i==1) {
+      if(grepl("LPS", trts[[i]][j])) {
+        res = results(dds_novakovic, contrast=c("time_treatment",trts[[i]][j],"1hr_LPS"))
+      }
+      if(grepl("BG", trts[[i]][j])) {
+        res = results(dds_novakovic, contrast=c("time_treatment",trts[[i]][j],"1hr_BG"))
+      }
+      if(grepl("Naive", trts[[i]][j])) {
+        res = results(dds_novakovic, contrast=c("time_treatment",trts[[i]][j],"1hr_Naive"))
+      }
+    }
+    if(i==2) res = results(dds_saeed, contrast=c("time_treatment",trts[[i]][j],"0days_Untreated"))
+    if(i==3) {
+      if(grepl("THP-1", trts[[i]][j])) {
+        res = results(dds_cell_lines, contrast=c("cell_condition",trts[[i]][j],"THP-1_Baseline"))
+      } else {
+        res = results(dds_cell_lines, contrast=c("cell_condition",trts[[i]][j],"U937_Baseline"))
+      }
+    }
+    
+    fc_res = cbind(fc_res, res$log2FoldChange, res$padj)
+    fc_res_long = rbind(fc_res_long, data.frame(trmt=trts[[i]][j], fc=res$log2FoldChange, p=res$padj, group=names(trts)[i]))
+  }
 }
 
-res_sanquin_plot$gene = rep(gene_list_all$hgnc_symbol, each=12)
-names(res_sanquin)[-1] = paste(rep(trts_sanquin, each=2), c("fc","p"), sep="_")
+fc_res_long$gene = rep(gene_list_all$hgnc_symbol, length(unlist(trts)))
+# names(fc_res)[-1] = paste(c(rep(names(trts)[1],length(trts[[1]])*2), rep(names(trts)[2],length(trts[[2]])*2), rep(names(trts)[3],length(trts[[3]])*2)), paste(rep(unlist(trts), each=2), c("fc","p"), sep="_"), sep="_")
+names(fc_res)[-1] = paste(rep(unlist(trts), each=2), c("fc","p"), sep="_")
 
 
-# CONDITION ENRICHMENT ----------------------------------------------------
+# DYNAMIC REGIONS ---------------------------------------------------------
 
-# run condition enrichment here lines 140-227
+fc_res_long_filt = filter(fc_res_long, p <= 0.05, abs(fc) >= 4)
+fc_res_long_filt = arrange(fc_res_long_filt, desc(abs(fc)))
 
+sort(table(fc_res_long_filt$trmt))
+tail(sort(table(fc_res_long_filt$gene)), 20)
 
-# \ CONDITIION ENRICHMENT -------------------------------------------------
+dyn_genes = unique(fc_res_long_filt$gene)
 
-# try to replicate figure 1b from novakovic here
-# filter for dynamic regions across all conditions
-dyn_genes = filter(res_sanquin_plot, p <= 0.05, abs(fc) >= 3) %>% dplyr::select(gene) %>% unlist() %>% as.character()
-pca_and_plot(rld_sanquin[which(gene_list_all$hgnc_symbol %in% dyn_genes)], annot_1=paste(rld_sanquin$treatment, rld_sanquin$time, sep="_"), annot_2=rld_sanquin$donor)
+col_ix = match(dyn_genes, gene_list_all$hgnc_symbol)
 
-res_sanquin = gather(res_sanquin, "group","score", 2:dim(res_sanquin)[2])
-res_sanquin$type = str_extract(res_sanquin$group, "[a-z]+$")
-res_sanquin$group = str_replace(res_sanquin$group, "_[a-z]+$", "")
-
-# gsk
-
-design(dds_cell_lines)
-dds_cell_lines$cell_condition = factor(paste(dds_cell_lines$cell_line,dds_cell_lines$condition,sep="_"))
-design(dds_cell_lines) = formula(~cell_condition)
-design(dds_cell_lines)
-
-dds_cell_lines = DESeq(dds_cell_lines)
-trts_thp1 = as.character(unique(dds_cell_lines$cell_condition)[2:6]) # pick out the treatment conditions
-trts_u937 = as.character(unique(dds_cell_lines$cell_condition)[8:12])
-res_cell_lines = data.frame(genes=gene_list_all$hgnc_symbol)
-
-# add contrasts across thp-1 and u937
-for(i in 1:length(trts_thp1)) {
-  res = results(dds_cell_lines, contrast=c("cell_condition",trts_thp1[i],"THP-1_Baseline"))
-  res_cell_lines = cbind(res_cell_lines, res$log2FoldChange, res$padj)
-}
-
-for(i in 1:length(trts_u937)) {
-  res = results(dds_cell_lines, contrast=c("cell_condition",trts_u937[i],"U937_Baseline"))
-  res_cell_lines = cbind(res_cell_lines, res$log2FoldChange, res$padj)
-}
-
-names(res_cell_lines)[-1] = paste(rep(c(trts_thp1,trts_u937), each=2), c("fc","p"), sep="_")
+y = assays(rld_all)[[1]]
+dim(y)
+rownames(y) = gene_list_all$hgnc_symbol
+y = y[col_ix,]
+dim(y)
+y = y[apply(y, 1, function(x) sd(x)>1),]
+dim(y)
+d3heatmap(t(y), cexCol=0.8)
+heatmaply(t(y), col=bluered(75))
 
 
 # CONDITION ENRICHMENT ----------------------------------------------------
 
 # what is the enrichment for a condition, e.g. thp1 + pma
-
-conds = c(trts_thp1,trts_u937) # *** trts_sanquin or c(trts_thps1,trts_u937)
-# conds = conds[c(9,7,6,12,1,3,2,10,4,8,5,11)]
-res_in = res_cell_lines # *** res_cell_lines or res_sanquin
+conds = unlist(trts)
 
 conds_list = vector("list", length(conds))
 names(conds_list) = conds
@@ -153,7 +162,7 @@ names(tfs_list) = conds
 
 for(i in 1:length(conds)) {
   
-  my_cond = res_in[,c(1, which(str_replace(names(res_in), "_[pfc]+$", "") %in% conds[i]))]
+  my_cond = fc_res[,c(1, which(str_replace(names(fc_res), "_[pfc]+$", "") %in% conds[i]))]
   my_cond = my_cond[my_cond[,3] < 0.05,]
   my_cond = my_cond[order(-my_cond[,2]),]
   my_cond = my_cond[!is.na(my_cond$genes),]
@@ -170,6 +179,7 @@ for(i in 1:length(conds)) {
 }
 
 gene_lists = lapply(conds_list, function(x) as.character(x[x[,2]>2, 'genes'])) # take everything with a fc > 2
+lapply(gene_lists, length)
 
 # import motif-gene rankings
 # how is this ranking performed?
@@ -190,6 +200,8 @@ for(j in 1:length(gene_lists)) { # visualise
   # get the significant motifs
   # can also apply motif-tf  mapping threshold here
   sig_motifs = filter(motif_enrichment, geneSet==conds[j], NES>=4)
+  
+  if(dim(sig_motifs)[1]==0) next
   
   # get all interactions between significant tfs and regulated genes
   # this is also identifying the significant regulated genes
@@ -213,8 +225,8 @@ for(j in 1:length(gene_lists)) { # visualise
     tf_df$frac_binding_genes[i] = length(unique(unlist(sapply(sig_motifs$enrichedGenes[t_ix], function(x) str_split(x, ";"))))) / length(gene_lists[[j]])
     
     if(length(t_ix) > 1) {
-    to_add = apply(inc_mat[t_ix,], 2, function(x) round(sum(x)/length(x)))
-    inc_mat_collapse = rbind(inc_mat_collapse, t(data.frame(to_add)))
+      to_add = apply(inc_mat[t_ix,], 2, function(x) round(sum(x)/length(x)))
+      inc_mat_collapse = rbind(inc_mat_collapse, t(data.frame(to_add)))
     } else {
       inc_mat_collapse = rbind(inc_mat_collapse, t(as.data.frame(inc_mat[t_ix,])))
     }
@@ -240,20 +252,20 @@ for(j in 1:length(gene_lists)) { # visualise
   
 }
 
-all_data = lapply(c(tfs_list_sanquin,tfs_list), function(x) as.character(x$tf))
+all_data = lapply(tfs_list, function(x) as.character(x$tf))
 all_data_tbl = as.data.frame.matrix((table(stack(all_data))))
 all_data_tbl = cbind(rownames(all_data_tbl), all_data_tbl)
 rownames(all_data_tbl) = NULL
 upset(all_data_tbl, order.by="freq", nsets=20)
 
-
 # \ CONDITION ENRICHMENT --------------------------------------------------
+
 
 res_cell_lines = gather(res_cell_lines, "group","score", 2:dim(res_cell_lines)[2])
 res_cell_lines$type = str_extract(res_cell_lines$group, "[a-z]+$")
 res_cell_lines$group = str_replace(res_cell_lines$group, "_[a-z]+$", "")
 
-res_all = rbind(res_cell_lines, res_sanquin) # fc and p values
+res_all = rbind(res_cell_lines, res_novakovic) # fc and p values
 # split fc and p values to 2 data frames
 res_all_p = filter(res_all, type=="p") %>% dplyr::select(-type) %>% spread(group, score)
 res_all_fc = filter(res_all, type=="fc") %>% dplyr::select(-type) %>% spread(group, score)
@@ -266,18 +278,18 @@ all(names(res_all_p)==names(res_all_fc))
 
 # CORRELATION BETWEEN CELL LINES AND PRIMARY ------------------------------
 
-# store correlation between thp and sanquin
+# store correlation between thp and novakovic
 trts_cell_lines = c(trts_thp1, trts_u937, "5days_BG") # add 5 days bg as control
-res_template = matrix(NA, nrow=length(trts_cell_lines), ncol=length(trts_sanquin))
-colnames(res_template) = trts_sanquin
+res_template = matrix(NA, nrow=length(trts_cell_lines), ncol=length(trts_novakovic))
+colnames(res_template) = trts_novakovic
 rownames(res_template) = trts_cell_lines
 
 # store the results for each pathway
 out_comp = vector("list", length(my_p_filter))
 names(out_comp) = names(my_p_filter)
 
-out_activity = matrix(NA, nrow=length(my_p_filter), ncol=length(c(trts_cell_lines, trts_sanquin)))
-colnames(out_activity) = c(trts_cell_lines, trts_sanquin)
+out_activity = matrix(NA, nrow=length(my_p_filter), ncol=length(c(trts_cell_lines, trts_novakovic)))
+colnames(out_activity) = c(trts_cell_lines, trts_novakovic)
 rownames(out_activity) = names(my_p_filter)
 
 for(i in 1:length(out_comp)) {
@@ -297,10 +309,10 @@ for(i in 1:length(out_comp)) {
   out_activity[i,] = fcs_per_condition[match(colnames(out_activity),names(fcs_per_condition))]
   
   for(j in 1:length(trts_cell_lines)) {
-    for(k in 1:length(trts_sanquin)) {
+    for(k in 1:length(trts_novakovic)) {
       
       x = pathway_fc[,which(names(pathway_fc)==trts_cell_lines[j])]
-      y = pathway_fc[,which(names(pathway_fc)==trts_sanquin[k])]
+      y = pathway_fc[,which(names(pathway_fc)==trts_novakovic[k])]
       # plot(x,y)
       
       fisher_mat = matrix(
@@ -329,7 +341,7 @@ ggplot(my_p_annot, aes(x=tissue, y=sig_fcs)) + geom_boxplot() + theme_thesis(15)
 
 # make out_comp long to look at correlation sets
 out_comp_long = data.frame()
-my_labels = as.character(outer(trts_cell_lines, trts_sanquin, paste, sep="_VS_"))
+my_labels = as.character(outer(trts_cell_lines, trts_novakovic, paste, sep="_VS_"))
 for(i in 1:length(out_comp)) {
   print(i)
   out_comp_long = rbind(
@@ -390,22 +402,22 @@ res_tidy %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj) %
 # adj p 0.05
 # rpkm > 1
 
-design(dds_sanquin)
-dds_sanquin = DESeq(dds_sanquin, test="LRT", reduced=~donor)
-res_sanquin = tbl_df(results(dds_sanquin))
-res_sanquin$gene = rownames(res_sanquin)
-res_sanquin$symbol = gene_list_all$hgnc_symbol
-arrange(res_sanquin, padj) %>% filter(padj<1e-8)
+design(dds_novakovic)
+dds_novakovic = DESeq(dds_novakovic, test="LRT", reduced=~donor)
+res_novakovic = tbl_df(results(dds_novakovic))
+res_novakovic$gene = rownames(res_novakovic)
+res_novakovic$symbol = gene_list_all$hgnc_symbol
+arrange(res_novakovic, padj) %>% filter(padj<1e-8)
 
 # take the top 1000 hits
-genes_top = head(res_sanquin$gene[order(res_sanquin$padj)],1e3)
+genes_top = head(res_novakovic$gene[order(res_novakovic$padj)],1e3)
 
 for(j in 1:3) {
-  y = plotCounts(dds_sanquin, gene=head(order(res_sanquin$padj),10)[j], intgroup=c("treatment","time","donor"), returnData=TRUE)
-  print(ggplot(y, aes(x=time, y=count)) + geom_point(shape=17, size=3) + theme_thesis(20) + xlab("") + ylab("Count") + ggtitle(res_sanquin$gene[head(order(res_sanquin$padj),10)[j]]))
+  y = plotCounts(dds_novakovic, gene=head(order(res_novakovic$padj),10)[j], intgroup=c("treatment","time","donor"), returnData=TRUE)
+  print(ggplot(y, aes(x=time, y=count)) + geom_point(shape=17, size=3) + theme_thesis(20) + xlab("") + ylab("Count") + ggtitle(res_novakovic$gene[head(order(res_novakovic$padj),10)[j]]))
 }
 
-y = t(assays(rld_sanquin)[[1]])
+y = t(assays(rld_novakovic)[[1]])
 dim(y)
 y = y[,colnames(y) %in% genes_top]
 y = y[,!apply(y, 2, function(x) sd(x)==0)] # remove regions with no variance
@@ -415,13 +427,13 @@ pca_res <- prcomp(y, scale=TRUE, center=TRUE)
 pca_res_summary = summary(pca_res)
 yy = data.frame(pca_res$x[,1:2])
 names(yy) = c("x","y")
-yy$annot_1 = paste(rld_sanquin$treatment, rld_sanquin$time, sep="_")
-yy$annot_2 = rld_sanquin$donor
+yy$annot_1 = paste(rld_novakovic$treatment, rld_novakovic$time, sep="_")
+yy$annot_2 = rld_novakovic$donor
 ggplot(yy, aes(x=x, y=y, color=annot_2)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=5, force=0.5) + theme(legend.position="none")
 
-for_heatmap = assays(rld_sanquin)[[1]]
+for_heatmap = assays(rld_novakovic)[[1]]
 colnames(for_heatmap) = paste(col_data_filt$treatment, col_data_filt$time, col_data_filt$donor, sep="_")
-for_heatmap = as.data.frame(for_heatmap[match(genes_top,rownames(dds_sanquin)),])
+for_heatmap = as.data.frame(for_heatmap[match(genes_top,rownames(dds_novakovic)),])
 dim(for_heatmap)
 pheatmap(for_heatmap, show_rownames=FALSE)
 
@@ -454,7 +466,7 @@ p_genes = read_excel("tmp/1-s2.0-S0092867416313162-mmc2.xlsx", sheet="Table S2B.
 dg_genes = p_genes$Promoter_H3K27ac_Differentiation_gain; dg_genes = dg_genes[!is.na(dg_genes)]
 dl_genes = p_genes$Promoter_H3K27ac_Differentiation_loss; dl_genes = dl_genes[!is.na(dl_genes)]
 
-for_heatmap = assays(rld_sanquin)[[1]]
+for_heatmap = assays(rld_novakovic)[[1]]
 colnames(for_heatmap) = paste(col_data_filt$treatment, col_data_filt$time, col_data_filt$donor, sep="_")
 match_ix = match(c(dg_genes,dl_genes), gene_list_all$hgnc_symbol); match_ix = match_ix[!is.na(match_ix)]
 for_heatmap = as.data.frame(for_heatmap[match_ix,])
