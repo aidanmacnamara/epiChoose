@@ -22,10 +22,12 @@ load("data/gene_list_all.RData")
 load("tmp/dds_cell_lines.RData")
 load("tmp/dds_saeed.RData")
 load("tmp/dds_novakovic.RData")
+load("tmp/dds_primary.RData")
 
 load("tmp/rld_cell_lines.RData")
 load("tmp/rld_saeed.RData")
 load("tmp/rld_novakovic.RData")
+loaD("tmp/rld_primary.RData")
 
 load("tmp/rld_all.RData")
 
@@ -83,7 +85,7 @@ upset(my_p_filter_tbl, order.by="freq", nsets=20, text.scale=1.5)
 
 # GET FOLD CHANGES --------------------------------------------------------
 
-novakovic = as.character(unique(dds_novakovic$time_treatment)[-1])
+novakovic = as.character(unique(dds_novakovic$time_treatment))
 novakovic = novakovic[!grepl("^1hr", novakovic)]
 
 trts = list(
@@ -155,23 +157,45 @@ plot(euler(
 
 dyn_genes = unique(fc_res_long_filt$gene) # primary dymamic h3k27ac signals
 
-col_ix = match(dyn_genes, gene_list_all$hgnc_symbol)
-
+# get the log-normalised signals
 y = assays(rld_all)[[1]]
 dim(y)
+
+# define indices
+gene_ix = match(dyn_genes, gene_list_all$hgnc_symbol)
+sample_ix = which(!grepl("BG|LPS|glucan|U937|THP|Broad", colnames(y)))
+colnames(y)[sample_ix]                 
+
 rownames(y) = gene_list_all$hgnc_symbol
-y = y[col_ix,]
+y = y[gene_ix,]
 dim(y)
-y = y[apply(y, 1, function(x) sd(x)>1),]
+y = y[apply(y, 1, function(x) sd(x[sample_ix])>1),]
 dim(y)
 
-y = y[,!grepl("BG|LPS|glucan", colnames(y), ignore.case=TRUE)]
+y = y[,!grepl("BG|LPS|glucan|broad", colnames(y), ignore.case=TRUE)]
 dim(y)
 
 d3heatmap(t(y), cexCol=0.8)
-heatmaply(t(y), col=bluered(75))
+annot_bar = rep(0,length(rownames(y)))
+annot_bar[rownames(y) %in% late_down] = 1
+annot_bar[rownames(y) %in% late_up] = 2
+heatmaply(t(y), col=bluered(75), cexCol=0.5, col_side_colors=annot_bar)
 
-filter(tbl_df(fc_res), genes %in% rownames(y)) %>% write_csv("out.csv")
+fc_res = tbl_df(fc_res)
+fc_res_out = filter(fc_res, genes %in% rownames(y)) %>% select(-grep("BG|LPS|glucan", names(.)))
+
+# early vs late
+res_early_late = results(dds_primary, contrast=c("group","late","early"))
+res_early_late$gene = gene_list_all$hgnc_symbol
+res_early_late = tbl_df(res_early_late) %>% filter(padj < 0.05) %>% arrange(desc(abs(log2FoldChange)))
+late_up = filter(res_early_late, log2FoldChange>0) %>% select(gene) %>% unlist %>% as.character()
+late_down = filter(res_early_late, log2FoldChange<0) %>% select(gene) %>% unlist %>% as.character()
+fc_res_out$up_regulated = 0
+fc_res_out$up_regulated[fc_res_out$genes %in% late_up] = 1
+fc_res_out$down_regulated = 0
+fc_res_out$down_regulated[fc_res_out$genes %in% late_down] = 1
+write_csv(fc_res_out, "out.csv")
+
 
 # correlation matrix
 

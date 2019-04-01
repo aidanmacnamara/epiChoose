@@ -168,6 +168,68 @@ pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_dist
 pca_and_plot(rld_cell_lines, annot_1=rld_cell_lines$condition, annot_2=rld_cell_lines$cell_line)
 
 
+# ALL PRIMARY -------------------------------------------------------------
+
+# PICK SAMPLES ------------------------------------------------------------
+
+row_ix = which(
+  ((grepl("sanquin", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) & !is.na(dat_all$tss$H3K27ac$annot$Name)) | grepl("N000", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE)) & !grepl("bg|glucan|lps", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) & grepl("[06]days|1hr", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) 
+)
+
+col_data = data.frame(label=rownames(dat_all$tss$H3K27ac$res)[row_ix])
+my_time = str_extract_all(col_data$label, "[0-9]+(hr[s]*|days)")
+col_data$time = NA
+col_data$challenge = 0
+for(i in 1:length(my_time)) {
+  if(grepl("LPS_T=4hrs$", col_data$label[i]) & length(my_time[[i]])>1) {
+    col_data$challenge[i] = 1
+    col_data$time[i] = my_time[[i]][2]
+  } else if(length(my_time[[i]])==2) {
+    col_data$time[i] = my_time[[i]][2]
+  } else {
+    col_data$time[i] = my_time[[i]][1]
+  }
+}
+col_data$treatment = str_replace(col_data$label, "^.*?([[:alpha:]_]+)_T.*$", "\\1")
+col_data$treatment = str_replace(col_data$treatment, "RPMI_", "")
+col_data$treatment[1:4] = rep("Untreated", 4)
+col_data$donor = str_replace(col_data$label, "^.*mono_([0-9]+).*$", "\\1")
+col_data$donor[1:4] = str_extract(col_data$label[1:4], "^[[:alnum:]]+")
+col_data$treatment[col_data$treatment=="RPMI"] = "Naive"
+rownames(col_data) = rownames(dat_all$tss$H3K27ac$res)[row_ix]
+col_data$group = c("late","early","late","early","early","early","early","late","late")
+
+
+# RUN DDS -----------------------------------------------------------------
+
+dat_add = dat_all$tss$H3K27ac$res[row_ix,]
+# dat_add = total_reg$H3K27ac$res[row_ix_filt,which(roi_reg$feature_type_name=="Enhancer")]
+dat_add[is.na(dat_add)] = 0
+dat_add = apply(dat_add, 2, as.integer)
+dim(dat_add)
+boxplot(t(dat_add))
+
+dds_primary = DESeqDataSetFromMatrix(countData=t(dat_add), colData=col_data, design=~group+donor)
+dds_primary = DESeq(dds_primary)
+
+rld_primary = vst(dds_primary, blind=FALSE)
+
+save(dds_primary, file="tmp/dds_primary.RData")
+save(rld_primary, file="tmp/rld_primary.RData")
+
+
+# PLOT HEATMAP/PCA --------------------------------------------------------
+
+sampleDists <- dist(t(assay(rld_primary)))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) = rld_primary$group
+colors <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+
+pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors, show_colnames=FALSE)
+
+pca_and_plot(rld_primary, annot_1=rld_primary$group, annot_2=rld_primary$time)
+
+
 # ALL SAMPLES -------------------------------------------------------------
 
 # PICK SAMPLES ------------------------------------------------------------
