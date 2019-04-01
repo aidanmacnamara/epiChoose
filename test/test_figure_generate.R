@@ -36,6 +36,7 @@ col_data$treatment = str_replace(col_data$label, "^.*?([[:alpha:]_]+)_T.*$", "\\
 col_data$treatment = str_replace(col_data$treatment, "RPMI_", "")
 col_data$donor = str_replace(col_data$label, "^.*mono_([0-9]+).*$", "\\1")
 col_data$treatment[col_data$treatment=="RPMI"] = "Naive"
+col_data$treatment[col_data$treatment=="Attached"] = "Naive"
 rownames(col_data) = rownames(dat_all$tss$H3K27ac$res)[row_ix]
 
 # remove challenge data

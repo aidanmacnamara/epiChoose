@@ -9,6 +9,11 @@ require(ggrepel)
 require(RcisTarget)
 require(DESeq2)
 require(d3heatmap)
+require(heatmaply)
+require(gplots)
+require(reshape2)
+require(UpSetR)
+require(eulerr)
 
 load("data/dat_all.RData")
 load("data/roi_reg.RData")
@@ -128,13 +133,27 @@ names(fc_res)[-1] = paste(rep(unlist(trts), each=2), c("fc","p"), sep="_")
 
 # DYNAMIC REGIONS ---------------------------------------------------------
 
-fc_res_long_filt = filter(fc_res_long, p <= 0.05, abs(fc) >= 4)
+# define first across the primary data
+
+fc_res_long$trmt = as.character(fc_res_long$trmt)
+
+# fc_res_long_filt = filter(fc_res_long, p <= 0.05, abs(fc) >= 4)
+fc_res_long_filt = filter(fc_res_long, p <= 0.05, abs(fc) >= 2, !grepl("BG|LPS|glucan|U937|THP", trmt, ignore.case=TRUE)) # filter out stimulatory conditions
 fc_res_long_filt = arrange(fc_res_long_filt, desc(abs(fc)))
 
 sort(table(fc_res_long_filt$trmt))
 tail(sort(table(fc_res_long_filt$gene)), 20)
 
-dyn_genes = unique(fc_res_long_filt$gene)
+plot(euler(
+  list(
+    novakovic_4_hrs = unique(fc_res_long_filt[fc_res_long_filt$trmt=="4hrs_Naive", 'gene']),
+    novakovic_24_hrs = unique(fc_res_long_filt[fc_res_long_filt$trmt=="24hrs_Naive", 'gene']),
+    novakovic_6_days = unique(fc_res_long_filt[fc_res_long_filt$trmt=="6days_Naive", 'gene']),
+    saeed_6_days = unique(fc_res_long_filt[fc_res_long_filt$trmt=="6days_Untreated", 'gene'])
+  )
+), quantities=TRUE)
+
+dyn_genes = unique(fc_res_long_filt$gene) # primary dymamic h3k27ac signals
 
 col_ix = match(dyn_genes, gene_list_all$hgnc_symbol)
 
@@ -145,14 +164,29 @@ y = y[col_ix,]
 dim(y)
 y = y[apply(y, 1, function(x) sd(x)>1),]
 dim(y)
+
+y = y[,!grepl("BG|LPS|glucan", colnames(y), ignore.case=TRUE)]
+dim(y)
+
 d3heatmap(t(y), cexCol=0.8)
 heatmaply(t(y), col=bluered(75))
+
+filter(tbl_df(fc_res), genes %in% rownames(y)) %>% write_csv("out.csv")
+
+# correlation matrix
+
+yy = cor(y)
+heatmaply(yy, col=bluered(75))
+
+row_ix = grep("SANQUIN|N000", rownames(yy))
+yyy = yy[row_ix, -row_ix]
 
 
 # CONDITION ENRICHMENT ----------------------------------------------------
 
 # what is the enrichment for a condition, e.g. thp1 + pma
 conds = unlist(trts)
+conds = conds[!grepl("BG|LPS|glucan", conds, ignore.case=TRUE)]
 
 conds_list = vector("list", length(conds))
 names(conds_list) = conds
@@ -253,6 +287,7 @@ for(j in 1:length(gene_lists)) { # visualise
 }
 
 all_data = lapply(tfs_list, function(x) as.character(x$tf))
+# all_data = gene_lists
 all_data_tbl = as.data.frame.matrix((table(stack(all_data))))
 all_data_tbl = cbind(rownames(all_data_tbl), all_data_tbl)
 rownames(all_data_tbl) = NULL
