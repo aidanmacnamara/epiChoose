@@ -27,7 +27,7 @@ load("tmp/dds_primary.RData")
 load("tmp/rld_cell_lines.RData")
 load("tmp/rld_saeed.RData")
 load("tmp/rld_novakovic.RData")
-loaD("tmp/rld_primary.RData")
+load("tmp/rld_primary.RData")
 
 load("tmp/rld_all.RData")
 
@@ -176,15 +176,11 @@ y = y[,!grepl("BG|LPS|glucan|broad", colnames(y), ignore.case=TRUE)]
 dim(y)
 
 d3heatmap(t(y), cexCol=0.8)
-annot_bar = rep(0,length(rownames(y)))
-annot_bar[rownames(y) %in% late_down] = 1
-annot_bar[rownames(y) %in% late_up] = 2
-heatmaply(t(y), col=bluered(75), cexCol=0.5, col_side_colors=annot_bar)
 
 fc_res = tbl_df(fc_res)
 fc_res_out = filter(fc_res, genes %in% rownames(y)) %>% select(-grep("BG|LPS|glucan", names(.)))
 
-# early vs late
+# annotate with significant changes from monocytes to macrophages (late vs. early)
 res_early_late = results(dds_primary, contrast=c("group","late","early"))
 res_early_late$gene = gene_list_all$hgnc_symbol
 res_early_late = tbl_df(res_early_late) %>% filter(padj < 0.05) %>% arrange(desc(abs(log2FoldChange)))
@@ -194,8 +190,12 @@ fc_res_out$up_regulated = 0
 fc_res_out$up_regulated[fc_res_out$genes %in% late_up] = 1
 fc_res_out$down_regulated = 0
 fc_res_out$down_regulated[fc_res_out$genes %in% late_down] = 1
-write_csv(fc_res_out, "out.csv")
+# write_csv(fc_res_out, "out.csv")
 
+annot_bar = rep(0,length(rownames(y)))
+annot_bar[rownames(y) %in% late_down] = 1
+annot_bar[rownames(y) %in% late_up] = 2
+heatmaply(t(y), col=bluered(75), cexCol=0.5, col_side_colors=annot_bar)
 
 # correlation matrix
 
