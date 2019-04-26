@@ -131,16 +131,25 @@ for(i in 1:length(trts)) {
 fc_res_long$gene = rep(gene_list_all$hgnc_symbol, length(unlist(trts)))
 # names(fc_res)[-1] = paste(c(rep(names(trts)[1],length(trts[[1]])*2), rep(names(trts)[2],length(trts[[2]])*2), rep(names(trts)[3],length(trts[[3]])*2)), paste(rep(unlist(trts), each=2), c("fc","p"), sep="_"), sep="_")
 names(fc_res)[-1] = paste(rep(unlist(trts), each=2), c("fc","p"), sep="_")
+fc_res_long$trmt = as.character(fc_res_long$trmt)
 
 
 # DYNAMIC REGIONS ---------------------------------------------------------
 
-# define first across the primary data
+# annotate with significant changes from monocytes to macrophages (late vs. early)
+res_early_late = results(dds_primary, contrast=c("group","late","early"))
+res_early_late$gene = gene_list_all$hgnc_symbol
+res_early_late = tbl_df(res_early_late) %>% filter(padj < 0.05, abs(log2FoldChange) > 1) %>% arrange(desc(abs(log2FoldChange)))
+late_up = filter(res_early_late, log2FoldChange>0) %>% select(gene) %>% unlist %>% as.character()
+late_down = filter(res_early_late, log2FoldChange<0) %>% select(gene) %>% unlist %>% as.character()
 
-fc_res_long$trmt = as.character(fc_res_long$trmt)
+# filter based on dynamic primary regions (no treatments)
+# fc_res_long_filt = filter(fc_res_long, p <= 0.05, abs(fc) >= 1, !grepl("BG|LPS|glucan|U937|THP", trmt, ignore.case=TRUE))
 
-# fc_res_long_filt = filter(fc_res_long, p <= 0.05, abs(fc) >= 4)
-fc_res_long_filt = filter(fc_res_long, p <= 0.05, abs(fc) >= 2, !grepl("BG|LPS|glucan|U937|THP", trmt, ignore.case=TRUE)) # filter out stimulatory conditions
+# filter based on dynamic cell line regions (pma only)
+fc_res_long_filt = filter(fc_res_long, p <= 0.05, abs(fc) >= 1, grepl("_PMA$", trmt, ignore.case=TRUE))
+
+# tidy
 fc_res_long_filt = arrange(fc_res_long_filt, desc(abs(fc)))
 
 sort(table(fc_res_long_filt$trmt))
@@ -148,14 +157,17 @@ tail(sort(table(fc_res_long_filt$gene)), 20)
 
 plot(euler(
   list(
-    novakovic_4_hrs = unique(fc_res_long_filt[fc_res_long_filt$trmt=="4hrs_Naive", 'gene']),
-    novakovic_24_hrs = unique(fc_res_long_filt[fc_res_long_filt$trmt=="24hrs_Naive", 'gene']),
-    novakovic_6_days = unique(fc_res_long_filt[fc_res_long_filt$trmt=="6days_Naive", 'gene']),
-    saeed_6_days = unique(fc_res_long_filt[fc_res_long_filt$trmt=="6days_Untreated", 'gene'])
+    # novakovic_4_hrs = unique(unlist(fc_res_long_filt[fc_res_long_filt$trmt=="4hrs_Naive", 'gene'])),
+    # novakovic_24_hrs = unique(unlist(fc_res_long_filt[fc_res_long_filt$trmt=="24hrs_Naive", 'gene'])),
+    # novakovic_6_days = unique(unlist(fc_res_long_filt[fc_res_long_filt$trmt=="6days_Naive", 'gene'])),
+    # saeed_6_days = unique(unlist(fc_res_long_filt[fc_res_long_filt$trmt=="6days_Untreated", 'gene']))
+    thp_pma = unique(unlist(fc_res_long_filt[fc_res_long_filt$trmt=="THP-1_PMA", 'gene'])),
+    u937_pma = unique(unlist(fc_res_long_filt[fc_res_long_filt$trmt=="U937_PMA", 'gene']))
   )
 ), quantities=TRUE)
 
-dyn_genes = unique(fc_res_long_filt$gene) # primary dymamic h3k27ac signals
+# dyn_genes = unique(c(late_down, late_up)) # primary dymamic h3k27ac signals
+dyn_genes = unique(fc_res_long_filt$gene)
 
 # get the log-normalised signals
 y = assays(rld_all)[[1]]
@@ -169,39 +181,64 @@ colnames(y)[sample_ix]
 rownames(y) = gene_list_all$hgnc_symbol
 y = y[gene_ix,]
 dim(y)
-y = y[apply(y, 1, function(x) sd(x[sample_ix])>1),]
-dim(y)
+# y = y[apply(y, 1, function(x) sd(x[sample_ix])>1),]
+# dim(y)
 
 y = y[,!grepl("BG|LPS|glucan|broad", colnames(y), ignore.case=TRUE)]
 dim(y)
 
-d3heatmap(t(y), cexCol=0.8)
-
+# fc_res for spreadsheet
 fc_res = tbl_df(fc_res)
 fc_res_out = filter(fc_res, genes %in% rownames(y)) %>% select(-grep("BG|LPS|glucan", names(.)))
 
-# annotate with significant changes from monocytes to macrophages (late vs. early)
-res_early_late = results(dds_primary, contrast=c("group","late","early"))
-res_early_late$gene = gene_list_all$hgnc_symbol
-res_early_late = tbl_df(res_early_late) %>% filter(padj < 0.05) %>% arrange(desc(abs(log2FoldChange)))
-late_up = filter(res_early_late, log2FoldChange>0) %>% select(gene) %>% unlist %>% as.character()
-late_down = filter(res_early_late, log2FoldChange<0) %>% select(gene) %>% unlist %>% as.character()
-fc_res_out$up_regulated = 0
-fc_res_out$up_regulated[fc_res_out$genes %in% late_up] = 1
-fc_res_out$down_regulated = 0
-fc_res_out$down_regulated[fc_res_out$genes %in% late_down] = 1
-# write_csv(fc_res_out, "out.csv")
+# primary annotation for spreadsheet
+fc_res_out$deregulated = ""
+fc_res_out$deregulated[fc_res_out$genes %in% late_up] = "Up"
+fc_res_out$deregulated[fc_res_out$genes %in% late_down] = "Down"
+fc_res_out$early_to_late_fc = res_early_late$log2FoldChange[match(fc_res_out$genes, res_early_late$gene)]
 
-annot_bar = rep(0,length(rownames(y)))
+# cell line annotation for spreadsheet
+thp_up = filter(fc_res_long_filt, fc > 0, trmt=="THP-1_PMA") %>% select(gene) %>% unlist() %>% as.character()
+u937_up = filter(fc_res_long_filt, fc > 0, trmt=="U937_PMA") %>% select(gene) %>% unlist() %>% as.character()
+both_up = intersect(thp_up, u937_up)
+thp_down = filter(fc_res_long_filt, fc < 0, trmt=="THP-1_PMA") %>% select(gene) %>% unlist() %>% as.character()
+u937_down = filter(fc_res_long_filt, fc < 0, trmt=="U937_PMA") %>% select(gene) %>% unlist() %>% as.character()
+both_down = intersect(thp_down, u937_down)
+sum(length(thp_up), length(thp_down), length(u937_up), length(u937_down), length(both_up), length(both_down))
+fc_res_out$group = ""
+fc_res_out$group[fc_res_out$genes %in% thp_up] = "THP-1 Up"
+fc_res_out$group[fc_res_out$genes %in% u937_up] = "U937 Up"
+fc_res_out$group[fc_res_out$genes %in% both_up] = "Both Up"
+fc_res_out$group[fc_res_out$genes %in% thp_down] = "THP-1 Down"
+fc_res_out$group[fc_res_out$genes %in% u937_down] = "U937 Down"
+fc_res_out$group[fc_res_out$genes %in% both_down] = "Both Down"
+fc_res_out$primary = ""
+fc_res_out$primary[fc_res_out$genes %in% late_down] = "Primary Down"
+fc_res_out$primary[fc_res_out$genes %in% late_up] = "Primary Up"
+
+# write to file
+write_csv(fc_res_out, "out.csv")
+
+# make annotation for heatmap
+annot_bar = rep("",length(rownames(y)))
+
+# primary
 annot_bar[rownames(y) %in% late_down] = 1
 annot_bar[rownames(y) %in% late_up] = 2
+
+# cell lines
+annot_bar[rownames(y) %in% thp_down] = "THP-1 down"
+annot_bar[rownames(y) %in% u937_down] = "U937 down"
+annot_bar[rownames(y) %in% both_down] = "BOTH down"
+
+# plot
 heatmaply(t(y), col=bluered(75), cexCol=0.5, col_side_colors=annot_bar)
 
 # correlation matrix
-
 yy = cor(y)
 heatmaply(yy, col=bluered(75))
 
+# look at primary data only
 row_ix = grep("SANQUIN|N000", rownames(yy))
 yyy = yy[row_ix, -row_ix]
 
@@ -257,7 +294,7 @@ for(j in 1:length(gene_lists)) { # visualise
   
   # get the significant motifs
   # can also apply motif-tf  mapping threshold here
-  sig_motifs = filter(motif_enrichment, geneSet==conds[j], NES>=4)
+  sig_motifs = filter(motif_enrichment, geneSet==names(gene_lists)[j], NES>=4)
   
   if(dim(sig_motifs)[1]==0) next
   
