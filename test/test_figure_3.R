@@ -63,26 +63,6 @@ pca_and_plot <- function(rld, annot_1, annot_2) {
 }
 
 
-# WHAT GENE SETS TO USE? --------------------------------------------------
-
-# my_p = gmtPathways("tmp/c7.all.v6.2.symbols.gmt") # immune set
-# my_p = gmtPathways("tmp/c2.cp.reactome.v6.2.symbols.gmt") # biological processes
-my_p = gmtPathways("tmp/c5.bp.v6.2.symbols.gmt") # biological processes
-
-my_p_filter = my_p[grep("monocyte|macrophage", names(my_p), ignore.case=TRUE)]
-my_p_filter = c(my_p_filter, my_p[grep("brain", names(my_p), ignore.case=TRUE)])
-my_p_annot = data.frame(name=names(my_p_filter), tissue=c(rep("myeloid",20),rep("brain",14)), mean_fc=NA, sig_fcs=NA)
-
-# my_p_filter = my_p_filter[1:20]
-# my_p_annot = my_p_annot[1:20,]
-
-lapply(my_p_filter, length)
-my_p_filter_tbl = as.data.frame.matrix((table(stack(my_p_filter))))
-my_p_filter_tbl = cbind(rownames(my_p_filter_tbl), my_p_filter_tbl)
-rownames(my_p_filter_tbl) = NULL
-upset(my_p_filter_tbl, order.by="freq", nsets=20, text.scale=1.5)
-
-
 # GET FOLD CHANGES --------------------------------------------------------
 
 novakovic = as.character(unique(dds_novakovic$time_treatment))
@@ -128,10 +108,12 @@ for(i in 1:length(trts)) {
   }
 }
 
+fc_res = tbl_df(fc_res)
+
 fc_res_long$gene = rep(gene_list_all$hgnc_symbol, length(unlist(trts)))
-# names(fc_res)[-1] = paste(c(rep(names(trts)[1],length(trts[[1]])*2), rep(names(trts)[2],length(trts[[2]])*2), rep(names(trts)[3],length(trts[[3]])*2)), paste(rep(unlist(trts), each=2), c("fc","p"), sep="_"), sep="_")
 names(fc_res)[-1] = paste(rep(unlist(trts), each=2), c("fc","p"), sep="_")
 fc_res_long$trmt = as.character(fc_res_long$trmt)
+fc_res_long = tbl_df(fc_res_long)
 
 
 # DYNAMIC REGIONS ---------------------------------------------------------
@@ -140,34 +122,20 @@ fc_res_long$trmt = as.character(fc_res_long$trmt)
 res_early_late = results(dds_primary, contrast=c("group","late","early"))
 res_early_late$gene = gene_list_all$hgnc_symbol
 res_early_late = tbl_df(res_early_late) %>% filter(padj < 0.05, abs(log2FoldChange) > 1) %>% arrange(desc(abs(log2FoldChange)))
-late_up = filter(res_early_late, log2FoldChange>0) %>% select(gene) %>% unlist %>% as.character()
-late_down = filter(res_early_late, log2FoldChange<0) %>% select(gene) %>% unlist %>% as.character()
 
-# filter based on dynamic primary regions (no treatments)
-# fc_res_long_filt = filter(fc_res_long, p <= 0.05, abs(fc) >= 1, !grepl("BG|LPS|glucan|U937|THP", trmt, ignore.case=TRUE))
+up_primary = filter(res_early_late, log2FoldChange>0) %>% select(gene) %>% unlist %>% as.character()
+down_primary = filter(res_early_late, log2FoldChange<0) %>% select(gene) %>% unlist %>% as.character()
+up_cell_line_t = filter(fc_res_long, p <= 0.05, fc >= 1, trmt=="THP-1_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
+down_cell_line_t = filter(fc_res_long, p <= 0.05, fc <= -1, trmt=="THP-1_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
+up_cell_line_u = filter(fc_res_long, p <= 0.05, fc >= 1, trmt=="U937_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
+down_cell_line_u = filter(fc_res_long, p <= 0.05, fc <= -1, trmt=="U937_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
 
-# filter based on dynamic cell line regions (pma only)
-fc_res_long_filt = filter(fc_res_long, p <= 0.05, abs(fc) >= 1, grepl("_PMA$", trmt, ignore.case=TRUE))
+dyn_genes = unique(
+  c(up_primary,up_cell_line_t,up_cell_line_u,down_primary,down_cell_line_t,down_cell_line_u)
+)
 
-# tidy
-fc_res_long_filt = arrange(fc_res_long_filt, desc(abs(fc)))
 
-sort(table(fc_res_long_filt$trmt))
-tail(sort(table(fc_res_long_filt$gene)), 20)
-
-plot(euler(
-  list(
-    # novakovic_4_hrs = unique(unlist(fc_res_long_filt[fc_res_long_filt$trmt=="4hrs_Naive", 'gene'])),
-    # novakovic_24_hrs = unique(unlist(fc_res_long_filt[fc_res_long_filt$trmt=="24hrs_Naive", 'gene'])),
-    # novakovic_6_days = unique(unlist(fc_res_long_filt[fc_res_long_filt$trmt=="6days_Naive", 'gene'])),
-    # saeed_6_days = unique(unlist(fc_res_long_filt[fc_res_long_filt$trmt=="6days_Untreated", 'gene']))
-    thp_pma = unique(unlist(fc_res_long_filt[fc_res_long_filt$trmt=="THP-1_PMA", 'gene'])),
-    u937_pma = unique(unlist(fc_res_long_filt[fc_res_long_filt$trmt=="U937_PMA", 'gene']))
-  )
-), quantities=TRUE)
-
-# dyn_genes = unique(c(late_down, late_up)) # primary dymamic h3k27ac signals
-dyn_genes = unique(fc_res_long_filt$gene)
+# HEATMAP -----------------------------------------------------------------
 
 # get the log-normalised signals
 y = assays(rld_all)[[1]]
@@ -175,61 +143,22 @@ dim(y)
 
 # define indices
 gene_ix = match(dyn_genes, gene_list_all$hgnc_symbol)
-sample_ix = which(!grepl("BG|LPS|glucan|U937|THP|Broad", colnames(y)))
-colnames(y)[sample_ix]                 
-
 rownames(y) = gene_list_all$hgnc_symbol
 y = y[gene_ix,]
 dim(y)
-# y = y[apply(y, 1, function(x) sd(x[sample_ix])>1),]
-# dim(y)
-
 y = y[,!grepl("BG|LPS|glucan|broad", colnames(y), ignore.case=TRUE)]
 dim(y)
 
-# fc_res for spreadsheet
-fc_res = tbl_df(fc_res)
-fc_res_out = filter(fc_res, genes %in% rownames(y)) %>% select(-grep("BG|LPS|glucan", names(.)))
-
-# primary annotation for spreadsheet
-fc_res_out$deregulated = ""
-fc_res_out$deregulated[fc_res_out$genes %in% late_up] = "Up"
-fc_res_out$deregulated[fc_res_out$genes %in% late_down] = "Down"
-fc_res_out$early_to_late_fc = res_early_late$log2FoldChange[match(fc_res_out$genes, res_early_late$gene)]
-
-# cell line annotation for spreadsheet
-thp_up = filter(fc_res_long_filt, fc > 0, trmt=="THP-1_PMA") %>% select(gene) %>% unlist() %>% as.character()
-u937_up = filter(fc_res_long_filt, fc > 0, trmt=="U937_PMA") %>% select(gene) %>% unlist() %>% as.character()
-both_up = intersect(thp_up, u937_up)
-thp_down = filter(fc_res_long_filt, fc < 0, trmt=="THP-1_PMA") %>% select(gene) %>% unlist() %>% as.character()
-u937_down = filter(fc_res_long_filt, fc < 0, trmt=="U937_PMA") %>% select(gene) %>% unlist() %>% as.character()
-both_down = intersect(thp_down, u937_down)
-sum(length(thp_up), length(thp_down), length(u937_up), length(u937_down), length(both_up), length(both_down))
-fc_res_out$group = ""
-fc_res_out$group[fc_res_out$genes %in% thp_up] = "THP-1 Up"
-fc_res_out$group[fc_res_out$genes %in% u937_up] = "U937 Up"
-fc_res_out$group[fc_res_out$genes %in% both_up] = "Both Up"
-fc_res_out$group[fc_res_out$genes %in% thp_down] = "THP-1 Down"
-fc_res_out$group[fc_res_out$genes %in% u937_down] = "U937 Down"
-fc_res_out$group[fc_res_out$genes %in% both_down] = "Both Down"
-fc_res_out$primary = ""
-fc_res_out$primary[fc_res_out$genes %in% late_down] = "Primary Down"
-fc_res_out$primary[fc_res_out$genes %in% late_up] = "Primary Up"
-
-# write to file
-write_csv(fc_res_out, "out.csv")
-
 # make annotation for heatmap
-annot_bar = rep("",length(rownames(y)))
+annot_bar = data.frame(name=rownames(y), primary_down=0, primary_up=0, thp_down=0, thp_up=0, u937_down=0, u937_up=0)
+annot_bar$primary_down[annot_bar$name %in% down_primary] = 1
+annot_bar$thp_down[annot_bar$name %in% down_cell_line_t] = 1
+annot_bar$u937_down[annot_bar$name %in% down_cell_line_u] = 1
+annot_bar$primary_up[annot_bar$name %in% up_primary] = 1
+annot_bar$thp_up[annot_bar$name %in% up_cell_line_t] = 1
+annot_bar$u937_up[annot_bar$name %in% up_cell_line_u] = 1
 
-# primary
-annot_bar[rownames(y) %in% late_down] = 1
-annot_bar[rownames(y) %in% late_up] = 2
-
-# cell lines
-annot_bar[rownames(y) %in% thp_down] = "THP-1 down"
-annot_bar[rownames(y) %in% u937_down] = "U937 down"
-annot_bar[rownames(y) %in% both_down] = "BOTH down"
+pheatmap(t(y), annotation_col=annot_bar, show_colnames=FALSE)
 
 # plot
 heatmaply(t(y), col=bluered(75), cexCol=0.5, col_side_colors=annot_bar)
@@ -243,38 +172,30 @@ row_ix = grep("SANQUIN|N000", rownames(yy))
 yyy = yy[row_ix, -row_ix]
 
 
-# CONDITION ENRICHMENT ----------------------------------------------------
+# TF ANALYSIS -------------------------------------------------------------
+
+fc_res_out = filter(fc_res, genes %in% dyn_genes) %>% dplyr::select(-grep("BG|LPS|VD3|glucan", names(.)))
+fc_res_out = cbind(fc_res_out, primary_down=0, primary_up=0, thp_down=0, thp_up=0, u937_down=0, u937_up=0)
+fc_res_out$primary_down[fc_res_out$genes %in% down_primary] = 1
+fc_res_out$thp_down[fc_res_out$genes %in% down_cell_line_t] = 1
+fc_res_out$u937_down[fc_res_out$genes %in% down_cell_line_u] = 1
+fc_res_out$primary_up[fc_res_out$genes %in% up_primary] = 1
+fc_res_out$thp_up[fc_res_out$genes %in% up_cell_line_t] = 1
+fc_res_out$u937_up[fc_res_out$genes %in% up_cell_line_u] = 1
+
+plot(euler(fc_res_out[,14:19]), quantities=TRUE)
 
 # what is the enrichment for a condition, e.g. thp1 + pma
-conds = unlist(trts)
-conds = conds[!grepl("BG|LPS|glucan", conds, ignore.case=TRUE)]
-
+conds = c("Primary", "THP-1", "U937")
 conds_list = vector("list", length(conds))
 names(conds_list) = conds
 
 tfs_list =  vector("list", length(conds))
 names(tfs_list) = conds
 
-for(i in 1:length(conds)) {
-  
-  my_cond = fc_res[,c(1, which(str_replace(names(fc_res), "_[pfc]+$", "") %in% conds[i]))]
-  my_cond = my_cond[my_cond[,3] < 0.05,]
-  my_cond = my_cond[order(-my_cond[,2]),]
-  my_cond = my_cond[!is.na(my_cond$genes),]
-  my_cond %>% head()
-  
-  # gsea_in = my_cond[,2]
-  # names(gsea_in) = my_cond$genes
-  # res_gsea <- fgsea(pathways=my_p, stats=gsea_in, nperm=1000)
-  # res_tidy = res_gsea %>% as_tibble() %>% arrange(desc(NES))
-  # res_tidy %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj) %>% DT::datatable()
-  
-  conds_list[[i]] = my_cond
-  
-}
-
-gene_lists = lapply(conds_list, function(x) as.character(x[x[,2]>2, 'genes'])) # take everything with a fc > 2
-lapply(gene_lists, length)
+conds_list$Primary = res_early_late %>% filter(padj <= 0.05, log2FoldChange >= 2) %>% dplyr::select(gene) %>% unlist() %>% as.character()
+conds_list$`THP-1` = fc_res_long %>% filter(trmt=="THP-1_PMA", fc >= 2, p <= 0.05) %>% dplyr::select(gene) %>% unlist() %>% as.character()
+conds_list$U937 = fc_res_long %>% filter(trmt=="U937_PMA", fc >= 2, p <= 0.05) %>% dplyr::select(gene) %>% unlist() %>% as.character()
 
 # import motif-gene rankings
 # how is this ranking performed?
@@ -286,21 +207,21 @@ data(motifAnnotations_hgnc)
 
 # run enrichment
 # question: what motifs are enriched in each cluster?
-motif_enrichment <- cisTarget(gene_lists, motif_rankings, motifAnnot=motifAnnotations_hgnc)
+motif_enrichment <- cisTarget(conds_list, motif_rankings, motifAnnot=motifAnnotations_hgnc)
 
-for(j in 1:length(gene_lists)) { # visualise
+for(j in 1:length(conds_list)) { # visualise
   
   print(j)
   
   # get the significant motifs
   # can also apply motif-tf  mapping threshold here
-  sig_motifs = filter(motif_enrichment, geneSet==names(gene_lists)[j], NES>=4)
+  sig_motifs = filter(motif_enrichment, geneSet==names(conds_list)[j], NES>=4)
   
   if(dim(sig_motifs)[1]==0) next
   
   # get all interactions between significant tfs and regulated genes
   # this is also identifying the significant regulated genes
-  inc_mat = getSignificantGenes(gene_lists[[j]], motif_rankings, signifRankingNames=sig_motifs$motif, plotCurve=FALSE, maxRank=5000-20, genesFormat="incidMatrix", method="aprox")$incidMatrix
+  inc_mat = getSignificantGenes(conds_list[[j]], motif_rankings, signifRankingNames=sig_motifs$motif, plotCurve=FALSE, maxRank=5000-20, genesFormat="incidMatrix", method="aprox")$incidMatrix
   
   # collapse from motifs to tfs
   tfs = str_extract(sig_motifs$TF_highConf, "^[[:alnum:]]+")
@@ -317,7 +238,7 @@ for(j in 1:length(gene_lists)) { # visualise
     t_ix = which(tfs==tfs_unique[i])
     tf_df$mean_nes[i] = mean(sig_motifs$NES[t_ix])
     tf_df$mean_auc[i] = mean(sig_motifs$AUC[t_ix])
-    tf_df$frac_binding_genes[i] = length(unique(unlist(sapply(sig_motifs$enrichedGenes[t_ix], function(x) str_split(x, ";"))))) / length(gene_lists[[j]])
+    tf_df$frac_binding_genes[i] = length(unique(unlist(sapply(sig_motifs$enrichedGenes[t_ix], function(x) str_split(x, ";"))))) / length(conds_list[[j]])
     
     if(length(t_ix) > 1) {
       to_add = apply(inc_mat[t_ix,], 2, function(x) round(sum(x)/length(x)))
@@ -328,7 +249,7 @@ for(j in 1:length(gene_lists)) { # visualise
   }
   
   rownames(inc_mat_collapse) = tfs_unique
-  tf_df$frac_binding_genes[tf_df$tf=="All"] = sum(apply(inc_mat_collapse, 2, function(x) any(x==1))) / length(gene_lists[[j]])
+  tf_df$frac_binding_genes[tf_df$tf=="All"] = sum(apply(inc_mat_collapse, 2, function(x) any(x==1))) / length(conds_list[[j]])
   
   # construct network  
   edges = melt(as.matrix(inc_mat_collapse))
@@ -354,61 +275,81 @@ all_data_tbl = cbind(rownames(all_data_tbl), all_data_tbl)
 rownames(all_data_tbl) = NULL
 upset(all_data_tbl, order.by="freq", nsets=20)
 
-# \ CONDITION ENRICHMENT --------------------------------------------------
+
+# WHAT GENE SETS TO USE? --------------------------------------------------
+
+# my_p = gmtPathways("tmp/c7.all.v6.2.symbols.gmt") # immune set
+# my_p = gmtPathways("tmp/c2.cp.reactome.v6.2.symbols.gmt") # biological processes
+my_p = gmtPathways("tmp/c5.bp.v6.2.symbols.gmt") # biological processes
+
+my_p_filter = my_p[grep("monocyte|macrophage", names(my_p), ignore.case=TRUE)]
+my_p_filter = c(my_p_filter, my_p[grep("brain", names(my_p), ignore.case=TRUE)])
+my_p_annot = data.frame(name=names(my_p_filter), tissue=c(rep("myeloid",20),rep("brain",14)), mean_fc=NA, sig_fcs=NA)
+
+# my_p_filter = my_p_filter[1:20]
+# my_p_annot = my_p_annot[1:20,]
+
+lapply(my_p_filter, length)
+my_p_filter_tbl = as.data.frame.matrix((table(stack(my_p_filter))))
+my_p_filter_tbl = cbind(rownames(my_p_filter_tbl), my_p_filter_tbl)
+rownames(my_p_filter_tbl) = NULL
+upset(my_p_filter_tbl, order.by="freq", nsets=20, text.scale=1.5)
 
 
-res_cell_lines = gather(res_cell_lines, "group","score", 2:dim(res_cell_lines)[2])
-res_cell_lines$type = str_extract(res_cell_lines$group, "[a-z]+$")
-res_cell_lines$group = str_replace(res_cell_lines$group, "_[a-z]+$", "")
+# PATHWAY COMPARISON ------------------------------------------------------
 
-res_all = rbind(res_cell_lines, res_novakovic) # fc and p values
 # split fc and p values to 2 data frames
-res_all_p = filter(res_all, type=="p") %>% dplyr::select(-type) %>% spread(group, score)
-res_all_fc = filter(res_all, type=="fc") %>% dplyr::select(-type) %>% spread(group, score)
-rownames(res_all_p) = res_all_p$genes
-rownames(res_all_fc) = res_all_fc$genes
-res_all_p = res_all_p[,-1]
-res_all_fc = res_all_fc[,-1]
-all(names(res_all_p)==names(res_all_fc))
+fc_res_p = fc_res %>% dplyr::select(matches("_p$")) %>% as.data.frame()
+names(fc_res_p) = str_replace(names(fc_res_p), "_p$", "")
+rownames(fc_res_p) = fc_res$genes
 
+fc_res_fc = fc_res %>% dplyr::select(matches("_fc$")) %>% as.data.frame()
+names(fc_res_fc) = str_replace(names(fc_res_fc), "_fc$", "")
+rownames(fc_res_fc) = fc_res$genes
 
-# CORRELATION BETWEEN CELL LINES AND PRIMARY ------------------------------
+all(names(fc_res_p)==names(fc_res_fc))
 
 # store correlation between thp and novakovic
-trts_cell_lines = c(trts_thp1, trts_u937, "5days_BG") # add 5 days bg as control
-res_template = matrix(NA, nrow=length(trts_cell_lines), ncol=length(trts_novakovic))
-colnames(res_template) = trts_novakovic
+trts_cell_lines = c(trts$cell_lines, "5days_BG") # add 5 days bg as control
+res_template = matrix(NA, nrow=length(trts_cell_lines), ncol=length(trts$novakovic))
+colnames(res_template) = trts$novakovic
 rownames(res_template) = trts_cell_lines
 
 # store the results for each pathway
 out_comp = vector("list", length(my_p_filter))
 names(out_comp) = names(my_p_filter)
 
-out_activity = matrix(NA, nrow=length(my_p_filter), ncol=length(c(trts_cell_lines, trts_novakovic)))
-colnames(out_activity) = c(trts_cell_lines, trts_novakovic)
+out_activity = matrix(NA, nrow=length(my_p_filter), ncol=length(c(trts_cell_lines, trts$novakovic)))
+colnames(out_activity) = c(trts_cell_lines, trts$novakovic)
 rownames(out_activity) = names(my_p_filter)
 
 for(i in 1:length(out_comp)) {
   
   res_copy = res_template
-  g_ix = which(rownames(res_all_fc) %in% my_p_filter[[i]]) # get the gene indices for the pathway
+  g_ix = which(rownames(fc_res_fc) %in% my_p_filter[[i]]) # get the gene indices for the pathway
   if(is_empty(g_ix)) next
   
-  pathway_fc = res_all_fc[g_ix,] # get the fold changes
-  pathway_p = res_all_p[g_ix,] # get the p-values
+  pathway_fc = fc_res_fc[g_ix,] # get the fold changes
+  pathway_p = fc_res_p[g_ix,] # get the p-values
   my_p_annot$mean_fc[i] = mean(as.numeric(unlist(pathway_fc)), na.rm=TRUE) # what is the mean fc for the pathway?
   my_p_annot$sig_fcs[i] = sum(pathway_p<0.05, na.rm=TRUE) / length(unlist(pathway_p)) # how many sig fcs for the pathway?
   
   # pathway_fc[pathway_p > 0.05] = NA # set non-significant (padj) fcs to na
   
-  fcs_per_condition = apply(pathway_fc, 2, function(x) sum(x < 0.05) / dim(pathway_fc)[1])
+  fcs_per_condition_func <- function(x) {
+    if(is.na(x)) {
+      return
+    }
+  }
+  
+  fcs_per_condition = apply(pathway_p, 2, function(x) sum(x < 0.05, na.rm=TRUE) / dim(pathway_p)[1])
   out_activity[i,] = fcs_per_condition[match(colnames(out_activity),names(fcs_per_condition))]
   
   for(j in 1:length(trts_cell_lines)) {
-    for(k in 1:length(trts_novakovic)) {
+    for(k in 1:length(trts$novakovic)) {
       
       x = pathway_fc[,which(names(pathway_fc)==trts_cell_lines[j])]
-      y = pathway_fc[,which(names(pathway_fc)==trts_novakovic[k])]
+      y = pathway_fc[,which(names(pathway_fc)==trts$novakovic[k])]
       # plot(x,y)
       
       fisher_mat = matrix(
@@ -437,7 +378,7 @@ ggplot(my_p_annot, aes(x=tissue, y=sig_fcs)) + geom_boxplot() + theme_thesis(15)
 
 # make out_comp long to look at correlation sets
 out_comp_long = data.frame()
-my_labels = as.character(outer(trts_cell_lines, trts_novakovic, paste, sep="_VS_"))
+my_labels = as.character(outer(trts_cell_lines, trts$novakovic, paste, sep="_VS_"))
 for(i in 1:length(out_comp)) {
   print(i)
   out_comp_long = rbind(
@@ -478,140 +419,16 @@ for(j in 1:length(select_ps)) {
   # i = which(names(my_p_filter)==select_ps[j])
   i = which(names(my_p_filter)=="GO_MACROPHAGE_CHEMOTAXIS")
   out_comp[[i]]
-  g_ix = which(rownames(res_all_fc) %in% my_p_filter[[i]])
-  dat_fc = res_all_fc[g_ix,]
+  g_ix = which(rownames(fc_res_fc) %in% my_p_filter[[i]])
+  dat_fc = fc_res_fc[g_ix,]
   pheatmap(dat_fc, main=names(my_p_filter)[i], fontsize_row=5)
   
 }
 
-gsea_in = res_all_fc$`5days_LPS`
-names(gsea_in) = rownames(res_all_fc)
+gsea_in = fc_res_fc$`5days_LPS`
+names(gsea_in) = rownames(fc_res_fc)
 res_gsea <- fgsea(pathways=my_p, stats=gsea_in, nperm=1000)
 res_tidy = res_gsea %>% as_tibble() %>% arrange(desc(NES))
 res_tidy %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj) %>% DT::datatable()
 
-
-# TOP N HITS --------------------------------------------------------------
-
-# novakovic criteria
-# fc 3
-# adj p 0.05
-# rpkm > 1
-
-design(dds_novakovic)
-dds_novakovic = DESeq(dds_novakovic, test="LRT", reduced=~donor)
-res_novakovic = tbl_df(results(dds_novakovic))
-res_novakovic$gene = rownames(res_novakovic)
-res_novakovic$symbol = gene_list_all$hgnc_symbol
-arrange(res_novakovic, padj) %>% filter(padj<1e-8)
-
-# take the top 1000 hits
-genes_top = head(res_novakovic$gene[order(res_novakovic$padj)],1e3)
-
-for(j in 1:3) {
-  y = plotCounts(dds_novakovic, gene=head(order(res_novakovic$padj),10)[j], intgroup=c("treatment","time","donor"), returnData=TRUE)
-  print(ggplot(y, aes(x=time, y=count)) + geom_point(shape=17, size=3) + theme_thesis(20) + xlab("") + ylab("Count") + ggtitle(res_novakovic$gene[head(order(res_novakovic$padj),10)[j]]))
-}
-
-y = t(assays(rld_novakovic)[[1]])
-dim(y)
-y = y[,colnames(y) %in% genes_top]
-y = y[,!apply(y, 2, function(x) sd(x)==0)] # remove regions with no variance
-dim(y)
-
-pca_res <- prcomp(y, scale=TRUE, center=TRUE)
-pca_res_summary = summary(pca_res)
-yy = data.frame(pca_res$x[,1:2])
-names(yy) = c("x","y")
-yy$annot_1 = paste(rld_novakovic$treatment, rld_novakovic$time, sep="_")
-yy$annot_2 = rld_novakovic$donor
-ggplot(yy, aes(x=x, y=y, color=annot_2)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=5, force=0.5) + theme(legend.position="none")
-
-for_heatmap = assays(rld_novakovic)[[1]]
-colnames(for_heatmap) = paste(col_data_filt$treatment, col_data_filt$time, col_data_filt$donor, sep="_")
-for_heatmap = as.data.frame(for_heatmap[match(genes_top,rownames(dds_novakovic)),])
-dim(for_heatmap)
-pheatmap(for_heatmap, show_rownames=FALSE)
-
-wss = (nrow(for_heatmap)-1) * sum(apply(for_heatmap,2,var))
-for(k in 2:15) {
-  wss[k] <- sum(kmeans(for_heatmap, centers=k)$withinss)
-}
-plot(1:15, wss, type="b", xlab="Number of Clusters", ylab="Within-group sum-of-squares")
-fit <- kmeans(for_heatmap, 6)
-
-pheatmap(for_heatmap, fontsize_row=8,
-         annotation_row = data.frame(
-           K_Means = factor(fit$cluster),
-           row.names=rownames(for_heatmap)
-         ), show_rownames=FALSE
-)
-
-for_heatmap$Gene = rownames(for_heatmap)
-for_heatmap$Cluster = factor(fit$cluster)
-head(for_heatmap)
-for_heatmap = gather(for_heatmap, "Group", "AUC", 1:17)
-for_heatmap$Group = factor(for_heatmap$Group)
-ggplot(for_heatmap, aes(x=Group,y=AUC,group=Gene)) + geom_point(shape=17) + geom_line(alpha=0.1) + facet_wrap(~Cluster) + theme_thesis(15)
-
-
-# MONOCYTE/MACROPHAGE RELEVANT GENES --------------------------------------
-
-# pick the gene set from saeed/novakovic
-p_genes = read_excel("tmp/1-s2.0-S0092867416313162-mmc2.xlsx", sheet="Table S2B. Genes H3K27ac prom", skip=1)
-dg_genes = p_genes$Promoter_H3K27ac_Differentiation_gain; dg_genes = dg_genes[!is.na(dg_genes)]
-dl_genes = p_genes$Promoter_H3K27ac_Differentiation_loss; dl_genes = dl_genes[!is.na(dl_genes)]
-
-for_heatmap = assays(rld_novakovic)[[1]]
-colnames(for_heatmap) = paste(col_data_filt$treatment, col_data_filt$time, col_data_filt$donor, sep="_")
-match_ix = match(c(dg_genes,dl_genes), gene_list_all$hgnc_symbol); match_ix = match_ix[!is.na(match_ix)]
-for_heatmap = as.data.frame(for_heatmap[match_ix,])
-dim(for_heatmap)
-
-pheatmap(for_heatmap, cluster_rows=FALSE, show_rownames=FALSE)
-col_clust = hclust(dist(t(for_heatmap)))
-col_names = paste0("Group_", cutree(col_clust, k=2))
-names(for_heatmap) = paste(names(for_heatmap), col_names, sep="_")
-head(for_heatmap)
-for_heatmap$Gene = gene_list_all$hgnc_symbol[match_ix]
-for_heatmap$Cluster = factor(ifelse(for_heatmap$Gene %in% dg_genes, "Up", "Down"))
-head(for_heatmap)
-
-for_heatmap_long = gather(for_heatmap,"Group","AUC",1:24)
-for_heatmap_long$Group = factor(for_heatmap_long$Group)
-head(for_heatmap_long)
-for_heatmap_long$all_group = str_extract(for_heatmap_long$Group, "Group_[12]")
-ggplot(for_heatmap_long, aes(x=all_group,y=AUC)) + geom_boxplot() + facet_wrap(~Cluster) + theme_thesis(20)
-
-
-# DIFFERENTIAL PMA VS. BASELINE -------------------------------------------
-
-design(dds_cell_lines)
-dds_cell_lines = DESeq(dds_cell_lines)
-res_cell_lines = tbl_df(results(dds_cell_lines, contrast=c("condition","PMA","Baseline")))
-res_cell_lines$gene = rownames(res_cell_lines)
-res_cell_lines$symbol = gene_list_all$hgnc_symbol
-arrange(res_cell_lines, padj)
-
-
-# WHAT IS DRIVING PC1 DIFFERENCES? ----------------------------------------
-
-y = t(assays(rld_all)[[1]])
-dim(y)
-pca_res <- prcomp(y, scale=TRUE, center=TRUE)
-
-dat = data.frame(gene=gene_list_all$hgnc_symbol, loadings=pca_res$rotation[,1])
-ranks = deframe(dat)
-p = gmtPathways("tmp/c2.cp.v6.2.symbols.gmt")
-
-res <- fgsea(pathways=p, stats=ranks, nperm=1000)
-res_tidy = res %>% as_tibble() %>% arrange(desc(NES))
-res_tidy %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj) %>% DT::datatable()
-
-print(ggplot(filter(res_tidy, padj<0.03), aes(reorder(pathway, NES), NES)) + geom_col(aes(fill=padj<0.03)) + coord_flip() + labs(x="Pathway", y="Normalized Enrichment Score") + theme_thesis(10))
-
-# remove the first pc and project again?
-y_rev = pca_res$x[,-1] %*% t(pca_res$rotation[,-1])
-dim(y_rev)
-pca_and_plot(y_rev, annot_1=paste(rld_all$cell_type, rld_all$treatment, rld_all$time, sep="_"), annot_2=NA) # still orthogonal, easier to look gene-by-gene
 
