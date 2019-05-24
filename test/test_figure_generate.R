@@ -288,3 +288,51 @@ rld_all = vst(dds_all, blind=FALSE)
 
 save(rld_all, file="tmp/rld_all.RData")
 
+# CELL LINES RNA-SEQ ------------------------------------------------------
+
+# PICK SAMPLES ------------------------------------------------------------
+
+# mapping file between rna and chip
+mapping = read_excel("inst/extdata/rna/rna_chip_mapping.xlsx")
+
+# count data
+rna_counts = read_tsv("inst/extdata/rna/E-MTAB-5191.genes.raw.htseq2.tsv")
+rna_genes = rna_counts$`Gene ID`
+rna_counts = rna_counts[,-1]
+gene_ix = match(gene_list_all$ensembl_gene_id, rna_genes)
+gene_missing_ix = which(is.na(gene_ix))
+rna_counts = rna_counts[gene_ix[-gene_missing_ix],] # filter for the same genes as chip
+
+# meta data
+rna_meta = read_tsv("inst/extdata/rna/E-MTAB-5191.sdrf.txt")
+rna_labels = mapping$rna_label[match(colData(dds_cell_lines)$Label, mapping$chip_label)] # match the labels to the chip data
+meta_ix = match(rna_labels, rna_meta$`Source Name`) # find the meta row indexes
+count_ix = match(names(rna_counts), rna_meta$`Comment[ENA_RUN]`[meta_ix]) # find the count column indexes
+rna_counts = rna_counts[,count_ix] # reorder
+all(rna_meta$`Source Name`[match(names(rna_counts), rna_meta$`Comment[ENA_RUN]`)] == rna_labels) # sanity check
+
+
+# RUN DDS -----------------------------------------------------------------
+
+dds_cell_lines_rna = DESeqDataSetFromMatrix(countData=rna_counts, colData=dplyr::select(data.frame(colData(dds_cell_lines)), -sizeFactor), design=~cell_condition)
+
+dds_cell_lines_rna = DESeq(dds_cell_lines_rna)
+
+rld_cell_lines_rna = vst(dds_cell_lines_rna, blind=FALSE)
+
+save(dds_cell_lines_rna, file="tmp/dds_cell_lines_rna.RData")
+save(rld_cell_lines_rna, file="tmp/rld_cell_lines_rna.RData")
+
+
+# PLOT HEATMAP/PCA --------------------------------------------------------
+
+sampleDists <- dist(t(assay(rld_cell_lines_rna)))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) = paste(rld_cell_lines_rna$condition, rld_cell_lines_rna$rep, sep="_")
+colors <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+
+pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors, show_colnames=FALSE)
+
+pca_and_plot(rld_cell_lines_rna, annot_1=rld_cell_lines$condition, annot_2=rld_cell_lines$cell_line)
+
+

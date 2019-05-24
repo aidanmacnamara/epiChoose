@@ -14,6 +14,7 @@ require(gplots)
 require(reshape2)
 require(UpSetR)
 require(eulerr)
+require(fgsea)
 
 load("data/dat_all.RData")
 load("data/roi_reg.RData")
@@ -108,10 +109,10 @@ for(i in 1:length(trts)) {
   }
 }
 
+names(fc_res)[-1] = paste(rep(unlist(trts), each=2), c("fc","p"), sep="_")
 fc_res = tbl_df(fc_res)
 
 fc_res_long$gene = rep(gene_list_all$hgnc_symbol, length(unlist(trts)))
-names(fc_res)[-1] = paste(rep(unlist(trts), each=2), c("fc","p"), sep="_")
 fc_res_long$trmt = as.character(fc_res_long$trmt)
 fc_res_long = tbl_df(fc_res_long)
 
@@ -125,13 +126,18 @@ res_early_late = tbl_df(res_early_late) %>% filter(padj < 0.05, abs(log2FoldChan
 
 up_primary = filter(res_early_late, log2FoldChange>0) %>% select(gene) %>% unlist %>% as.character()
 down_primary = filter(res_early_late, log2FoldChange<0) %>% select(gene) %>% unlist %>% as.character()
-up_cell_line_t = filter(fc_res_long, p <= 0.05, fc >= 1, trmt=="THP-1_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
-down_cell_line_t = filter(fc_res_long, p <= 0.05, fc <= -1, trmt=="THP-1_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
-up_cell_line_u = filter(fc_res_long, p <= 0.05, fc >= 1, trmt=="U937_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
-down_cell_line_u = filter(fc_res_long, p <= 0.05, fc <= -1, trmt=="U937_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
+up_cell_line_t_pma = filter(fc_res_long, p <= 0.05, fc >= 1, trmt=="THP-1_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
+down_cell_line_t_pma = filter(fc_res_long, p <= 0.05, fc <= -1, trmt=="THP-1_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
+up_cell_line_u_pma = filter(fc_res_long, p <= 0.05, fc >= 1, trmt=="U937_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
+down_cell_line_u_pma = filter(fc_res_long, p <= 0.05, fc <= -1, trmt=="U937_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
+up_cell_line_t_vd3 = filter(fc_res_long, p <= 0.05, fc >= 1, trmt=="THP-1_VD3") %>% dplyr::select(gene) %>% unlist() %>% as.character()
+down_cell_line_t_vd3 = filter(fc_res_long, p <= 0.05, fc <= -1, trmt=="THP-1_VD3") %>% dplyr::select(gene) %>% unlist() %>% as.character()
+up_cell_line_u_vd3 = filter(fc_res_long, p <= 0.05, fc >= 1, trmt=="U937_VD3") %>% dplyr::select(gene) %>% unlist() %>% as.character()
+down_cell_line_u_vd3 = filter(fc_res_long, p <= 0.05, fc <= -1, trmt=="U937_VD3") %>% dplyr::select(gene) %>% unlist() %>% as.character()
+
 
 dyn_genes = unique(
-  c(up_primary,up_cell_line_t,up_cell_line_u,down_primary,down_cell_line_t,down_cell_line_u)
+  c(up_primary,up_cell_line_t_pma,up_cell_line_u_pma,down_primary,down_cell_line_t_pma,down_cell_line_u_pma,down_cell_line_t_vd3,down_cell_line_u_vd3,up_cell_line_t_vd3,up_cell_line_u_vd3)
 )
 
 
@@ -174,16 +180,20 @@ yyy = yy[row_ix, -row_ix]
 
 # TF ANALYSIS -------------------------------------------------------------
 
-fc_res_out = filter(fc_res, genes %in% dyn_genes) %>% dplyr::select(-grep("BG|LPS|VD3|glucan", names(.)))
-fc_res_out = cbind(fc_res_out, primary_down=0, primary_up=0, thp_down=0, thp_up=0, u937_down=0, u937_up=0)
+fc_res_out = filter(fc_res, genes %in% dyn_genes) %>% dplyr::select(-grep("BG|LPS|glucan", names(.)))
+fc_res_out = cbind(fc_res_out, primary_down=0, primary_up=0, thp_pma_down=0, thp_pma_up=0, u937_pma_down=0, u937_pma_up=0, thp_vd3_down=0, thp_vd3_up=0, u937_vd3_down=0, u937_vd3_up=0)
 fc_res_out$primary_down[fc_res_out$genes %in% down_primary] = 1
-fc_res_out$thp_down[fc_res_out$genes %in% down_cell_line_t] = 1
-fc_res_out$u937_down[fc_res_out$genes %in% down_cell_line_u] = 1
+fc_res_out$thp_pma_down[fc_res_out$genes %in% down_cell_line_t_pma] = 1
+fc_res_out$u937_pma_down[fc_res_out$genes %in% down_cell_line_u_pma] = 1
+fc_res_out$thp_vd3_down[fc_res_out$genes %in% down_cell_line_t_vd3] = 1
+fc_res_out$u937_vd3_down[fc_res_out$genes %in% down_cell_line_u_vd3] = 1
 fc_res_out$primary_up[fc_res_out$genes %in% up_primary] = 1
-fc_res_out$thp_up[fc_res_out$genes %in% up_cell_line_t] = 1
-fc_res_out$u937_up[fc_res_out$genes %in% up_cell_line_u] = 1
+fc_res_out$thp_pma_up[fc_res_out$genes %in% up_cell_line_t_pma] = 1
+fc_res_out$u937_pma_up[fc_res_out$genes %in% up_cell_line_u_pma] = 1
+fc_res_out$thp_vd3_up[fc_res_out$genes %in% up_cell_line_t_vd3] = 1
+fc_res_out$u937_vd3_up[fc_res_out$genes %in% up_cell_line_u_vd3] = 1
 
-plot(euler(fc_res_out[,14:19]), quantities=TRUE)
+plot(euler(fc_res_out[,18:27]), quantities=TRUE)
 
 # what is the enrichment for a condition, e.g. thp1 + pma
 conds = c("Primary", "THP-1", "U937")
@@ -432,3 +442,66 @@ res_tidy = res_gsea %>% as_tibble() %>% arrange(desc(NES))
 res_tidy %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj) %>% DT::datatable()
 
 
+# THP-1 VS PMA CHARACTERISATION -------------------------------------------
+
+my_p = gmtPathways("tmp/c2.cp.reactome.v6.2.symbols.gmt") # biological processes
+# my_p = gmtPathways("tmp/c5.bp.v6.2.symbols.gmt")
+
+my_contrasts = list(
+  c("THP-1_PMA","THP-1_Baseline"),
+  c("THP-1_VD3","THP-1_Baseline"),
+  c("U937_PMA","U937_Baseline"),
+  c("U937_VD3","U937_Baseline"),
+  c("THP-1_PMA","U937_PMA")
+)
+
+sig_pathways = vector("list", length(my_contrasts)*2)
+names(sig_pathways) = paste(c(rep("chip",length(my_contrasts)),rep("rna",length(my_contrasts))), unlist(lapply(my_contrasts, function(x) paste(x, collapse="_vs_"))), sep="_")
+sig_diff = sig_pathways
+sig_count = 1
+
+for(j in 1:2) {
+  
+  if(j==1) dds_to_use = dds_cell_lines
+  if(j==2) dds_to_use = dds_cell_lines_rna
+  
+  for(i in 1:length(my_contrasts)) {
+    
+    res = results(dds_to_use, contrast=c("cell_condition", my_contrasts[[i]]))
+    
+    if(j==1) res$gene = gene_list_all$hgnc_symbol
+    if(j==2) res$gene = gene_list_all$hgnc_symbol[-gene_missing_ix]
+    
+    res = tbl_df(res) %>% filter(padj < 0.05) %>% arrange(desc(log2FoldChange))
+    
+    gsea_in = res$log2FoldChange
+    names(gsea_in) = res$gene
+    res_gsea <- fgsea(pathways=my_p, stats=gsea_in, nperm=1000)
+    res_tidy = res_gsea %>% as_tibble() %>% arrange(desc(NES)) %>% filter(padj < 0.1)
+    res_tidy %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj) %>% DT::datatable()
+    
+    sig_pathways[[sig_count]] = res_tidy$pathway
+    if(j==1) sig_diff[[sig_count]] = filter(res, log2FoldChange>1) %>% select(gene) %>% unlist() %>% as.character()
+    if(j==2) sig_diff[[sig_count]] = filter(res, log2FoldChange>3) %>% select(gene) %>% unlist() %>% as.character()
+    sig_count = sig_count + 1
+  }
+}
+
+lapply(sig_pathways, length)
+lapply(sig_diff, length)
+
+
+# PLOT --------------------------------------------------------------------
+
+plot(euler(sig_pathways), quantities=TRUE)
+plot(euler(sig_diff), quantities=TRUE)
+
+my_dat_genes_all_tbl = as.data.frame.matrix((table(stack(sig_diff))))
+my_dat_genes_all_tbl = cbind(rownames(my_dat_genes_all_tbl), my_dat_genes_all_tbl)
+rownames(my_dat_genes_all_tbl) = NULL
+upset(my_dat_genes_all_tbl, order.by="freq", nsets=10)
+
+x_ix = which(colData(dds_cell_lines)$Label=="THP-1_BR1_Baseline")
+y_ix = which(colData(dds_cell_lines)$Label=="U937_BR1_VD3")
+
+data.frame(chip=assays(rld_cell_lines)[[1]][-gene_missing_ix,x_ix], rna=assays(rld_cell_lines_rna)[[1]][,y_ix]) %>% ggplot(aes(x=chip,y=rna)) + geom_point(size=0.5, alpha=0.2) + theme_thesis()

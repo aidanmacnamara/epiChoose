@@ -263,7 +263,7 @@ res$hgnc_symbol = gene_list_all$hgnc_symbol
 res = tbl_df(res)
 res_filt = filter(res, padj < 0.05, abs(log2FoldChange) > 1.2) %>% arrange(desc(abs(log2FoldChange)))
 
-#auc
+# auc
 
 # 1. start off with h3k27ac matrix
 dat_add = dat_all$tss$H3K27ac$res[grep("thp-1", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE),]
