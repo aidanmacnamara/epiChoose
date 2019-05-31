@@ -33,33 +33,56 @@ load("tmp/rld_primary.RData")
 load("tmp/rld_all.RData")
 
 
-# FUNCTIONS ---------------------------------------------------------------
+# GENE SETS ---------------------------------------------------------------
 
-pca_and_plot <- function(rld, annot_1, annot_2) {
+my_p = list(
+  go_bp = gmtPathways("tmp/c5.bp.v6.2.symbols.gmt"), # go biological processes,
+  reactome = gmtPathways("tmp/c2.cp.reactome.v6.2.symbols.gmt") # reactome
+)
+
+
+# BECKY'S COMPARISONS -----------------------------------------------------
+
+comps = c("late_vs_early_novakovic",
+          "late_vs_early_saeed",
+          "thp1_pma_vs_baseline",
+          "u937_pma_vs_baseline",
+          "thp1_vd3_vs_baseline",
+          "u937_vd3_vs_baseline"
+)
+my_res = vector("list", length(comps))
+names(my_res) = comps
+
+my_res$late_vs_early_novakovic = results(dds_novakovic, contrast=c("time_treatment","6days_Naive","1hr_Naive"))
+my_res$late_vs_early_saeed = results(dds_saeed, contrast=c("time_treatment","6days_Untreated","0days_Untreated"))
+my_res$thp1_pma_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","THP-1_PMA","THP-1_Baseline"))
+my_res$u937_pma_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","U937_PMA","U937_Baseline"))
+my_res$thp1_vd3_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","THP-1_VD3","THP-1_Baseline"))
+my_res$u937_vd3_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","U937_VD3","U937_Baseline"))
+
+for(i in 1:length(my_res)) {
+  my_res[[i]]$gene = gene_list_all$hgnc_symbol
+  my_res[[i]] = tbl_df(my_res[[i]]) %>% filter(padj < 0.05, log2FoldChange > 0) %>% arrange(desc(abs(log2FoldChange)))
+}
+
+plot(euler(lapply(my_res, function(x) x$gene)), quantities=TRUE)
+all_primary_genes = unique(unlist(lapply(my_res, function(x) x$gene)))
+data.frame(
+  saeed = my_res$late_vs_early_saeed$log2FoldChange[match(all_primary_genes, my_res$late_vs_early_saeed$gene)],
+  novakovic = my_res$late_vs_early_novakovic$log2FoldChange[match(all_primary_genes, my_res$late_vs_early_novakovic$gene)]
+) %>% ggplot(aes(saeed, novakovic)) + geom_point(size=0.5, alpha=0.5) + theme_thesis() + coord_cartesian(ylim=c(0,5), xlim=c(0,5))
+
+# enrichment
+
+my_enrichment = vector("list", length(comps))
+names(my_enrichment) = comps
+
+for(i in 1:length(comps)) {
   
-  if(class(rld)=="matrix") {
-    y = rld
-  } else {
-    y = t(assays(rld)[[1]])
-  }
-  
-  dim(y)
-  y = y[,!apply(y, 2, function(x) sd(x)==0)] # remove regions with no variance
-  dim(y)
-  
-  pca_res <- prcomp(y, scale=TRUE, center=TRUE)
-  pca_res_summary = summary(pca_res)
-  yy = data.frame(pca_res$x[,1:2])
-  names(yy) = c("x","y")
-  yy$annot_1 = annot_1
-  yy$annot_2 = annot_2
-  
-  if(is.na(annot_2)) {
-    my_plot = ggplot(yy, aes(x=x, y=y)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=5, force=0.5) + theme(legend.position="none")
-  } else {
-    my_plot = ggplot(yy, aes(x=x, y=y, color=annot_2)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=5, force=0.5) + theme(legend.position="none")
-  }
-  return(my_plot)
+  gsea_in = my_res[[i]]$log2FoldChange
+  names(gsea_in) = my_res[[i]]$gene
+  res_gsea <- lapply(my_p, function(x) fgsea(x, stats=gsea_in, nperm=1000))
+  my_enrichment[[i]] = lapply(res_gsea, function(x) x %>% as_tibble() %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(desc(padj)))
   
 }
 

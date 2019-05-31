@@ -288,6 +288,7 @@ rld_all = vst(dds_all, blind=FALSE)
 
 save(rld_all, file="tmp/rld_all.RData")
 
+
 # CELL LINES RNA-SEQ ------------------------------------------------------
 
 # PICK SAMPLES ------------------------------------------------------------
