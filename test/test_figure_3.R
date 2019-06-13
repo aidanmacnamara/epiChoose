@@ -16,21 +16,20 @@ require(UpSetR)
 require(eulerr)
 require(fgsea)
 
-load("data/dat_all.RData")
-load("data/roi_reg.RData")
-load("data/gene_list_all.RData")
+# load("data/dat_all.RData")
+# load("data/roi_reg.RData")
+load("data/roi_tss.RData")
 
 load("tmp/dds_cell_lines.RData")
 load("tmp/dds_saeed.RData")
 load("tmp/dds_novakovic.RData")
-load("tmp/dds_primary.RData")
+# load("tmp/dds_primary.RData")
 
-load("tmp/rld_cell_lines.RData")
-load("tmp/rld_saeed.RData")
-load("tmp/rld_novakovic.RData")
-load("tmp/rld_primary.RData")
-
-load("tmp/rld_all.RData")
+# load("tmp/rld_cell_lines.RData")
+# load("tmp/rld_saeed.RData")
+# load("tmp/rld_novakovic.RData")
+# load("tmp/rld_primary.RData")
+# load("tmp/rld_all.RData")
 
 
 # GENE SETS ---------------------------------------------------------------
@@ -60,31 +59,71 @@ my_res$u937_pma_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition
 my_res$thp1_vd3_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","THP-1_VD3","THP-1_Baseline"))
 my_res$u937_vd3_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","U937_VD3","U937_Baseline"))
 
+# or substitute in david's code here
+load("tmp/results.rda")
+my_res = results
+names(my_res) = c(
+  "",
+  "",
+  "",
+  "pma_vs_primary",
+  "vd3_vs_primary",
+  "",
+  ""
+  )
+
 for(i in 1:length(my_res)) {
-  my_res[[i]]$gene = gene_list_all$hgnc_symbol
+  my_res[[i]]$gene = roi_tss$hgnc_symbol
   my_res[[i]] = tbl_df(my_res[[i]]) %>% filter(padj < 0.05, log2FoldChange > 0) %>% arrange(desc(abs(log2FoldChange)))
 }
 
+lapply(my_res, dim)
 plot(euler(lapply(my_res, function(x) x$gene)), quantities=TRUE)
+
 all_primary_genes = unique(unlist(lapply(my_res, function(x) x$gene)))
 data.frame(
   saeed = my_res$late_vs_early_saeed$log2FoldChange[match(all_primary_genes, my_res$late_vs_early_saeed$gene)],
   novakovic = my_res$late_vs_early_novakovic$log2FoldChange[match(all_primary_genes, my_res$late_vs_early_novakovic$gene)]
 ) %>% ggplot(aes(saeed, novakovic)) + geom_point(size=0.5, alpha=0.5) + theme_thesis() + coord_cartesian(ylim=c(0,5), xlim=c(0,5))
 
+# construct intersect table
+
+all_diffs = lapply(my_res, function(x) unique(x$gene))
+all_diffs_tbl = as.data.frame.matrix((table(stack(all_diffs))))
+all_diffs_tbl = cbind(rownames(all_diffs_tbl), all_diffs_tbl)
+rownames(all_diffs_tbl) = NULL
+colnames(all_diffs_tbl)[1] = "gene"
+
+upset(all_diffs_tbl, order.by="freq", nsets=20, text.scale=1.5)
+y = get_intersect_members(all_diffs_tbl, c("late_vs_early_novakovic","late_vs_early_saeed","thp1_pma_vs_baseline"))
+dim(y)
+
+contrasts = list(
+  comp_1 = c("late_vs_early_novakovic","late_vs_early_saeed","thp1_pma_vs_baseline","u937_pma_vs_baseline"),
+  comp_2 = c("late_vs_early_novakovic","late_vs_early_saeed","thp1_pma_vs_baseline")
+)
+
+pull_gene_names <- function(x) {
+  res = get_intersect_members(all_diffs_tbl, x)
+  return(as.character(all_diffs_tbl[rownames(res),1]))
+}
+
+gene_sets = c(
+  lapply(my_res, function(x) x$gene),
+  lapply(contrasts, pull_gene_names)
+)
+
 # enrichment
 
-my_enrichment = vector("list", length(comps))
-names(my_enrichment) = comps
+dbs = tbl_df(listEnrichrDbs())
+dbs = c("GO_Biological_Process_2017","Reactome_2016")
 
-for(i in 1:length(comps)) {
-  
-  gsea_in = my_res[[i]]$log2FoldChange
-  names(gsea_in) = my_res[[i]]$gene
-  res_gsea <- lapply(my_p, function(x) fgsea(x, stats=gsea_in, nperm=1000))
-  my_enrichment[[i]] = lapply(res_gsea, function(x) x %>% as_tibble() %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(desc(padj)))
-  
+enrich_process <- function(x) {
+  res = enrichr(unique(x), dbs)
+  res = lapply(res, function(x) tbl_df(filter(x, `Adjusted.P.value` <= 0.05)))
 }
+
+enrich_res <- lapply(gene_sets, enrich_process)
 
 
 # GET FOLD CHANGES --------------------------------------------------------
@@ -164,41 +203,7 @@ dyn_genes = unique(
 )
 
 
-# HEATMAP -----------------------------------------------------------------
 
-# get the log-normalised signals
-y = assays(rld_all)[[1]]
-dim(y)
-
-# define indices
-gene_ix = match(dyn_genes, gene_list_all$hgnc_symbol)
-rownames(y) = gene_list_all$hgnc_symbol
-y = y[gene_ix,]
-dim(y)
-y = y[,!grepl("BG|LPS|glucan|broad", colnames(y), ignore.case=TRUE)]
-dim(y)
-
-# make annotation for heatmap
-annot_bar = data.frame(name=rownames(y), primary_down=0, primary_up=0, thp_down=0, thp_up=0, u937_down=0, u937_up=0)
-annot_bar$primary_down[annot_bar$name %in% down_primary] = 1
-annot_bar$thp_down[annot_bar$name %in% down_cell_line_t] = 1
-annot_bar$u937_down[annot_bar$name %in% down_cell_line_u] = 1
-annot_bar$primary_up[annot_bar$name %in% up_primary] = 1
-annot_bar$thp_up[annot_bar$name %in% up_cell_line_t] = 1
-annot_bar$u937_up[annot_bar$name %in% up_cell_line_u] = 1
-
-pheatmap(t(y), annotation_col=annot_bar, show_colnames=FALSE)
-
-# plot
-heatmaply(t(y), col=bluered(75), cexCol=0.5, col_side_colors=annot_bar)
-
-# correlation matrix
-yy = cor(y)
-heatmaply(yy, col=bluered(75))
-
-# look at primary data only
-row_ix = grep("SANQUIN|N000", rownames(yy))
-yyy = yy[row_ix, -row_ix]
 
 
 # TF ANALYSIS -------------------------------------------------------------
