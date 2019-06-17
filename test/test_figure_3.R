@@ -15,6 +15,7 @@ require(reshape2)
 require(UpSetR)
 require(eulerr)
 require(fgsea)
+require(enrichR)
 
 # load("data/dat_all.RData")
 # load("data/roi_reg.RData")
@@ -40,7 +41,35 @@ my_p = list(
 )
 
 
-# BECKY'S COMPARISONS -----------------------------------------------------
+# DAVID'S CONTRASTS -------------------------------------------------------
+
+load("tmp/results.rda")
+
+my_dir = data.frame(name=c(
+  "pma_vs_baseline",
+  "vd3_vs_baseline",
+  "thp1_vs_u937",
+  "u937_vs_thp1",
+  "pma_vs_primary",
+  "primary_vs_pma",
+  "vd3_vs_primary",
+  "primary_vs_vd3",
+  "pma_diff",
+  "vd3_diff"
+), up_down=c(1,1,1,-1,1,-1,1,-1,1,1), results_ix=c(1,2,3,3,4,4,5,5,6,7))
+
+my_res = vector("list", length(my_dir$name))
+names(my_res) = my_dir$name
+
+for(i in 1:length(my_res)) {
+  res = results[[my_dir$results_ix[i]]]
+  res$gene = roi_tss$hgnc_symbol
+  if(my_dir$up_down[i]==-1) res$log2FoldChange = res$log2FoldChange * -1
+  my_res[[i]] = tbl_df(res) %>% arrange(desc(log2FoldChange))
+}
+
+
+# MY CONTRASTS ------------------------------------------------------------
 
 comps = c("late_vs_early_novakovic",
           "late_vs_early_saeed",
@@ -52,55 +81,44 @@ comps = c("late_vs_early_novakovic",
 my_res = vector("list", length(comps))
 names(my_res) = comps
 
-my_res$late_vs_early_novakovic = results(dds_novakovic, contrast=c("time_treatment","6days_Naive","1hr_Naive"))
-my_res$late_vs_early_saeed = results(dds_saeed, contrast=c("time_treatment","6days_Untreated","0days_Untreated"))
-my_res$thp1_pma_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","THP-1_PMA","THP-1_Baseline"))
-my_res$u937_pma_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","U937_PMA","U937_Baseline"))
-my_res$thp1_vd3_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","THP-1_VD3","THP-1_Baseline"))
-my_res$u937_vd3_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","U937_VD3","U937_Baseline"))
-
-# or substitute in david's code here
-load("tmp/results.rda")
-my_res = results
-names(my_res) = c(
-  "",
-  "",
-  "",
-  "pma_vs_primary",
-  "vd3_vs_primary",
-  "",
-  ""
-  )
+my_res$late_vs_early_novakovic = results(dds_novakovic, contrast=c("time_treatment","6days_Naive","1hr_Naive"), independentFiltering=FALSE)
+my_res$late_vs_early_saeed = results(dds_saeed, contrast=c("time_treatment","6days_Untreated","0days_Untreated"), independentFiltering=FALSE)
+my_res$thp1_pma_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","THP-1_PMA","THP-1_Baseline"), independentFiltering=FALSE)
+my_res$u937_pma_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","U937_PMA","U937_Baseline"), independentFiltering=FALSE)
+my_res$thp1_vd3_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","THP-1_VD3","THP-1_Baseline"), independentFiltering=FALSE)
+my_res$u937_vd3_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","U937_VD3","U937_Baseline"), independentFiltering=FALSE)
 
 for(i in 1:length(my_res)) {
-  my_res[[i]]$gene = roi_tss$hgnc_symbol
-  my_res[[i]] = tbl_df(my_res[[i]]) %>% filter(padj < 0.05, log2FoldChange > 0) %>% arrange(desc(abs(log2FoldChange)))
+  res = my_res[[i]]
+  res$gene = roi_tss$hgnc_symbol
+  my_res[[i]] = tbl_df(res) %>% arrange(desc(log2FoldChange))
 }
 
-lapply(my_res, dim)
-plot(euler(lapply(my_res, function(x) x$gene)), quantities=TRUE)
 
-all_primary_genes = unique(unlist(lapply(my_res, function(x) x$gene)))
-data.frame(
-  saeed = my_res$late_vs_early_saeed$log2FoldChange[match(all_primary_genes, my_res$late_vs_early_saeed$gene)],
-  novakovic = my_res$late_vs_early_novakovic$log2FoldChange[match(all_primary_genes, my_res$late_vs_early_novakovic$gene)]
-) %>% ggplot(aes(saeed, novakovic)) + geom_point(size=0.5, alpha=0.5) + theme_thesis() + coord_cartesian(ylim=c(0,5), xlim=c(0,5))
+# FILTER ------------------------------------------------------------------
+
+my_res_filt = vector("list", length(my_res))
+names(my_res_filt) = names(my_res)
+
+for(i in 1:length(my_res_filt)) {
+  my_res_filt[[i]] = my_res[[i]] %>% filter(padj <= 0.05, log2FoldChange >= 1) %>% arrange(desc(log2FoldChange))
+}
+
+lapply(my_res_filt, dim)
+plot(euler(lapply(my_res_filt, function(x) x$gene)), quantities=TRUE)
 
 # construct intersect table
 
-all_diffs = lapply(my_res, function(x) unique(x$gene))
+all_diffs = lapply(my_res_filt, function(x) unique(x$gene))
 all_diffs_tbl = as.data.frame.matrix((table(stack(all_diffs))))
 all_diffs_tbl = cbind(rownames(all_diffs_tbl), all_diffs_tbl)
 rownames(all_diffs_tbl) = NULL
 colnames(all_diffs_tbl)[1] = "gene"
 
 upset(all_diffs_tbl, order.by="freq", nsets=20, text.scale=1.5)
-y = get_intersect_members(all_diffs_tbl, c("late_vs_early_novakovic","late_vs_early_saeed","thp1_pma_vs_baseline"))
-dim(y)
 
 contrasts = list(
-  comp_1 = c("late_vs_early_novakovic","late_vs_early_saeed","thp1_pma_vs_baseline","u937_pma_vs_baseline"),
-  comp_2 = c("late_vs_early_novakovic","late_vs_early_saeed","thp1_pma_vs_baseline")
+  comp_1 = c("late_vs_early_novakovic","late_vs_early_saeed","thp1_pma_vs_baseline")
 )
 
 pull_gene_names <- function(x) {
@@ -108,8 +126,11 @@ pull_gene_names <- function(x) {
   return(as.character(all_diffs_tbl[rownames(res),1]))
 }
 
+
+# ENRICHMENT --------------------------------------------------------------
+
 gene_sets = c(
-  lapply(my_res, function(x) x$gene),
+  lapply(my_res_filt, function(x) x$gene),
   lapply(contrasts, pull_gene_names)
 )
 
@@ -124,6 +145,20 @@ enrich_process <- function(x) {
 }
 
 enrich_res <- lapply(gene_sets, enrich_process)
+
+# gene set enrichment analysis
+
+gsea_res = vector("list", length(my_res))
+names(gsea_res) = names(my_res)
+
+for(i in 1:length(my_res)) {
+  
+  gsea_in = my_res_filt[[i]]$log2FoldChange
+  names(gsea_in) = my_res_filt[[i]]$gene
+  res_gsea <- lapply(my_p, function(x) fgsea(x, stats=gsea_in, nperm=1000))
+  gsea_res[[i]] = lapply(res_gsea, function(x) x %>% as_tibble() %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj))
+  
+}
 
 
 # GET FOLD CHANGES --------------------------------------------------------
