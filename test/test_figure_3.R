@@ -43,26 +43,33 @@ my_p = list(
 
 # DAVID'S CONTRASTS -------------------------------------------------------
 
-load("tmp/results.rda")
+load("tmp/results_b.rda")
+load("tmp/contrasts_b.rda")
 
 my_dir = data.frame(name=c(
+  "late_vs_early",
   "pma_vs_baseline",
   "vd3_vs_baseline",
   "thp1_vs_u937",
   "u937_vs_thp1",
   "pma_vs_primary",
-  "primary_vs_pma",
   "vd3_vs_primary",
-  "primary_vs_vd3",
   "pma_diff",
-  "vd3_diff"
-), up_down=c(1,1,1,-1,1,-1,1,-1,1,1), results_ix=c(1,2,3,3,4,4,5,5,6,7))
+  "vd3_diff",
+  "pma_vs_prime_thp1",
+  "prime_vs_pma_thp1",
+  "vd3_vs_prime_thp1",
+  "pma_vs_prime_u937",
+  "prime_vs_pma_u937",
+  "vd3_vs_prime_u937"
+), up_down=c(1,1,1,1,-1,1,1,1,1,1,-1,1,1,-1,1), results_ix=c(1:3,4,4,5:8,9,9,10,11,11,12)
+)
 
 my_res = vector("list", length(my_dir$name))
 names(my_res) = my_dir$name
 
 for(i in 1:length(my_res)) {
-  res = results[[my_dir$results_ix[i]]]
+  res = results_bundle$results[[my_dir$results_ix[i]]]
   res$gene = roi_tss$hgnc_symbol
   if(my_dir$up_down[i]==-1) res$log2FoldChange = res$log2FoldChange * -1
   my_res[[i]] = tbl_df(res) %>% arrange(desc(log2FoldChange))
@@ -99,12 +106,16 @@ for(i in 1:length(my_res)) {
 
 my_res_filt = vector("list", length(my_res))
 names(my_res_filt) = names(my_res)
+my_res_sig = my_res_filt
 
 for(i in 1:length(my_res_filt)) {
   my_res_filt[[i]] = my_res[[i]] %>% filter(padj <= 0.05, log2FoldChange >= 1) %>% arrange(desc(log2FoldChange))
+  my_res_sig[[i]] = my_res[[i]] %>% filter(padj <= 0.05) %>% arrange(desc(log2FoldChange))
 }
 
 lapply(my_res_filt, dim)
+lapply(my_res_sig, dim)
+
 plot(euler(lapply(my_res_filt, function(x) x$gene)), quantities=TRUE)
 
 # construct intersect table
@@ -117,9 +128,10 @@ colnames(all_diffs_tbl)[1] = "gene"
 
 upset(all_diffs_tbl, order.by="freq", nsets=20, text.scale=1.5)
 
-contrasts = list(
-  comp_1 = c("late_vs_early_novakovic","late_vs_early_saeed","thp1_pma_vs_baseline")
-)
+contrasts = list()
+# contrasts = list(
+#   comp_1 = c("late_vs_early_novakovic","late_vs_early_saeed","thp1_pma_vs_baseline")
+# )
 
 pull_gene_names <- function(x) {
   res = get_intersect_members(all_diffs_tbl, x)
@@ -153,8 +165,8 @@ names(gsea_res) = names(my_res)
 
 for(i in 1:length(my_res)) {
   
-  gsea_in = my_res_filt[[i]]$log2FoldChange
-  names(gsea_in) = my_res_filt[[i]]$gene
+  gsea_in = my_res_sig[[i]]$log2FoldChange
+  names(gsea_in) = my_res_sig[[i]]$gene
   res_gsea <- lapply(my_p, function(x) fgsea(x, stats=gsea_in, nperm=1000))
   gsea_res[[i]] = lapply(res_gsea, function(x) x %>% as_tibble() %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj))
   
@@ -214,61 +226,10 @@ fc_res_long$trmt = as.character(fc_res_long$trmt)
 fc_res_long = tbl_df(fc_res_long)
 
 
-# DYNAMIC REGIONS ---------------------------------------------------------
-
-# annotate with significant changes from monocytes to macrophages (late vs. early)
-res_early_late = results(dds_primary, contrast=c("group","late","early"))
-res_early_late$gene = gene_list_all$hgnc_symbol
-res_early_late = tbl_df(res_early_late) %>% filter(padj < 0.05, abs(log2FoldChange) > 1) %>% arrange(desc(abs(log2FoldChange)))
-
-up_primary = filter(res_early_late, log2FoldChange>0) %>% select(gene) %>% unlist %>% as.character()
-down_primary = filter(res_early_late, log2FoldChange<0) %>% select(gene) %>% unlist %>% as.character()
-up_cell_line_t_pma = filter(fc_res_long, p <= 0.05, fc >= 1, trmt=="THP-1_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
-down_cell_line_t_pma = filter(fc_res_long, p <= 0.05, fc <= -1, trmt=="THP-1_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
-up_cell_line_u_pma = filter(fc_res_long, p <= 0.05, fc >= 1, trmt=="U937_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
-down_cell_line_u_pma = filter(fc_res_long, p <= 0.05, fc <= -1, trmt=="U937_PMA") %>% dplyr::select(gene) %>% unlist() %>% as.character()
-up_cell_line_t_vd3 = filter(fc_res_long, p <= 0.05, fc >= 1, trmt=="THP-1_VD3") %>% dplyr::select(gene) %>% unlist() %>% as.character()
-down_cell_line_t_vd3 = filter(fc_res_long, p <= 0.05, fc <= -1, trmt=="THP-1_VD3") %>% dplyr::select(gene) %>% unlist() %>% as.character()
-up_cell_line_u_vd3 = filter(fc_res_long, p <= 0.05, fc >= 1, trmt=="U937_VD3") %>% dplyr::select(gene) %>% unlist() %>% as.character()
-down_cell_line_u_vd3 = filter(fc_res_long, p <= 0.05, fc <= -1, trmt=="U937_VD3") %>% dplyr::select(gene) %>% unlist() %>% as.character()
-
-
-dyn_genes = unique(
-  c(up_primary,up_cell_line_t_pma,up_cell_line_u_pma,down_primary,down_cell_line_t_pma,down_cell_line_u_pma,down_cell_line_t_vd3,down_cell_line_u_vd3,up_cell_line_t_vd3,up_cell_line_u_vd3)
-)
-
-
-
-
-
 # TF ANALYSIS -------------------------------------------------------------
 
-fc_res_out = filter(fc_res, genes %in% dyn_genes) %>% dplyr::select(-grep("BG|LPS|glucan", names(.)))
-fc_res_out = cbind(fc_res_out, primary_down=0, primary_up=0, thp_pma_down=0, thp_pma_up=0, u937_pma_down=0, u937_pma_up=0, thp_vd3_down=0, thp_vd3_up=0, u937_vd3_down=0, u937_vd3_up=0)
-fc_res_out$primary_down[fc_res_out$genes %in% down_primary] = 1
-fc_res_out$thp_pma_down[fc_res_out$genes %in% down_cell_line_t_pma] = 1
-fc_res_out$u937_pma_down[fc_res_out$genes %in% down_cell_line_u_pma] = 1
-fc_res_out$thp_vd3_down[fc_res_out$genes %in% down_cell_line_t_vd3] = 1
-fc_res_out$u937_vd3_down[fc_res_out$genes %in% down_cell_line_u_vd3] = 1
-fc_res_out$primary_up[fc_res_out$genes %in% up_primary] = 1
-fc_res_out$thp_pma_up[fc_res_out$genes %in% up_cell_line_t_pma] = 1
-fc_res_out$u937_pma_up[fc_res_out$genes %in% up_cell_line_u_pma] = 1
-fc_res_out$thp_vd3_up[fc_res_out$genes %in% up_cell_line_t_vd3] = 1
-fc_res_out$u937_vd3_up[fc_res_out$genes %in% up_cell_line_u_vd3] = 1
-
-plot(euler(fc_res_out[,18:27]), quantities=TRUE)
-
-# what is the enrichment for a condition, e.g. thp1 + pma
-conds = c("Primary", "THP-1", "U937")
-conds_list = vector("list", length(conds))
-names(conds_list) = conds
-
-tfs_list =  vector("list", length(conds))
-names(tfs_list) = conds
-
-conds_list$Primary = res_early_late %>% filter(padj <= 0.05, log2FoldChange >= 2) %>% dplyr::select(gene) %>% unlist() %>% as.character()
-conds_list$`THP-1` = fc_res_long %>% filter(trmt=="THP-1_PMA", fc >= 2, p <= 0.05) %>% dplyr::select(gene) %>% unlist() %>% as.character()
-conds_list$U937 = fc_res_long %>% filter(trmt=="U937_PMA", fc >= 2, p <= 0.05) %>% dplyr::select(gene) %>% unlist() %>% as.character()
+tfs_list =  vector("list", length(gene_sets))
+names(tfs_list) = names(gene_sets)
 
 # import motif-gene rankings
 # how is this ranking performed?
@@ -280,21 +241,21 @@ data(motifAnnotations_hgnc)
 
 # run enrichment
 # question: what motifs are enriched in each cluster?
-motif_enrichment <- cisTarget(conds_list, motif_rankings, motifAnnot=motifAnnotations_hgnc)
+motif_enrichment <- cisTarget(gene_sets, motif_rankings, motifAnnot=motifAnnotations_hgnc)
 
-for(j in 1:length(conds_list)) { # visualise
+for(j in 1:length(gene_sets)) { # visualise
   
   print(j)
   
   # get the significant motifs
   # can also apply motif-tf  mapping threshold here
-  sig_motifs = filter(motif_enrichment, geneSet==names(conds_list)[j], NES>=4)
+  sig_motifs = filter(motif_enrichment, geneSet==names(gene_sets)[j], NES>=4)
   
   if(dim(sig_motifs)[1]==0) next
   
   # get all interactions between significant tfs and regulated genes
   # this is also identifying the significant regulated genes
-  inc_mat = getSignificantGenes(conds_list[[j]], motif_rankings, signifRankingNames=sig_motifs$motif, plotCurve=FALSE, maxRank=5000-20, genesFormat="incidMatrix", method="aprox")$incidMatrix
+  inc_mat = getSignificantGenes(gene_sets[[j]], motif_rankings, signifRankingNames=sig_motifs$motif, plotCurve=FALSE, maxRank=5000-20, genesFormat="incidMatrix", method="aprox")$incidMatrix
   
   # collapse from motifs to tfs
   tfs = str_extract(sig_motifs$TF_highConf, "^[[:alnum:]]+")
@@ -311,7 +272,7 @@ for(j in 1:length(conds_list)) { # visualise
     t_ix = which(tfs==tfs_unique[i])
     tf_df$mean_nes[i] = mean(sig_motifs$NES[t_ix])
     tf_df$mean_auc[i] = mean(sig_motifs$AUC[t_ix])
-    tf_df$frac_binding_genes[i] = length(unique(unlist(sapply(sig_motifs$enrichedGenes[t_ix], function(x) str_split(x, ";"))))) / length(conds_list[[j]])
+    tf_df$frac_binding_genes[i] = length(unique(unlist(sapply(sig_motifs$enrichedGenes[t_ix], function(x) str_split(x, ";"))))) / length(gene_sets[[j]])
     
     if(length(t_ix) > 1) {
       to_add = apply(inc_mat[t_ix,], 2, function(x) round(sum(x)/length(x)))
@@ -322,7 +283,7 @@ for(j in 1:length(conds_list)) { # visualise
   }
   
   rownames(inc_mat_collapse) = tfs_unique
-  tf_df$frac_binding_genes[tf_df$tf=="All"] = sum(apply(inc_mat_collapse, 2, function(x) any(x==1))) / length(conds_list[[j]])
+  tf_df$frac_binding_genes[tf_df$tf=="All"] = sum(apply(inc_mat_collapse, 2, function(x) any(x==1))) / length(gene_sets[[j]])
   
   # construct network  
   edges = melt(as.matrix(inc_mat_collapse))
