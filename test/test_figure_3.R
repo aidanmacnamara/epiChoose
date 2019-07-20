@@ -43,37 +43,94 @@ my_p = list(
 
 # DAVID'S CONTRASTS -------------------------------------------------------
 
-load("tmp/results_b.rda")
-load("tmp/contrasts_b.rda")
+# devtools::install("../cProfile")
+require(cProfile)
+data("cProfileDemo")
 
-my_dir = data.frame(name=c(
-  "late_vs_early",
-  "pma_vs_baseline",
-  "vd3_vs_baseline",
-  "thp1_vs_u937",
-  "u937_vs_thp1",
-  "pma_vs_primary",
-  "vd3_vs_primary",
-  "pma_diff",
-  "vd3_diff",
-  "pma_vs_prime_thp1",
-  "prime_vs_pma_thp1",
-  "vd3_vs_prime_thp1",
-  "pma_vs_prime_u937",
-  "prime_vs_pma_u937",
-  "vd3_vs_prime_u937"
-), up_down=c(1,1,1,1,-1,1,1,1,1,1,-1,1,1,-1,1), results_ix=c(1:3,4,4,5:8,9,9,10,11,11,12)
+# test data - david's code example
+
+t(as.data.frame(results_bundle$descriptions))
+n = jointGeneOrdering(bundle=results_bundle, contrasts=c("c.pma.prime","c.vd3.prime"), n=1000, metric=min)
+a_pma = filterProfiles(recodeLevels(selectData("c.pma.prime"),"PMA"), results_bundle$results[["c.pma.prime"]], n=-n, average=T, trans=NULL)
+a_vd3 = filterProfiles(recodeLevels(selectData("c.vd3.prime"),"VD3"), results_bundle$results[["c.vd3.prime"]], n=-n, average=T, trans=NULL)
+a_1 = makeCrossCluster(U=list(pma=a_pma, vd3=a_vd3), nClusters=10, nstart=10)
+a_1$profiles %>% ggplot(aes(state, value, group=profile, colour=set)) + facet_grid(x~y) + geom_line(alpha=0.3) + labs(x="", y="") + theme_thesis(10) + scale_y_log10()
+b = joint_regulation_plot(a_1, contrasts=list(list(contrast="c.pma.prime",stimulus="PMA"), list(contrast="c.vd3.prime",stimulus="VD3")), onlyGeneSets=T, n_sets=5, theme_size=15)
+b$g_12
+
+# by far, the most interesting is thp-1 + pma vs. primary
+# set up this contrast
+
+# get the top genes
+n_genes = jointGeneOrdering(bundle=results_bundle, contrasts=c("c.THP1.pma.prime"), n=500, metric=min)
+
+# pull out the auc values
+auc_df_long = filterProfiles(recodeLevels(selectData("c.THP1.pma.prime"),"PMA"), results_bundle$results[["c.THP1.pma.prime"]], n=500, average=T, trans=NULL)
+
+# rehape the data for the clustering
+auc_df_wide = makeProfile(auc_df_long)
+
+# get clustering results and reshape again
+auc_clust = makeClusters(auc_df_wide)
+auc_clust = auc_clust$partition %>% gather(key="state",value="value", measurement=2:5)
+
+# plot clusters
+auc_clust %>% ggplot(aes(state, value, group=gene)) + facet_wrap(~cluster) + geom_line(alpha=0.3) + labs(x="", y="") + theme_thesis(10) + scale_y_log10()
+
+# look at the fold changes x-y
+
+auc_clust_wide = auc_clust %>% tidyr::spread(state, value)
+aes_1 = aes(change_cl, change_p, colour=factor(cluster))
+auc_clust_wide %>% mutate(change_cl=`post PMA`/`no PMA`, change_p=`primary 6`/`primary 0`, rel_change_cl=change_cl-change_p) %>% ggplot(aes_1) + geom_hline(yintercept=1, colour="gray") + geom_vline(xintercept=1, colour="gray") + geom_point(alpha=0.3) + scale_y_log10() + scale_x_log10() + labs(x="cell line stimulation [fold change]", y="primary activation [fold change]") + theme_thesis(15)
+
+# add expression data
+
+rna = dat_all$tss$RNA$res
+state_translate = list(
+  "no PMA" = c("THP-1_BR1_Baseline","THP-1_BR2_Baseline"),
+  "post PMA" = c("THP-1_BR1_PMA","THP-1_BR2_PMA"),
+  "primary 0" = c("SANQUIN_mono_38_monocyte - Attached_T=1hr","N00031319896021_monocyte - T=0days","N00031401639721_monocyte - T=0days","SANQUIN_mono_11_monocyte - Attached_T=1hr"),
+  "primary 6" = c("N00031401639721_macrophage - T=6days untreated","N00031319896021_macrophage - T=6days untreated","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days")
 )
 
-my_res = vector("list", length(my_dir$name))
-names(my_res) = my_dir$name
+auc_clust$rna_value = NA
 
-for(i in 1:length(my_res)) {
-  res = results_bundle$results[[my_dir$results_ix[i]]]
-  res$gene = roi_tss$hgnc_symbol
-  if(my_dir$up_down[i]==-1) res$log2FoldChange = res$log2FoldChange * -1
-  my_res[[i]] = tbl_df(res) %>% arrange(desc(log2FoldChange))
+for(i in 1:length(auc_clust$rna_value)) {
+  
+  print(i)
+  
+  my_samples = state_translate[[which(names(state_translate)==auc_clust$state[i])]]
+  auc_clust$rna_value[i] = mean(dat_all$tss$RNA$res[rownames(dat_all$tss$RNA$res) %in% my_samples,auc_clust$gene[i]])
+  
 }
+
+auc_clust %>% ggplot(aes(x=value, y=log(rna_value))) + geom_point(alpha=0.2, size=1) + labs(x="",y="") + theme_thesis(15)
+
+p_1 = auc_clust %>% dplyr::select(-rna_value) %>% spread(state, value) %>% mutate(change_cl=`post PMA`/`no PMA`, change_p=`primary 6`/`primary 0`, rel_change_cl=change_cl-change_p) %>% ggplot(aes_1) + geom_hline(yintercept=1, colour="gray") + geom_vline(xintercept=1, colour="gray") + geom_point(alpha=0.3) + scale_y_log10() + scale_x_log10() + labs(x="cell line stimulation [fold change]", y="primary activation [fold change]") + theme_thesis(15) + coord_flip()
+
+# aes_2 = aes(`no PMA`, `post PMA`, colour=factor(cluster))
+# auc_clust %>% dplyr::select(-value) %>% spread(state, rna_value) %>% mutate(change_cl=`post PMA`/`no PMA`) %>% ggplot(aes_2) + geom_hline(yintercept=1, colour="gray") + geom_vline(xintercept=1, colour="gray") + geom_point(alpha=0.3) + scale_y_log10() + scale_x_log10() + labs(x="Baseline", y="PMA") + theme_thesis(15)
+p_2 = auc_clust %>% dplyr::select(-value) %>% spread(state, rna_value) %>% mutate(change_cl=`post PMA`/`no PMA`, group=factor("THP-1")) %>% ggplot(aes(x=group, y=log(change_cl), colour=factor(cluster))) + geom_beeswarm(alpha=0.2, priority="density") + labs(x="", y="Fold Change") + theme_thesis(15)
+
+cowplot::plot_grid(p_1, p_2, ncol=2, nrow=1)
+
+# run enrichment
+
+gene_sets = list(
+  "green"=roi_tss$hgnc_symbol[auc_clust_wide$gene[auc_clust_wide$cluster==2]],
+  "other"=roi_tss$hgnc_symbol[auc_clust_wide$gene[auc_clust_wide$cluster!=2]]
+)
+
+dbs = tbl_df(listEnrichrDbs())
+dbs = c("GO_Biological_Process_2017","Reactome_2016")
+dbs = dbs$libraryName[grep("201[89]$", dbs$libraryName)]
+
+enrich_process <- function(x) {
+  res = enrichr(unique(x), dbs)
+  res = lapply(res, function(x) tbl_df(filter(x, `Adjusted.P.value` <= 0.05)))
+}
+
+enrich_res <- lapply(gene_sets, enrich_process)
 
 
 # MY CONTRASTS ------------------------------------------------------------
