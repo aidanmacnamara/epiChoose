@@ -55,7 +55,7 @@ a_pma = filterProfiles(recodeLevels(selectData("c.pma.prime"),"PMA"), results_bu
 a_vd3 = filterProfiles(recodeLevels(selectData("c.vd3.prime"),"VD3"), results_bundle$results[["c.vd3.prime"]], n=-n, average=T, trans=NULL)
 a_1 = makeCrossCluster(U=list(pma=a_pma, vd3=a_vd3), nClusters=10, nstart=10)
 a_1$profiles %>% ggplot(aes(state, value, group=profile, colour=set)) + facet_grid(x~y) + geom_line(alpha=0.3) + labs(x="", y="") + theme_thesis(10) + scale_y_log10()
-b = joint_regulation_plot(a_1, contrasts=list(list(contrast="c.pma.prime",stimulus="PMA"), list(contrast="c.vd3.prime",stimulus="VD3")), onlyGeneSets=T, n_sets=5, theme_size=15)
+b = joint_regulation_plot(cross_clustering=a_1, contrasts=list(list(contrast="c.pma.prime",stimulus="PMA"), list(contrast="c.vd3.prime",stimulus="VD3")), onlyGeneSets=T, n_sets=5, theme_size=15, bundle=results_bundle)
 b$g_12
 
 # by far, the most interesting is thp-1 + pma vs. primary
@@ -106,13 +106,15 @@ for(i in 1:length(auc_clust$rna_value)) {
 
 auc_clust %>% ggplot(aes(x=value, y=log(rna_value))) + geom_point(alpha=0.2, size=1) + labs(x="",y="") + theme_thesis(15)
 
-p_1 = auc_clust %>% dplyr::select(-rna_value) %>% spread(state, value) %>% mutate(change_cl=`post PMA`/`no PMA`, change_p=`primary 6`/`primary 0`, rel_change_cl=change_cl-change_p) %>% ggplot(aes_1) + geom_hline(yintercept=1, colour="gray") + geom_vline(xintercept=1, colour="gray") + geom_point(alpha=0.3) + scale_y_log10() + scale_x_log10() + labs(x="cell line stimulation [fold change]", y="primary activation [fold change]") + theme_thesis(15) + coord_flip()
+p_1 = auc_clust %>% dplyr::select(-rna_value) %>% spread(state, value) %>% mutate(change_cl=`post PMA`/`no PMA`, change_p=`primary 6`/`primary 0`, rel_change_cl=change_cl-change_p) %>% ggplot(aes_1) + geom_hline(yintercept=1, colour="gray") + geom_vline(xintercept=1, colour="gray") + geom_point(alpha=0.3) + scale_y_log10() + scale_x_log10() + labs(x="cell line stimulation [fold change]", y="primary activation [fold change]") + theme_thesis(25) + coord_flip()
 
 # aes_2 = aes(`no PMA`, `post PMA`, colour=factor(cluster))
 # auc_clust %>% dplyr::select(-value) %>% spread(state, rna_value) %>% mutate(change_cl=`post PMA`/`no PMA`) %>% ggplot(aes_2) + geom_hline(yintercept=1, colour="gray") + geom_vline(xintercept=1, colour="gray") + geom_point(alpha=0.3) + scale_y_log10() + scale_x_log10() + labs(x="Baseline", y="PMA") + theme_thesis(15)
-p_2 = auc_clust %>% dplyr::select(-value) %>% spread(state, rna_value) %>% mutate(change_cl=`post PMA`/`no PMA`, group=factor("THP-1")) %>% ggplot(aes(x=group, y=log(change_cl), colour=factor(cluster))) + geom_beeswarm(alpha=0.2, priority="density") + labs(x="", y="Fold Change") + theme_thesis(15)
+p_2 = auc_clust %>% dplyr::select(-value) %>% spread(state, rna_value) %>% mutate(change_cl=`post PMA`/`no PMA`, group=factor("THP-1")) %>% ggplot(aes(x=group, y=log(change_cl), colour=factor(cluster))) + geom_beeswarm(alpha=0.2, priority="density") + labs(x="", y="Fold Change") + theme_thesis(25)
 
+png("out.png", height=500, width=1000)
 cowplot::plot_grid(p_1, p_2, ncol=2, nrow=1)
+dev.off()
 
 # run enrichment
 
@@ -173,7 +175,7 @@ for(i in 1:length(my_res_filt)) {
 lapply(my_res_filt, dim)
 lapply(my_res_sig, dim)
 
-plot(euler(lapply(my_res_filt, function(x) x$gene)), quantities=TRUE)
+plot(euler(lapply(my_res_filt, function(x) x$gene)), quantities=TRUE) # for paper
 
 # construct intersect table
 
@@ -281,6 +283,58 @@ fc_res = tbl_df(fc_res)
 fc_res_long$gene = rep(gene_list_all$hgnc_symbol, length(unlist(trts)))
 fc_res_long$trmt = as.character(fc_res_long$trmt)
 fc_res_long = tbl_df(fc_res_long)
+
+
+# PILE-UP PLOT ------------------------------------------------------------
+
+# get gene list (definition of dynamic genes)
+# define window
+# pull in signal
+
+files = as.list(c(
+  "~/Downloads/THP1_H3K27ac_ChIP-Seq_P2MonocyteMacrophage89_H3K27ac_P2MonocyteMacrophage89_bwa_samse_BR2TR1_edited.bw",
+  "~/Downloads/THP1_PL_H3K27ac_ChIP-Seq_P2MonocyteMacrophage89_H3K27ac_P2MonocyteMacrophage89_bwa_samse_BR1TR1_edited.bw"
+))
+
+gene_list = roi_tss[roi_tss$hgnc_symbol %in% head(my_res_filt$thp1_pma_vs_baseline$gene, 100)]
+sample_names = c("A","B")
+n_tiles = 21
+
+y = lapply(files, function(x) rtracklayer::import(con=x, which=gene_list))
+names(y) = sample_names
+
+# tile each gene
+gene_list_tiled = tile(gene_list, n=n_tiles)
+
+for(i in 1:length(gene_list_tiled)) {
+  gene_list_tiled[[i]]$gene = gene_list$hgnc_symbol[i]
+}
+gene_list_tiled = unlist(gene_list_tiled)
+mcol_ix = 2
+
+for(j in 1:length(y)) {
+  ols = findOverlaps(gene_list_tiled, y[[j]])
+  binned_score = rep(NA, length(gene_list_tiled))
+  for(k in 1:length(binned_score)) {
+    binned_score[k] = mean(y[[j]]$score[subjectHits(ols)[queryHits(ols)==k]], na.rm=TRUE)
+  }
+  binned_score[is.nan(binned_score)] = 0
+  mcols(gene_list_tiled)[,mcol_ix] = binned_score
+  names(mcols(gene_list_tiled))[mcol_ix] = sample_names[j]
+  mcol_ix = mcol_ix+1
+}
+
+round_up <- function(x, to=10) {
+  to*(x %/% to + as.logical(x%%to))
+}
+tile_size = round_up((width(gene_list[1])/n_tiles), to=100)
+coord_labels = c(paste0("-", tile_size*1:((n_tiles-1)/2)),"TSS",paste0("+", tile_size*1:((n_tiles-1)/2)))
+gene_list_tiled$coord_ix = rep(1:n_tiles, length(gene_list))
+
+gene_list_df = tbl_df(as.data.frame(gene_list_tiled))
+gene_list_df = gene_list_df %>% gather("sample","score",7:8)
+
+gene_list_df %>% ggplot(aes(coord_ix, gene)) + geom_tile(aes(fill=score)) + facet_wrap(~sample) + theme_thesis(10) + coord_cartesian(xlim=c(2,20)) + xlab("") + ylab("Gene") + scale_fill_gradient(low="white",high="red") + scale_x_continuous(breaks=1:n_tiles, labels=coord_labels)
 
 
 # TF ANALYSIS -------------------------------------------------------------

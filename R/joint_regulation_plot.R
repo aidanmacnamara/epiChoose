@@ -19,9 +19,9 @@ joint_regulation_plot <- function(cross_clustering, contrasts=list(list(contrast
   gene_sets = lapply(split(temp, temp$cluster), function(x) (as.numeric(x$gene)))
   n = as.integer(cross_clustering$n)
   
-  g_1 = regulationPlot(contrast=contrasts[[1]]$contrast, stimulus=contrasts[[1]]$stimulus, onlyGeneSets=onlyGeneSets, n=-n, geneSets=gene_sets, bundle=bundle) + labs(title=paste(contrasts[[1]]$contrast, contrasts[[1]]$stimulus, sep="; ")) + theme_thesis(theme_size)
+  g_1 = regulationPlot(contrast=contrasts[[1]]$contrast, stimulus=contrasts[[1]]$stimulus, onlyGeneSets=onlyGeneSets, n=-n, geneSets=gene_sets, bundle=bundle) + theme_thesis(theme_size)
   
-  g_2 = regulationPlot(contrast=contrasts[[2]]$contrast, stimulus=contrasts[[2]]$stimulus, onlyGeneSets=onlyGeneSets, n=-n, geneSets=gene_sets, bundle=bundle) + labs(title=paste(contrasts[[2]]$contrast, contrasts[[2]]$stimulus, sep="; ")) + theme_thesis(theme_size)
+  g_2 = regulationPlot(contrast=contrasts[[2]]$contrast, stimulus=contrasts[[2]]$stimulus, onlyGeneSets=onlyGeneSets, n=-n, geneSets=gene_sets, bundle=bundle) + theme_thesis(theme_size)
   
   g_12 = cowplot::plot_grid(g_1, g_2, ncol=2, nrow=1)
   list(geneSets=gene_sets, g_1=g_1, g_2=g_2, g_12=g_12)
