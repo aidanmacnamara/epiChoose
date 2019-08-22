@@ -168,8 +168,8 @@ names(my_res_filt) = names(my_res)
 my_res_sig = my_res_filt
 
 for(i in 1:length(my_res_filt)) {
-  my_res_filt[[i]] = my_res[[i]] %>% filter(padj <= 0.05, log2FoldChange >= 1) %>% arrange(desc(log2FoldChange))
-  my_res_sig[[i]] = my_res[[i]] %>% filter(padj <= 0.05) %>% arrange(desc(log2FoldChange))
+  my_res_filt[[i]] = my_res[[i]] %>% filter(padj <= 0.05, abs(log2FoldChange) >= 2) %>% arrange(desc(abs(log2FoldChange)))
+  my_res_sig[[i]] = my_res[[i]] %>% filter(padj <= 0.05) %>% arrange(desc(abs(log2FoldChange)))
 }
 
 lapply(my_res_filt, dim)
@@ -246,7 +246,7 @@ trts = list(
   )
 )
 
-fc_res = data.frame(genes=gene_list_all$hgnc_symbol)
+fc_res = data.frame(genes=roi_tss$hgnc_symbol)
 fc_res_long = data.frame(trmt=NULL, fc=NULL, p=NULL, group=NULL)
 
 for(i in 1:length(trts)) {
@@ -280,7 +280,7 @@ for(i in 1:length(trts)) {
 names(fc_res)[-1] = paste(rep(unlist(trts), each=2), c("fc","p"), sep="_")
 fc_res = tbl_df(fc_res)
 
-fc_res_long$gene = rep(gene_list_all$hgnc_symbol, length(unlist(trts)))
+fc_res_long$gene = rep(roi_tss$hgnc_symbol, length(unlist(trts)))
 fc_res_long$trmt = as.character(fc_res_long$trmt)
 fc_res_long = tbl_df(fc_res_long)
 
@@ -291,50 +291,87 @@ fc_res_long = tbl_df(fc_res_long)
 # define window
 # pull in signal
 
-files = as.list(c(
-  "~/Downloads/THP1_H3K27ac_ChIP-Seq_P2MonocyteMacrophage89_H3K27ac_P2MonocyteMacrophage89_bwa_samse_BR2TR1_edited.bw",
-  "~/Downloads/THP1_PL_H3K27ac_ChIP-Seq_P2MonocyteMacrophage89_H3K27ac_P2MonocyteMacrophage89_bwa_samse_BR1TR1_edited.bw"
-))
-
-gene_list = roi_tss[roi_tss$hgnc_symbol %in% head(my_res_filt$thp1_pma_vs_baseline$gene, 100)]
-sample_names = c("A","B")
-n_tiles = 21
-
-y = lapply(files, function(x) rtracklayer::import(con=x, which=gene_list))
-names(y) = sample_names
-
-# tile each gene
-gene_list_tiled = tile(gene_list, n=n_tiles)
-
-for(i in 1:length(gene_list_tiled)) {
-  gene_list_tiled[[i]]$gene = gene_list$hgnc_symbol[i]
-}
-gene_list_tiled = unlist(gene_list_tiled)
-mcol_ix = 2
-
-for(j in 1:length(y)) {
-  ols = findOverlaps(gene_list_tiled, y[[j]])
-  binned_score = rep(NA, length(gene_list_tiled))
-  for(k in 1:length(binned_score)) {
-    binned_score[k] = mean(y[[j]]$score[subjectHits(ols)[queryHits(ols)==k]], na.rm=TRUE)
-  }
-  binned_score[is.nan(binned_score)] = 0
-  mcols(gene_list_tiled)[,mcol_ix] = binned_score
-  names(mcols(gene_list_tiled))[mcol_ix] = sample_names[j]
-  mcol_ix = mcol_ix+1
-}
-
 round_up <- function(x, to=10) {
   to*(x %/% to + as.logical(x%%to))
 }
-tile_size = round_up((width(gene_list[1])/n_tiles), to=100)
-coord_labels = c(paste0("-", tile_size*1:((n_tiles-1)/2)),"TSS",paste0("+", tile_size*1:((n_tiles-1)/2)))
-gene_list_tiled$coord_ix = rep(1:n_tiles, length(gene_list))
 
-gene_list_df = tbl_df(as.data.frame(gene_list_tiled))
-gene_list_df = gene_list_df %>% gather("sample","score",7:8)
+comps = list(
+  comp_1 = list(
+    sample_comps = c("THP-1_PMA","6days_Naive"),
+    sample_names = c("THP-1_BR1_PMA","THP-1_BR2_PMA","THP-1_BR1_Baseline","THP-1_BR1_Baseline","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
+    sample_labels = c("THP-1 PMA (Rep 1)","THP-1 PMA (Rep 2)","THP-1 Baseline (Rep 1)","THP-1 Baseline (Rep 2)","Novakovic Macrophage (Donor 1)","Novakovic Macrophage (Donor 2)","Novakovic Monocyte (Donor 3)","Novakovic Monocyte (Donor 2)")
+  ),
+  comp_2 = list(
+    sample_comps = c("6days_Untreated","6days_Naive"),
+    sample_names = c("SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr","N00031319896021_macrophage - T=6days untreated","N00031401639721_macrophage - T=6days untreated","N00031319896021_monocyte - T=0days","N00031401639721_monocyte - T=0days"),
+    sample_labels = c("Novakovic Macrophage (Donor 1)","Novakovic Macrophage (Donor 2)","Novakovic Monocyte (Donor 3)","Novakovic Monocyte (Donor 2)","Saeed Macrophage (Donor 1)","Saeed Macrophage (Donor 2)","Saeed Monocyte (Donor 1)","Saeed Monocyte (Donor 2)")
+  )
+)
 
-gene_list_df %>% ggplot(aes(coord_ix, gene)) + geom_tile(aes(fill=score)) + facet_wrap(~sample) + theme_thesis(10) + coord_cartesian(xlim=c(2,20)) + xlab("") + ylab("Gene") + scale_fill_gradient(low="white",high="red") + scale_x_continuous(breaks=1:n_tiles, labels=coord_labels)
+for(i in 1:length(comps)) {
+  
+  # get the bigwig files
+  files = dat_all$tss$H3K27ac$annot$Bigwig[match(comps[[i]]$sample_names, dat_all$tss$H3K27ac$annot$Label)]
+  files = str_replace(files, "/GWD/bioinfo/projects/", "/Volumes/am673712/links/")
+  
+  # define dynamic genes for comparisons
+  dynamic_genes = vector("list",length(comps[[i]]$sample_comps))
+  names(dynamic_genes) = comps[[i]]$sample_comps
+  
+  for(j in 1:length(comps[[i]]$sample_comps)) {
+    dynamic_genes[[j]] = fc_res_long %>% filter(fc>2, trmt==comps[[i]]$sample_comps[j]) %>% dplyr::select(gene) %>% unlist() %>% as.character()
+  }
+  
+  plot(euler(dynamic_genes), quantities=TRUE)
+  
+  gene_tbl = as.data.frame.matrix((table(stack(dynamic_genes))))
+  gene_tbl$gene = rownames(gene_tbl); gene_tbl = tbl_df(gene_tbl)
+  gene_tbl_long = gene_tbl %>% gather("sample","deregulated",1:2)
+  dynamic_genes = unique(unlist(dynamic_genes))
+  
+  gene_list = roi_tss[match(dynamic_genes,roi_tss$hgnc_symbol)]
+  
+  n_tiles = 21
+  
+  y = bplapply(1:length(files), function(x) rtracklayer::import(con=files[x], which=gene_list))
+  names(y) = comps[[i]]$sample_names
+  
+  # tile each gene
+  gene_list_tiled = tile(gene_list, n=n_tiles)
+  
+  for(j in 1:length(gene_list_tiled)) {
+    gene_list_tiled[[j]]$gene = gene_list$hgnc_symbol[j]
+  }
+  gene_list_tiled = unlist(gene_list_tiled)
+  mcol_ix = 2
+  
+  for(j in 1:length(y)) {
+    ols = findOverlaps(gene_list_tiled, y[[j]])
+    binned_score = rep(NA, length(gene_list_tiled))
+    for(k in 1:length(binned_score)) {
+      binned_score[k] = mean(y[[j]]$score[subjectHits(ols)[queryHits(ols)==k]], na.rm=TRUE)
+    }
+    binned_score[is.nan(binned_score)] = 0
+    mcols(gene_list_tiled)[,mcol_ix] = binned_score
+    names(mcols(gene_list_tiled))[mcol_ix] = comps[[i]]$sample_names[j]
+    mcol_ix = mcol_ix+1
+  }
+  
+  tile_size = round_up((width(gene_list[1])/n_tiles), to=100)
+  coord_labels = c(paste0("-", tile_size*1:((n_tiles-1)/2)),"TSS",paste0("+", tile_size*1:((n_tiles-1)/2)))
+  gene_list_tiled$coord_ix = rep(1:n_tiles, length(gene_list))
+  
+  gene_list_df = tbl_df(as.data.frame(gene_list_tiled))
+  names(gene_list_df)[7:(dim(gene_list_df)[2]-1)] = comps[[i]]$sample_labels
+  gene_list_df_long = gene_list_df %>% gather("sample","score",7:(dim(gene_list_df)[2]-1))
+  
+  pdf(paste0("~/Downloads/pile_up_",i,".pdf"), height=10, width=20)
+  p_1 = gene_list_df_long %>% ggplot(aes(coord_ix, factor(gene, levels=rev(unique(dynamic_genes))))) + geom_tile(aes(fill=score)) + facet_wrap(~sample, ncol=length(comps[[i]]$sample_names)) + theme_thesis(8) + coord_cartesian(xlim=c(2,20)) + xlab("") + scale_fill_gradient(low="white",high="red") + scale_x_continuous(breaks=1:n_tiles, labels=coord_labels) + theme(axis.text.y=element_blank(), axis.title.y=element_blank(), axis.ticks.y=element_blank())
+  p_2 = ggplot(gene_tbl_long, aes(x=sample, y=factor(gene, levels=rev(unique(dynamic_genes))))) + geom_tile(aes(fill=factor(deregulated))) + theme_thesis(8) + theme(axis.text.y=element_blank(), axis.title.y=element_blank(), axis.ticks.y=element_blank()) + coord_cartesian(xlim=c(1.1, dim(gene_tbl)[2]-1.1))
+  plot_grid(p_1, p_2, align="h", rel_widths=c(4,1))
+  dev.off()
+  
+}
 
 
 # TF ANALYSIS -------------------------------------------------------------
