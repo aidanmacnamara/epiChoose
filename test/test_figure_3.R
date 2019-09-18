@@ -305,6 +305,9 @@ comps = list(
     sample_comps = c("6days_Untreated","6days_Naive"),
     sample_names = c("SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr","N00031319896021_macrophage - T=6days untreated","N00031401639721_macrophage - T=6days untreated","N00031319896021_monocyte - T=0days","N00031401639721_monocyte - T=0days"),
     sample_labels = c("Novakovic Macrophage (Donor 1)","Novakovic Macrophage (Donor 2)","Novakovic Monocyte (Donor 3)","Novakovic Monocyte (Donor 2)","Saeed Macrophage (Donor 1)","Saeed Macrophage (Donor 2)","Saeed Monocyte (Donor 1)","Saeed Monocyte (Donor 2)")
+  ),
+  comp_3 = list(
+    
   )
 )
 
