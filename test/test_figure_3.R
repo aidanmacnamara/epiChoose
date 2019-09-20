@@ -290,28 +290,44 @@ fc_res_long = tbl_df(fc_res_long)
 # get gene list (definition of dynamic genes)
 # define window
 # pull in signal
+# sample comps comes from fc_res_long
 
 round_up <- function(x, to=10) {
   to*(x %/% to + as.logical(x%%to))
 }
 
 comps = list(
-  comp_1 = list(
+  comp_1 = list( # thp-1 vs. primary
     sample_comps = c("THP-1_PMA","6days_Naive"),
-    sample_names = c("THP-1_BR1_PMA","THP-1_BR2_PMA","THP-1_BR1_Baseline","THP-1_BR1_Baseline","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
+    sample_names = c("THP-1_BR1_PMA","THP-1_BR2_PMA","THP-1_BR1_Baseline","THP-1_BR2_Baseline","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
     sample_labels = c("THP-1 PMA (Rep 1)","THP-1 PMA (Rep 2)","THP-1 Baseline (Rep 1)","THP-1 Baseline (Rep 2)","Novakovic Macrophage (Donor 1)","Novakovic Macrophage (Donor 2)","Novakovic Monocyte (Donor 3)","Novakovic Monocyte (Donor 2)")
   ),
-  comp_2 = list(
+  comp_2 = list( # primary comp
     sample_comps = c("6days_Untreated","6days_Naive"),
     sample_names = c("SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr","N00031319896021_macrophage - T=6days untreated","N00031401639721_macrophage - T=6days untreated","N00031319896021_monocyte - T=0days","N00031401639721_monocyte - T=0days"),
     sample_labels = c("Novakovic Macrophage (Donor 1)","Novakovic Macrophage (Donor 2)","Novakovic Monocyte (Donor 3)","Novakovic Monocyte (Donor 2)","Saeed Macrophage (Donor 1)","Saeed Macrophage (Donor 2)","Saeed Monocyte (Donor 1)","Saeed Monocyte (Donor 2)")
   ),
-  comp_3 = list(
-    
+  comp_3 = list( # lps
+    sample_comps = c("THP-1_LPS","THP-1_PMA+LPS","4hrs_LPS","24hrs_LPS","5days_LPS"),
+    sample_names = c("THP-1_BR1_Baseline","THP-1_BR2_Baseline","THP-1_BR1_LPS","THP-1_BR2_LPS","THP-1_BR1_PMA+LPS","THP-1_BR2_PMA+LPS","SANQUIN_mono_11_monocyte - RPMI_LPS_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_LPS_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_LPS_T=4hrs","SANQUIN_mono_38_monocyte - RPMI_LPS_T=24hrs_RPMI_T=5days","SANQUIN_mono_61_monocyte - RPMI_LPS_T=24hrs_RPMI_T=5days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
+    sample_labels = c("THP-1 Baseline (Rep 1)","THP-1 Baseline (Rep 2)","THP-1 LPS (Rep 1)","THP-1 LPS (Rep 2)","THP-1 PMA + LPS (Rep 1)","THP-1 PMA + LPS (Rep 2)","Novakovic 24hrs LPS (Donor 1)","Novakovic 24hrs LPS (Donor 2)","Novakovic 4hrs LPS (Donor 2)","Novakovic 5 days LPS (Donor 3)","Novakovic 5 days LPS (Donor 4)","Novakovic 0 days LPS (Donor 1)","Novakovic 0 days LPS (Donor 3)")
+  ),
+  comp_4 = list( # primary time-course
+    sample_comps = c("4hrs_Naive","24hrs_Naive","6days_Naive"),
+    sample_names = c("SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr","SANQUIN_mono_11_monocyte - RPMI_T=4hrs","SANQUIN_mono_36_monocyte - RPMI_T=4hrs","SANQUIN_mono_11_monocyte - RPMI_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_T=24hrs","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days"),
+    sample_labels = c("Novakovic 0 days (Donor 1)","Novakovic 0 days (Donor 2)","Novakovic 4hrs (Donor 1)","Novakovic 4hrs (Donor 3)","Novakovic 24hrs (Donor 1)","Novakovic 24hrs (Donor 3)","Novakovic 6 days (Donor 2)","Novakovic 6 days (Donor 4)")
   )
 )
 
-for(i in 1:length(comps)) {
+# store the results of all the comparisons in these objects
+total_signal = data.frame()
+total_diff = data.frame()
+total_gene_orders = vector("list", length(comps))
+names(total_gene_orders) = names(comps)
+
+for(i in 2:length(comps)) {
+  
+  print(paste("Comparison", i))
   
   # get the bigwig files
   files = dat_all$tss$H3K27ac$annot$Bigwig[match(comps[[i]]$sample_names, dat_all$tss$H3K27ac$annot$Label)]
@@ -321,18 +337,29 @@ for(i in 1:length(comps)) {
   dynamic_genes = vector("list",length(comps[[i]]$sample_comps))
   names(dynamic_genes) = comps[[i]]$sample_comps
   
+  # get any genes with fc > 2 across all the comparisons for each plot
   for(j in 1:length(comps[[i]]$sample_comps)) {
     dynamic_genes[[j]] = fc_res_long %>% filter(fc>2, trmt==comps[[i]]$sample_comps[j]) %>% dplyr::select(gene) %>% unlist() %>% as.character()
   }
   
   plot(euler(dynamic_genes), quantities=TRUE)
   
+  # get these genes into long format 'gene_tbl_long'
   gene_tbl = as.data.frame.matrix((table(stack(dynamic_genes))))
   gene_tbl$gene = rownames(gene_tbl); gene_tbl = tbl_df(gene_tbl)
-  gene_tbl_long = gene_tbl %>% gather("sample","deregulated",1:2)
-  dynamic_genes = unique(unlist(dynamic_genes))
+  gene_tbl_long = gene_tbl %>% gather("sample","deregulated",1:length(comps[[i]]$sample_comps))
+  gene_tbl_long$comp = names(comps)[i]
   
+  # match genes to granges total genome (roi_tss)
+  dynamic_genes = unique(unlist(dynamic_genes))
   gene_list = roi_tss[match(dynamic_genes,roi_tss$hgnc_symbol)]
+  
+  # increase the window
+  start(gene_list) = start(gene_list) - 1e4
+  end(gene_list) = end(gene_list) + 1e4
+  
+  # also store the list of genes for plot levels
+  total_gene_orders[[i]] = dynamic_genes
   
   n_tiles = 21
   
@@ -349,6 +376,9 @@ for(i in 1:length(comps)) {
   mcol_ix = 2
   
   for(j in 1:length(y)) {
+    
+    print(paste("sample:", j))
+    
     ols = findOverlaps(gene_list_tiled, y[[j]])
     binned_score = rep(NA, length(gene_list_tiled))
     for(k in 1:length(binned_score)) {
@@ -361,21 +391,26 @@ for(i in 1:length(comps)) {
   }
   
   tile_size = round_up((width(gene_list[1])/n_tiles), to=100)
-  coord_labels = c(paste0("-", tile_size*1:((n_tiles-1)/2)),"TSS",paste0("+", tile_size*1:((n_tiles-1)/2)))
+  coord_labels = c(paste0("-", rev(tile_size*1:((n_tiles-1)/2))),"TSS",paste0("+", tile_size*1:((n_tiles-1)/2)))
   gene_list_tiled$coord_ix = rep(1:n_tiles, length(gene_list))
   
   gene_list_df = tbl_df(as.data.frame(gene_list_tiled))
   names(gene_list_df)[7:(dim(gene_list_df)[2]-1)] = comps[[i]]$sample_labels
   gene_list_df_long = gene_list_df %>% gather("sample","score",7:(dim(gene_list_df)[2]-1))
+  gene_list_df_long$comp = names(comps)[i]
   
-  pdf(paste0("~/Downloads/pile_up_",i,".pdf"), height=10, width=20)
-  p_1 = gene_list_df_long %>% ggplot(aes(coord_ix, factor(gene, levels=rev(unique(dynamic_genes))))) + geom_tile(aes(fill=score)) + facet_wrap(~sample, ncol=length(comps[[i]]$sample_names)) + theme_thesis(8) + coord_cartesian(xlim=c(2,20)) + xlab("") + scale_fill_gradient(low="white",high="red") + scale_x_continuous(breaks=1:n_tiles, labels=coord_labels) + theme(axis.text.y=element_blank(), axis.title.y=element_blank(), axis.ticks.y=element_blank())
-  p_2 = ggplot(gene_tbl_long, aes(x=sample, y=factor(gene, levels=rev(unique(dynamic_genes))))) + geom_tile(aes(fill=factor(deregulated))) + theme_thesis(8) + theme(axis.text.y=element_blank(), axis.title.y=element_blank(), axis.ticks.y=element_blank()) + coord_cartesian(xlim=c(1.1, dim(gene_tbl)[2]-1.1))
-  plot_grid(p_1, p_2, align="h", rel_widths=c(4,1))
-  dev.off()
+  total_signal = rbind(total_signal, gene_list_df_long)
+  total_diff = rbind(total_diff, gene_tbl_long)
   
 }
 
+for(i in 1:length(comps)) {
+  pdf(paste0("~/Downloads/pile_up_",i,".pdf"), height=10, width=20)
+  p_1 = filter(total_signal, comp==names(comps)[i]) %>% ggplot(aes(coord_ix, factor(gene, levels=rev(unique(total_gene_orders[[i]]))))) + geom_tile(aes(fill=score)) + facet_wrap(~sample, ncol=length(comps[[i]]$sample_names)) + theme_thesis(8) + coord_cartesian(xlim=c(2,20)) + xlab("") + scale_fill_gradient(low="white",high="red") + scale_x_continuous(breaks=1:n_tiles, labels=coord_labels) + theme(axis.text.y=element_blank(), axis.title.y=element_blank(), axis.ticks.y=element_blank())
+  p_2 = filter(total_diff, comp==names(comps)[i]) %>% ggplot(aes(x=sample, y=factor(gene, levels=rev(unique(total_gene_orders[[i]]))))) + geom_tile(aes(fill=factor(deregulated))) + theme_thesis(8) + theme(axis.text.y=element_blank(), axis.title.y=element_blank(), axis.ticks.y=element_blank()) + coord_cartesian(xlim=c(1.1, length(comps[[i]]$sample_comps)-0.1))
+  print(plot_grid(p_1, p_2, align="h", rel_widths=c(4,1)))
+  dev.off()
+}
 
 # TF ANALYSIS -------------------------------------------------------------
 
