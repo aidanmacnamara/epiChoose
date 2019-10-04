@@ -41,197 +41,6 @@ my_p = list(
 )
 
 
-# DAVID'S CONTRASTS -------------------------------------------------------
-
-# devtools::install("../cProfile")
-require(cProfile)
-data("cProfileDemo")
-
-# test data - david's code example
-
-t(as.data.frame(results_bundle$descriptions))
-n = jointGeneOrdering(bundle=results_bundle, contrasts=c("c.pma.prime","c.vd3.prime"), n=1000, metric=min)
-a_pma = filterProfiles(recodeLevels(selectData("c.pma.prime"),"PMA"), results_bundle$results[["c.pma.prime"]], n=-n, average=T, trans=NULL)
-a_vd3 = filterProfiles(recodeLevels(selectData("c.vd3.prime"),"VD3"), results_bundle$results[["c.vd3.prime"]], n=-n, average=T, trans=NULL)
-a_1 = makeCrossCluster(U=list(pma=a_pma, vd3=a_vd3), nClusters=10, nstart=10)
-a_1$profiles %>% ggplot(aes(state, value, group=profile, colour=set)) + facet_grid(x~y) + geom_line(alpha=0.3) + labs(x="", y="") + theme_thesis(10) + scale_y_log10()
-b = joint_regulation_plot(cross_clustering=a_1, contrasts=list(list(contrast="c.pma.prime",stimulus="PMA"), list(contrast="c.vd3.prime",stimulus="VD3")), onlyGeneSets=T, n_sets=5, theme_size=15, bundle=results_bundle)
-b$g_12
-
-# by far, the most interesting is thp-1 + pma vs. primary
-# set up this contrast
-
-# get the top genes
-n_genes = jointGeneOrdering(bundle=results_bundle, contrasts=c("c.THP1.pma.prime"), n=500, metric=min)
-
-# pull out the auc values
-auc_df_long = filterProfiles(recodeLevels(selectData("c.THP1.pma.prime"),"PMA"), results_bundle$results[["c.THP1.pma.prime"]], n=500, average=T, trans=NULL)
-
-# rehape the data for the clustering
-auc_df_wide = makeProfile(auc_df_long)
-
-# get clustering results and reshape again
-auc_clust = makeClusters(auc_df_wide)
-auc_clust = auc_clust$partition %>% gather(key="state",value="value", measurement=2:5)
-
-# plot clusters
-auc_clust %>% ggplot(aes(state, value, group=gene)) + facet_wrap(~cluster) + geom_line(alpha=0.3) + labs(x="", y="") + theme_thesis(10) + scale_y_log10()
-
-# look at the fold changes x-y
-
-auc_clust_wide = auc_clust %>% tidyr::spread(state, value)
-aes_1 = aes(change_cl, change_p, colour=factor(cluster))
-auc_clust_wide %>% mutate(change_cl=`post PMA`/`no PMA`, change_p=`primary 6`/`primary 0`, rel_change_cl=change_cl-change_p) %>% ggplot(aes_1) + geom_hline(yintercept=1, colour="gray") + geom_vline(xintercept=1, colour="gray") + geom_point(alpha=0.3) + scale_y_log10() + scale_x_log10() + labs(x="cell line stimulation [fold change]", y="primary activation [fold change]") + theme_thesis(15)
-
-# add expression data
-
-rna = dat_all$tss$RNA$res
-state_translate = list(
-  "no PMA" = c("THP-1_BR1_Baseline","THP-1_BR2_Baseline"),
-  "post PMA" = c("THP-1_BR1_PMA","THP-1_BR2_PMA"),
-  "primary 0" = c("SANQUIN_mono_38_monocyte - Attached_T=1hr","N00031319896021_monocyte - T=0days","N00031401639721_monocyte - T=0days","SANQUIN_mono_11_monocyte - Attached_T=1hr"),
-  "primary 6" = c("N00031401639721_macrophage - T=6days untreated","N00031319896021_macrophage - T=6days untreated","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days")
-)
-
-auc_clust$rna_value = NA
-
-for(i in 1:length(auc_clust$rna_value)) {
-  
-  print(i)
-  
-  my_samples = state_translate[[which(names(state_translate)==auc_clust$state[i])]]
-  auc_clust$rna_value[i] = mean(dat_all$tss$RNA$res[rownames(dat_all$tss$RNA$res) %in% my_samples,auc_clust$gene[i]])
-  
-}
-
-auc_clust %>% ggplot(aes(x=value, y=log(rna_value))) + geom_point(alpha=0.2, size=1) + labs(x="",y="") + theme_thesis(15)
-
-p_1 = auc_clust %>% dplyr::select(-rna_value) %>% spread(state, value) %>% mutate(change_cl=`post PMA`/`no PMA`, change_p=`primary 6`/`primary 0`, rel_change_cl=change_cl-change_p) %>% ggplot(aes_1) + geom_hline(yintercept=1, colour="gray") + geom_vline(xintercept=1, colour="gray") + geom_point(alpha=0.3) + scale_y_log10() + scale_x_log10() + labs(x="cell line stimulation [fold change]", y="primary activation [fold change]") + theme_thesis(25) + coord_flip()
-
-# aes_2 = aes(`no PMA`, `post PMA`, colour=factor(cluster))
-# auc_clust %>% dplyr::select(-value) %>% spread(state, rna_value) %>% mutate(change_cl=`post PMA`/`no PMA`) %>% ggplot(aes_2) + geom_hline(yintercept=1, colour="gray") + geom_vline(xintercept=1, colour="gray") + geom_point(alpha=0.3) + scale_y_log10() + scale_x_log10() + labs(x="Baseline", y="PMA") + theme_thesis(15)
-p_2 = auc_clust %>% dplyr::select(-value) %>% spread(state, rna_value) %>% mutate(change_cl=`post PMA`/`no PMA`, group=factor("THP-1")) %>% ggplot(aes(x=group, y=log(change_cl), colour=factor(cluster))) + geom_beeswarm(alpha=0.2, priority="density") + labs(x="", y="Fold Change") + theme_thesis(25)
-
-png("out.png", height=500, width=1000)
-cowplot::plot_grid(p_1, p_2, ncol=2, nrow=1)
-dev.off()
-
-# run enrichment
-
-gene_sets = list(
-  "green"=roi_tss$hgnc_symbol[auc_clust_wide$gene[auc_clust_wide$cluster==2]],
-  "other"=roi_tss$hgnc_symbol[auc_clust_wide$gene[auc_clust_wide$cluster!=2]]
-)
-
-dbs = tbl_df(listEnrichrDbs())
-dbs = c("GO_Biological_Process_2017","Reactome_2016")
-dbs = dbs$libraryName[grep("201[89]$", dbs$libraryName)]
-
-enrich_process <- function(x) {
-  res = enrichr(unique(x), dbs)
-  res = lapply(res, function(x) tbl_df(filter(x, `Adjusted.P.value` <= 0.05)))
-}
-
-enrich_res <- lapply(gene_sets, enrich_process)
-
-
-# MY CONTRASTS ------------------------------------------------------------
-
-comps = c("late_vs_early_novakovic",
-          "late_vs_early_saeed",
-          "thp1_pma_vs_baseline",
-          "u937_pma_vs_baseline",
-          "thp1_vd3_vs_baseline",
-          "u937_vd3_vs_baseline"
-)
-my_res = vector("list", length(comps))
-names(my_res) = comps
-
-my_res$late_vs_early_novakovic = results(dds_novakovic, contrast=c("time_treatment","6days_Naive","1hr_Naive"), independentFiltering=FALSE)
-my_res$late_vs_early_saeed = results(dds_saeed, contrast=c("time_treatment","6days_Untreated","0days_Untreated"), independentFiltering=FALSE)
-my_res$thp1_pma_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","THP-1_PMA","THP-1_Baseline"), independentFiltering=FALSE)
-my_res$u937_pma_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","U937_PMA","U937_Baseline"), independentFiltering=FALSE)
-my_res$thp1_vd3_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","THP-1_VD3","THP-1_Baseline"), independentFiltering=FALSE)
-my_res$u937_vd3_vs_baseline = results(dds_cell_lines, contrast=c("cell_condition","U937_VD3","U937_Baseline"), independentFiltering=FALSE)
-
-for(i in 1:length(my_res)) {
-  res = my_res[[i]]
-  res$gene = roi_tss$hgnc_symbol
-  my_res[[i]] = tbl_df(res) %>% arrange(desc(log2FoldChange))
-}
-
-
-# FILTER ------------------------------------------------------------------
-
-my_res_filt = vector("list", length(my_res))
-names(my_res_filt) = names(my_res)
-my_res_sig = my_res_filt
-
-for(i in 1:length(my_res_filt)) {
-  my_res_filt[[i]] = my_res[[i]] %>% filter(padj <= 0.05, abs(log2FoldChange) >= 2) %>% arrange(desc(abs(log2FoldChange)))
-  my_res_sig[[i]] = my_res[[i]] %>% filter(padj <= 0.05) %>% arrange(desc(abs(log2FoldChange)))
-}
-
-lapply(my_res_filt, dim)
-lapply(my_res_sig, dim)
-
-plot(euler(lapply(my_res_filt, function(x) x$gene)), quantities=TRUE) # for paper
-
-# construct intersect table
-
-all_diffs = lapply(my_res_filt, function(x) unique(x$gene))
-all_diffs_tbl = as.data.frame.matrix((table(stack(all_diffs))))
-all_diffs_tbl = cbind(rownames(all_diffs_tbl), all_diffs_tbl)
-rownames(all_diffs_tbl) = NULL
-colnames(all_diffs_tbl)[1] = "gene"
-
-upset(all_diffs_tbl, order.by="freq", nsets=20, text.scale=1.5)
-
-contrasts = list()
-# contrasts = list(
-#   comp_1 = c("late_vs_early_novakovic","late_vs_early_saeed","thp1_pma_vs_baseline")
-# )
-
-pull_gene_names <- function(x) {
-  res = get_intersect_members(all_diffs_tbl, x)
-  return(as.character(all_diffs_tbl[rownames(res),1]))
-}
-
-
-# ENRICHMENT --------------------------------------------------------------
-
-gene_sets = c(
-  lapply(my_res_filt, function(x) x$gene),
-  lapply(contrasts, pull_gene_names)
-)
-
-# enrichment
-
-dbs = tbl_df(listEnrichrDbs())
-dbs = c("GO_Biological_Process_2017","Reactome_2016")
-
-enrich_process <- function(x) {
-  res = enrichr(unique(x), dbs)
-  res = lapply(res, function(x) tbl_df(filter(x, `Adjusted.P.value` <= 0.05)))
-}
-
-enrich_res <- lapply(gene_sets, enrich_process)
-
-# gene set enrichment analysis
-
-gsea_res = vector("list", length(my_res))
-names(gsea_res) = names(my_res)
-
-for(i in 1:length(my_res)) {
-  
-  gsea_in = my_res_sig[[i]]$log2FoldChange
-  names(gsea_in) = my_res_sig[[i]]$gene
-  res_gsea <- lapply(my_p, function(x) fgsea(x, stats=gsea_in, nperm=1000))
-  gsea_res[[i]] = lapply(res_gsea, function(x) x %>% as_tibble() %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj))
-  
-}
-
-
 # GET FOLD CHANGES --------------------------------------------------------
 
 novakovic = as.character(unique(dds_novakovic$time_treatment))
@@ -296,26 +105,56 @@ round_up <- function(x, to=10) {
   to*(x %/% to + as.logical(x%%to))
 }
 
+options(stringsAsFactors=FALSE)
+
 comps = list(
   comp_1 = list( # thp-1 vs. primary
-    sample_comps = c("THP-1_PMA","6days_Naive"),
-    sample_names = c("THP-1_BR1_PMA","THP-1_BR2_PMA","THP-1_BR1_Baseline","THP-1_BR2_Baseline","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
-    sample_labels = c("THP-1 PMA (Rep 1)","THP-1 PMA (Rep 2)","THP-1 Baseline (Rep 1)","THP-1 Baseline (Rep 2)","Novakovic Macrophage (Donor 1)","Novakovic Macrophage (Donor 2)","Novakovic Monocyte (Donor 3)","Novakovic Monocyte (Donor 2)")
+    sample_comp = c("THP-1_PMA","6days_Naive"),
+    sample_dat = data.frame(
+      sample_name = c("THP-1_BR1_PMA","THP-1_BR2_PMA","THP-1_BR1_Baseline","THP-1_BR2_Baseline","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
+      sample_condition = c("THP-1 PMA","THP-1 PMA","THP-1 Baseline","THP-1 Baseline","Novakovic Macrophage","Novakovic Macrophage","Novakovic Monocyte","Novakovic Monocyte"),
+      sample_donor = c(1,2,1,2,1,2,3,2)
+    )
   ),
   comp_2 = list( # primary comp
-    sample_comps = c("6days_Untreated","6days_Naive"),
-    sample_names = c("SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr","N00031319896021_macrophage - T=6days untreated","N00031401639721_macrophage - T=6days untreated","N00031319896021_monocyte - T=0days","N00031401639721_monocyte - T=0days"),
-    sample_labels = c("Novakovic Macrophage (Donor 1)","Novakovic Macrophage (Donor 2)","Novakovic Monocyte (Donor 3)","Novakovic Monocyte (Donor 2)","Saeed Macrophage (Donor 1)","Saeed Macrophage (Donor 2)","Saeed Monocyte (Donor 1)","Saeed Monocyte (Donor 2)")
+    sample_comp = c("6days_Untreated","6days_Naive"),
+    sample_dat = data.frame(
+      sample_name = c("SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr","N00031319896021_macrophage - T=6days untreated","N00031401639721_macrophage - T=6days untreated","N00031319896021_monocyte - T=0days","N00031401639721_monocyte - T=0days"),
+      sample_condition = c("Novakovic Macrophage","Novakovic Macrophage","Novakovic Monocyte","Novakovic Monocyte","Saeed Macrophage","Saeed Macrophage","Saeed Monocyte","Saeed Monocyte"),
+      sample_donor = NA
+    )
   ),
-  comp_3 = list( # lps
-    sample_comps = c("THP-1_LPS","THP-1_PMA+LPS","4hrs_LPS","24hrs_LPS","5days_LPS"),
-    sample_names = c("THP-1_BR1_Baseline","THP-1_BR2_Baseline","THP-1_BR1_LPS","THP-1_BR2_LPS","THP-1_BR1_PMA+LPS","THP-1_BR2_PMA+LPS","SANQUIN_mono_11_monocyte - RPMI_LPS_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_LPS_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_LPS_T=4hrs","SANQUIN_mono_38_monocyte - RPMI_LPS_T=24hrs_RPMI_T=5days","SANQUIN_mono_61_monocyte - RPMI_LPS_T=24hrs_RPMI_T=5days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
-    sample_labels = c("THP-1 Baseline (Rep 1)","THP-1 Baseline (Rep 2)","THP-1 LPS (Rep 1)","THP-1 LPS (Rep 2)","THP-1 PMA + LPS (Rep 1)","THP-1 PMA + LPS (Rep 2)","Novakovic 24hrs LPS (Donor 1)","Novakovic 24hrs LPS (Donor 2)","Novakovic 4hrs LPS (Donor 2)","Novakovic 5 days LPS (Donor 3)","Novakovic 5 days LPS (Donor 4)","Novakovic 0 days LPS (Donor 1)","Novakovic 0 days LPS (Donor 3)")
+  comp_3 = list( # lps u937
+    sample_comp = c("THP-1_LPS","THP-1_PMA+LPS","4hrs_LPS","24hrs_LPS","5days_LPS"),
+    sample_dat = data.frame(
+      sample_name = c("THP-1_BR1_Baseline","THP-1_BR2_Baseline","THP-1_BR1_LPS","THP-1_BR2_LPS","THP-1_BR1_PMA+LPS","THP-1_BR2_PMA+LPS","SANQUIN_mono_11_monocyte - RPMI_LPS_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_LPS_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_LPS_T=4hrs","SANQUIN_mono_38_monocyte - RPMI_LPS_T=24hrs_RPMI_T=5days","SANQUIN_mono_61_monocyte - RPMI_LPS_T=24hrs_RPMI_T=5days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
+      sample_condition = c("THP-1 Baseline","THP-1 Baseline","THP-1 LPS","THP-1 LPS","THP-1 PMA + LPS","THP-1 PMA + LPS","Novakovic 24hrs LPS","Novakovic 24hrs LPS","Novakovic 4hrs LPS","Novakovic 5 days LPS","Novakovic 5 days LPS","Novakovic 0 days LPS","Novakovic 0 days LPS"),
+      sample_donor = NA
+    )
   ),
   comp_4 = list( # primary time-course
-    sample_comps = c("4hrs_Naive","24hrs_Naive","6days_Naive"),
-    sample_names = c("SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr","SANQUIN_mono_11_monocyte - RPMI_T=4hrs","SANQUIN_mono_36_monocyte - RPMI_T=4hrs","SANQUIN_mono_11_monocyte - RPMI_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_T=24hrs","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days"),
-    sample_labels = c("Novakovic 0 days (Donor 1)","Novakovic 0 days (Donor 2)","Novakovic 4hrs (Donor 1)","Novakovic 4hrs (Donor 3)","Novakovic 24hrs (Donor 1)","Novakovic 24hrs (Donor 3)","Novakovic 6 days (Donor 2)","Novakovic 6 days (Donor 4)")
+    sample_comp = c("4hrs_Naive","24hrs_Naive","6days_Naive"),
+    sample_dat = data.frame(
+      sample_name = c("SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr","SANQUIN_mono_11_monocyte - RPMI_T=4hrs","SANQUIN_mono_36_monocyte - RPMI_T=4hrs","SANQUIN_mono_11_monocyte - RPMI_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_T=24hrs","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days"),
+      sample_condition = c("Novakovic 0 days","Novakovic 0 days","Novakovic 4hrs","Novakovic 4hrs","Novakovic 24hrs","Novakovic 24hrs","Novakovic 6 days","Novakovic 6 days"),
+      sample_donor = NA
+    )
+  ),
+  comp_5 = list( # u937 vs. primary
+    sample_comp = c("U937_PMA","6days_Naive"),
+    sample_dat = data.frame(
+      sample_name = c("U937_BR1_PMA","U937_BR2_PMA","U937_BR1_Baseline","U937_BR2_Baseline","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
+      sample_condition = c("U937 PMA","U937 PMA","U937 Baseline","U937 Baseline","Novakovic Macrophage","Novakovic Macrophage","Novakovic Monocyte","Novakovic Monocyte"),
+      sample_donor = c(1,2,1,2,1,2,3,2)
+    )
+  ),
+  comp_6 = list( # lps u937
+    sample_comp = c("U937_LPS","U937_PMA+LPS","4hrs_LPS","24hrs_LPS","5days_LPS"),
+    sample_dat = data.frame(
+      sample_name = c("U937_BR1_Baseline","U937_BR2_Baseline","U937_BR1_LPS","U937_BR2_LPS","U937_BR1_PMA+LPS","U937_BR2_PMA+LPS","SANQUIN_mono_11_monocyte - RPMI_LPS_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_LPS_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_LPS_T=4hrs","SANQUIN_mono_38_monocyte - RPMI_LPS_T=24hrs_RPMI_T=5days","SANQUIN_mono_61_monocyte - RPMI_LPS_T=24hrs_RPMI_T=5days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
+      sample_condition = c("U937 Baseline","U937 Baseline","U937 LPS","U937 LPS","U937 PMA + LPS","U937 PMA + LPS","Novakovic 24hrs LPS","Novakovic 24hrs LPS","Novakovic 4hrs LPS","Novakovic 5 days LPS","Novakovic 5 days LPS","Novakovic 0 days LPS","Novakovic 0 days LPS"),
+      sample_donor = NA
+    )
   )
 )
 
@@ -325,29 +164,30 @@ total_diff = data.frame()
 total_gene_orders = vector("list", length(comps))
 names(total_gene_orders) = names(comps)
 
-for(i in 2:length(comps)) {
+for(i in 1:length(comps)) {
   
   print(paste("Comparison", i))
   
   # get the bigwig files
-  files = dat_all$tss$H3K27ac$annot$Bigwig[match(comps[[i]]$sample_names, dat_all$tss$H3K27ac$annot$Label)]
+  files = dat_all$tss$H3K27ac$annot$Bigwig[match(comps[[i]]$sample_dat$sample_name, dat_all$tss$H3K27ac$annot$Label)]
   files = str_replace(files, "/GWD/bioinfo/projects/", "/Volumes/am673712/links/")
   
   # define dynamic genes for comparisons
-  dynamic_genes = vector("list",length(comps[[i]]$sample_comps))
-  names(dynamic_genes) = comps[[i]]$sample_comps
+  dynamic_genes = vector("list",length(comps[[i]]$sample_comp))
+  names(dynamic_genes) = comps[[i]]$sample_comp
   
   # get any genes with fc > 2 across all the comparisons for each plot
-  for(j in 1:length(comps[[i]]$sample_comps)) {
-    dynamic_genes[[j]] = fc_res_long %>% filter(fc>2, trmt==comps[[i]]$sample_comps[j]) %>% dplyr::select(gene) %>% unlist() %>% as.character()
+  for(j in 1:length(comps[[i]]$sample_comp)) {
+    dynamic_genes[[j]] = fc_res_long %>% filter(p <= 0.05, fc >= 2, trmt==comps[[i]]$sample_comp[j]) %>% dplyr::select(gene) %>% unlist() %>% as.character()
   }
   
+  # plot the venn diagram
   plot(euler(dynamic_genes), quantities=TRUE)
   
   # get these genes into long format 'gene_tbl_long'
   gene_tbl = as.data.frame.matrix((table(stack(dynamic_genes))))
   gene_tbl$gene = rownames(gene_tbl); gene_tbl = tbl_df(gene_tbl)
-  gene_tbl_long = gene_tbl %>% gather("sample","deregulated",1:length(comps[[i]]$sample_comps))
+  gene_tbl_long = gene_tbl %>% gather("sample","deregulated",1:length(comps[[i]]$sample_comp))
   gene_tbl_long$comp = names(comps)[i]
   
   # match genes to granges total genome (roi_tss)
@@ -361,10 +201,12 @@ for(i in 2:length(comps)) {
   # also store the list of genes for plot levels
   total_gene_orders[[i]] = dynamic_genes
   
+  # define the number of tiles per gene for the pile-up plot
   n_tiles = 21
   
+  # grab the signal values
   y = bplapply(1:length(files), function(x) rtracklayer::import(con=files[x], which=gene_list))
-  names(y) = comps[[i]]$sample_names
+  names(y) = paste(comps[[i]]$sample_dat$sample_name, comps[[i]]$sample_dat$sample_donor, sep="_")
   
   # tile each gene
   gene_list_tiled = tile(gene_list, n=n_tiles)
@@ -375,7 +217,7 @@ for(i in 2:length(comps)) {
   gene_list_tiled = unlist(gene_list_tiled)
   mcol_ix = 2
   
-  for(j in 1:length(y)) {
+  for(j in 1:length(y)) { # for each gene, split the signal across the tiles
     
     print(paste("sample:", j))
     
@@ -386,7 +228,7 @@ for(i in 2:length(comps)) {
     }
     binned_score[is.nan(binned_score)] = 0
     mcols(gene_list_tiled)[,mcol_ix] = binned_score
-    names(mcols(gene_list_tiled))[mcol_ix] = comps[[i]]$sample_names[j]
+    names(mcols(gene_list_tiled))[mcol_ix] = comps[[i]]$sample_dat$sample_name[j]
     mcol_ix = mcol_ix+1
   }
   
@@ -394,23 +236,72 @@ for(i in 2:length(comps)) {
   coord_labels = c(paste0("-", rev(tile_size*1:((n_tiles-1)/2))),"TSS",paste0("+", tile_size*1:((n_tiles-1)/2)))
   gene_list_tiled$coord_ix = rep(1:n_tiles, length(gene_list))
   
+  # make the df from the granges object
+  
   gene_list_df = tbl_df(as.data.frame(gene_list_tiled))
-  names(gene_list_df)[7:(dim(gene_list_df)[2]-1)] = comps[[i]]$sample_labels
+  names(gene_list_df)[7:(dim(gene_list_df)[2]-1)] = comps[[i]]$sample_dat$sample_name # correct name
+  
+  # change to long format
   gene_list_df_long = gene_list_df %>% gather("sample","score",7:(dim(gene_list_df)[2]-1))
   gene_list_df_long$comp = names(comps)[i]
   
-  total_signal = rbind(total_signal, gene_list_df_long)
+  # collapse replicates
+  gene_list_df_long$sample_condition = comps[[i]]$sample_dat$sample_condition[match(gene_list_df_long$sample, comps[[i]]$sample_dat$sample_name)]
+  gene_list_df_long_summ = gene_list_df_long %>% group_by(seqnames,start,end,width,strand,gene,coord_ix,sample_condition,comp) %>% summarise(score_mean=mean(score))
+  
+  # add to totals
+  total_signal = rbind(total_signal, as.data.frame(gene_list_df_long_summ))
   total_diff = rbind(total_diff, gene_tbl_long)
   
 }
 
-for(i in 1:length(comps)) {
-  pdf(paste0("~/Downloads/pile_up_",i,".pdf"), height=10, width=20)
-  p_1 = filter(total_signal, comp==names(comps)[i]) %>% ggplot(aes(coord_ix, factor(gene, levels=rev(unique(total_gene_orders[[i]]))))) + geom_tile(aes(fill=score)) + facet_wrap(~sample, ncol=length(comps[[i]]$sample_names)) + theme_thesis(8) + coord_cartesian(xlim=c(2,20)) + xlab("") + scale_fill_gradient(low="white",high="red") + scale_x_continuous(breaks=1:n_tiles, labels=coord_labels) + theme(axis.text.y=element_blank(), axis.title.y=element_blank(), axis.ticks.y=element_blank())
-  p_2 = filter(total_diff, comp==names(comps)[i]) %>% ggplot(aes(x=sample, y=factor(gene, levels=rev(unique(total_gene_orders[[i]]))))) + geom_tile(aes(fill=factor(deregulated))) + theme_thesis(8) + theme(axis.text.y=element_blank(), axis.title.y=element_blank(), axis.ticks.y=element_blank()) + coord_cartesian(xlim=c(1.1, length(comps[[i]]$sample_comps)-0.1))
-  print(plot_grid(p_1, p_2, align="h", rel_widths=c(4,1)))
-  dev.off()
+save(total_signal, file="~/Dropbox/OTAR020/figures_dat/total_signal.RData") # savepoint
+save(total_diff, file="~/Dropbox/OTAR020/figures_dat/total_diff.RData") # savepoint
+save(total_gene_orders, file="~/Dropbox/OTAR020/figures_dat/total_gene_orders.RData") # savepoint
+
+
+# GENE ENRICHMENT ---------------------------------------------------------
+
+load("~/Dropbox/OTAR020/figures_dat/total_diff.RData")
+load("~/Dropbox/OTAR020/figures_dat/total_signal.RData")
+load("~/Dropbox/OTAR020/figures_dat/total_gene_orders.RData")
+
+fc_res_long_filt = fc_res_long %>% filter(fc >= 2, p <= 0.05)
+table(fc_res_long_filt$trmt)
+
+gene_sets = sapply(unique(fc_res_long_filt$trmt), function(x) fc_res_long_filt$gene[fc_res_long_filt$trmt==x])
+
+# enrichment
+
+dbs = tbl_df(listEnrichrDbs())
+dbs = c("GO_Biological_Process_2017","Reactome_2016")
+
+enrich_process <- function(x) {
+  res = enrichr(unique(x), dbs)
+  res = lapply(res, function(x) tbl_df(filter(x, `Adjusted.P.value` <= 0.05)))
 }
+
+enrich_res <- lapply(gene_sets, enrich_process)
+
+# gene set enrichment analysis
+
+gsea_res = vector("list", length(my_res))
+names(gsea_res) = names(my_res)
+
+for(i in 1:length(my_res)) {
+  
+  gsea_in = my_res_sig[[i]]$log2FoldChange
+  names(gsea_in) = my_res_sig[[i]]$gene
+  res_gsea <- lapply(my_p, function(x) fgsea(x, stats=gsea_in, nperm=1000))
+  gsea_res[[i]] = lapply(res_gsea, function(x) x %>% as_tibble() %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj))
+  
+}
+
+
+# CHECK AGAINST PAPER -----------------------------------------------------
+
+promoter_peaks = read_excel("tmp/1-s2.0-S0092867416313162-mmc1.xlsx", sheet="S1B. H3K27ac AcP", skip=3)
+
 
 # TF ANALYSIS -------------------------------------------------------------
 

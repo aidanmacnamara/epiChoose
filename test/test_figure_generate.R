@@ -270,7 +270,9 @@ col_data_filt$treatment[33:57] = str_extract(col_data_filt$label[33:57], "[[:aln
 col_data_filt$time[33:57] = "0days"
 col_data_filt$donor[33:57] = "None"
 col_data_filt$cell_type = str_extract(col_data_filt$label, "macrophage|monocyte|THP-1|U937")
-col_data_filt$cell_type[dim(col_data_filt)[1]] = "monocyte"
+col_data_filt$cell_type[grepl("hrs", col_data_filt$time) | (grepl("0days", col_data_filt$time) & !grepl("THP-1|U937", col_data_filt$cell_type))] = "monocyte"
+col_data_filt$cell_type[grep("[56]days", col_data_filt$time)] = "macrophage"
+col_data_filt$cell_type[dim(col_data_filt)[1]] = "monocyte" # edit sample from encode
 
 
 # RUN DDS -----------------------------------------------------------------
