@@ -79,6 +79,7 @@ save(roi_tss, file="data/roi_tss.RData") # savepoint
 
 # look across all regulatory regions
 load("data/roi_reg.RData")
+load("data/roi_tss.RData")
 load("data/gene_list_all.RData")
 marks = c("H3K27ac","H3K4me3","H3K27me3","ATAC","CTCF")
 
