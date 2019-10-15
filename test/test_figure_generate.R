@@ -339,3 +339,53 @@ pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_dist
 pca_and_plot(rld_cell_lines_rna, annot_1=rld_cell_lines$condition, annot_2=rld_cell_lines$cell_line)
 
 
+# NEW PRIMARY -------------------------------------------------------------
+
+# PICK SAMPLES ------------------------------------------------------------
+
+donors = list(
+  monocyte = c("C0010K","C00408","C000S5","C001UY","C0011I","C004SQ"),
+  macrophage = c("S001S7","S0022I","S00390"),
+  inflamm = c("S001S7","S0022I","S001MJ")
+)
+
+rownames(dat_all$tss$H3K27ac$res)[which(dat_all$tss$H3K27ac$annot$Donor %in% unlist(donors))]
+
+col_data = dat_all$tss$H3K27ac$annot[row_ix,]
+col_data_filt = data.frame(dplyr::select(col_data, Label))
+col_data_filt$rep = str_extract(col_data_filt$Label, "BR[12]")
+col_data_filt$condition = str_extract(col_data_filt$Label, "[[:alnum:]+]+$")
+col_data_filt$cell_line = str_extract(col_data_filt$Label, "^[[:alnum:]-]+")
+
+
+# RUN DDS -----------------------------------------------------------------
+
+dat_add = dat_all$tss$H3K27ac$res[row_ix,]
+# dat_add = total_reg$H3K27ac$res[row_ix,which(roi_reg$feature_type_name=="Enhancer")]
+dat_add[is.na(dat_add)] = 0
+dat_add = apply(dat_add, 2, as.integer)
+dim(dat_add)
+dds_cell_lines = DESeqDataSetFromMatrix(countData=t(dat_add), colData=col_data_filt, design=~rep+condition+cell_line)
+
+design(dds_cell_lines)
+dds_cell_lines$cell_condition = factor(paste(dds_cell_lines$cell_line,dds_cell_lines$condition,sep="_"))
+design(dds_cell_lines) = formula(~cell_condition)
+design(dds_cell_lines)
+dds_cell_lines = DESeq(dds_cell_lines)
+
+rld_cell_lines = vst(dds_cell_lines, blind=FALSE)
+
+save(dds_cell_lines, file="tmp/dds_cell_lines.RData")
+save(rld_cell_lines, file="tmp/rld_cell_lines.RData")
+
+
+# PLOT HEATMAP/PCA --------------------------------------------------------
+
+sampleDists <- dist(t(assay(rld_cell_lines)))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) = paste(rld_cell_lines$condition, rld_cell_lines$rep, sep="_")
+colors <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
+
+pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors, show_colnames=FALSE)
+
+pca_and_plot(rld_cell_lines, annot_1=rld_cell_lines$condition, annot_2=rld_cell_lines$cell_line)

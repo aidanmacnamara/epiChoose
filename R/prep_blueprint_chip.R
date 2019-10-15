@@ -49,7 +49,7 @@ prep_blueprint_chip <- function(blueprint_data, assays=c("H3K27ac","H3K4me3","H3
   )
   
   # add back in missing relevant donors for manuscript
-  bp_donors = filter(bp, (Donor %in% c("C0010K","C00408","C000S5","C001UY","C0011I")), Format=="bigWig", Experiment %in% assays)
+  bp_donors = filter(bp, (Donor %in% c("C0010K","C00408","C000S5","C001UY","C0011I")), Format=="bigWig", Experiment %in% assays, !grepl("neutrophil",`Sub-group`))
   bp_donors_summ = bp_donors %>% group_by_(.dots=group_vars) %>% summarise (
     Data = all(assays %in% Experiment)
   )
