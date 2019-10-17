@@ -207,10 +207,6 @@ group_labels = c(
   rep("GSK", dim(gsk_chip_filtered[[1]]$res)[1]),
   rep("ENCODE", dim(encode_chip_filtered[[1]]$res)[1]),
   rep("DEEP", dim(deep_chip_filtered[[1]]$res)[1])
-  # rep("BLUEPRINT", 82),
-  # rep("GSK", 82),
-  # rep("ENCODE", 31),
-  # rep("DEEP", 5)
 )
 
 # total_reg_edit = total_tss

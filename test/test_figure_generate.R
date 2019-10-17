@@ -349,13 +349,28 @@ donors = list(
   inflamm = c("S001S7","S0022I","S001MJ")
 )
 
-rownames(dat_all$tss$H3K27ac$res)[which(dat_all$tss$H3K27ac$annot$Donor %in% unlist(donors))]
+table(unlist(donors) %in% dat_all$tss$H3K27ac$annot$Donor)
+
+row_ix = which(
+  grepl("thp-1|u937", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) | (dat_all$tss$H3K27ac$annot$Donor %in% unlist(donors))
+)
+row_ix = c(row_ix, which(rownames(dat_all$tss$H3K27ac$res)=="Monocytes-CD14+_Broad"))
 
 col_data = dat_all$tss$H3K27ac$annot[row_ix,]
-col_data_filt = data.frame(dplyr::select(col_data, Label))
-col_data_filt$rep = str_extract(col_data_filt$Label, "BR[12]")
-col_data_filt$condition = str_extract(col_data_filt$Label, "[[:alnum:]+]+$")
-col_data_filt$cell_line = str_extract(col_data_filt$Label, "^[[:alnum:]-]+")
+col_data = data.frame(dplyr::select(col_data, Label))
+col_data$rep = str_extract(col_data$Label, "BR[12]")
+col_data$condition = str_extract(col_data$Label, "[[:alnum:]+]+$")
+col_data$cell_type = str_extract(col_data$Label, "^[[:alnum:]-]+")
+primary_ix = c(1:12,37)
+col_data$rep[primary_ix] = "BR1"
+col_data$cell_type[primary_ix] = "primary"
+col_data$condition[c(1:6,37)] = "primary_monocyte"
+col_data$condition[c(9,11,12)] = "primary_macrophage"
+col_data$condition[c(7,8,10)] = "primary_macrophage_inflamm"
+col_data$source = c(rep("External",12), rep("GSK",24), "External")
+col_data$group = paste(col_data$cell_type, col_data$condition, sep="_")
+col_data$group[primary_ix] = col_data$condition[primary_ix]
+col_data[,2:6] = lapply(col_data[,2:6], factor)
 
 
 # RUN DDS -----------------------------------------------------------------
@@ -365,27 +380,26 @@ dat_add = dat_all$tss$H3K27ac$res[row_ix,]
 dat_add[is.na(dat_add)] = 0
 dat_add = apply(dat_add, 2, as.integer)
 dim(dat_add)
-dds_cell_lines = DESeqDataSetFromMatrix(countData=t(dat_add), colData=col_data_filt, design=~rep+condition+cell_line)
+dds_all = DESeqDataSetFromMatrix(countData=t(dat_add), colData=col_data, design=~group)
 
-design(dds_cell_lines)
-dds_cell_lines$cell_condition = factor(paste(dds_cell_lines$cell_line,dds_cell_lines$condition,sep="_"))
-design(dds_cell_lines) = formula(~cell_condition)
-design(dds_cell_lines)
-dds_cell_lines = DESeq(dds_cell_lines)
+design(dds_all)
+dds_all = DESeq(dds_all)
 
-rld_cell_lines = vst(dds_cell_lines, blind=FALSE)
+rld_all = vst(dds_all, blind=FALSE)
 
-save(dds_cell_lines, file="tmp/dds_cell_lines.RData")
-save(rld_cell_lines, file="tmp/rld_cell_lines.RData")
+save(dds_all, file="tmp/dds_all.RData")
+save(rld_all, file="tmp/rld_all.RData")
 
 
 # PLOT HEATMAP/PCA --------------------------------------------------------
 
-sampleDists <- dist(t(assay(rld_cell_lines)))
+sampleDists <- dist(t(assay(rld_all)))
 sampleDistMatrix <- as.matrix(sampleDists)
-rownames(sampleDistMatrix) = paste(rld_cell_lines$condition, rld_cell_lines$rep, sep="_")
+rownames(sampleDistMatrix) = paste(rld_all$condition, rld_all$rep, sep="_")
 colors <- colorRampPalette(rev(brewer.pal(9, "Blues")))(255)
 
 pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors, show_colnames=FALSE)
 
-pca_and_plot(rld_cell_lines, annot_1=rld_cell_lines$condition, annot_2=rld_cell_lines$cell_line)
+pca_and_plot(rld_all, annot_1=rld_all$condition, annot_2=rld_all$cell_type)
+
+
