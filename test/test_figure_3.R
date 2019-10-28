@@ -17,20 +17,9 @@ require(eulerr)
 require(fgsea)
 require(enrichR)
 
-# load("data/dat_all.RData")
-# load("data/roi_reg.RData")
+load("data/dat_all.RData")
+load("tmp/dds_all.RData")
 load("data/roi_tss.RData")
-
-load("tmp/dds_cell_lines.RData")
-load("tmp/dds_saeed.RData")
-load("tmp/dds_novakovic.RData")
-# load("tmp/dds_primary.RData")
-
-# load("tmp/rld_cell_lines.RData")
-# load("tmp/rld_saeed.RData")
-# load("tmp/rld_novakovic.RData")
-# load("tmp/rld_primary.RData")
-# load("tmp/rld_all.RData")
 
 
 # GENE SETS ---------------------------------------------------------------
@@ -43,16 +32,9 @@ my_p = list(
 
 # GET FOLD CHANGES --------------------------------------------------------
 
-novakovic = as.character(unique(dds_novakovic$time_treatment))
-novakovic = novakovic[!grepl("^1hr", novakovic)]
-
 trts = list(
-  novakovic = novakovic,
-  saeed = as.character(unique(dds_saeed$time_treatment))[1:3],
-  cell_lines = c(
-    as.character(unique(dds_cell_lines$cell_condition)[2:6]), # pick out the treatment conditions
-    as.character(unique(dds_cell_lines$cell_condition)[8:12])
-  )
+  primary = c("primary_macrophage","primary_macrophage_inflamm"),
+  cell_lines = c("THP-1_LPS","THP-1_PMA","THP-1_PMA+LPS","THP-1_VD3","THP-1_VD3+LPS","U937_LPS","U937_PMA","U937_PMA+LPS","U937_VD3","U937_VD3+LPS")
 )
 
 fc_res = data.frame(genes=roi_tss$hgnc_symbol)
@@ -62,22 +44,13 @@ for(i in 1:length(trts)) {
   for(j in 1:length(trts[[i]])) {
     
     if(i==1) {
-      if(grepl("LPS", trts[[i]][j])) {
-        res = results(dds_novakovic, contrast=c("time_treatment",trts[[i]][j],"1hr_LPS"))
-      }
-      if(grepl("BG", trts[[i]][j])) {
-        res = results(dds_novakovic, contrast=c("time_treatment",trts[[i]][j],"1hr_BG"))
-      }
-      if(grepl("Naive", trts[[i]][j])) {
-        res = results(dds_novakovic, contrast=c("time_treatment",trts[[i]][j],"1hr_Naive"))
-      }
+      res = results(dds_all, contrast=c("group",trts[[i]][j],"primary_monocyte"))
     }
-    if(i==2) res = results(dds_saeed, contrast=c("time_treatment",trts[[i]][j],"0days_Untreated"))
-    if(i==3) {
+    if(i==2) {
       if(grepl("THP-1", trts[[i]][j])) {
-        res = results(dds_cell_lines, contrast=c("cell_condition",trts[[i]][j],"THP-1_Baseline"))
+        res = results(dds_all, contrast=c("group",trts[[i]][j],"THP-1_Baseline"))
       } else {
-        res = results(dds_cell_lines, contrast=c("cell_condition",trts[[i]][j],"U937_Baseline"))
+        res = results(dds_all, contrast=c("group",trts[[i]][j],"U937_Baseline"))
       }
     }
     
@@ -108,51 +81,30 @@ round_up <- function(x, to=10) {
 options(stringsAsFactors=FALSE)
 
 comps = list(
-  comp_1 = list( # thp-1 vs. primary
-    sample_comp = c("THP-1_PMA","6days_Naive"),
+  comp_1 = list( # everything
+    sample_comp = c("THP-1_PMA","THP-1_PMA+LPS","U937_PMA","U937_PMA+LPS","primary_macrophage","primary_macrophage_inflamm"),
     sample_dat = data.frame(
-      sample_name = c("THP-1_BR1_PMA","THP-1_BR2_PMA","THP-1_BR1_Baseline","THP-1_BR2_Baseline","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
-      sample_condition = c("THP-1 PMA","THP-1 PMA","THP-1 Baseline","THP-1 Baseline","Novakovic Macrophage","Novakovic Macrophage","Novakovic Monocyte","Novakovic Monocyte"),
-      sample_donor = c(1,2,1,2,1,2,3,2)
-    )
-  ),
-  comp_2 = list( # primary comp
-    sample_comp = c("6days_Untreated","6days_Naive"),
-    sample_dat = data.frame(
-      sample_name = c("SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr","N00031319896021_macrophage - T=6days untreated","N00031401639721_macrophage - T=6days untreated","N00031319896021_monocyte - T=0days","N00031401639721_monocyte - T=0days"),
-      sample_condition = c("Novakovic Macrophage","Novakovic Macrophage","Novakovic Monocyte","Novakovic Monocyte","Saeed Macrophage","Saeed Macrophage","Saeed Monocyte","Saeed Monocyte"),
-      sample_donor = NA
-    )
-  ),
-  comp_3 = list( # lps u937
-    sample_comp = c("THP-1_LPS","THP-1_PMA+LPS","4hrs_LPS","24hrs_LPS","5days_LPS"),
-    sample_dat = data.frame(
-      sample_name = c("THP-1_BR1_Baseline","THP-1_BR2_Baseline","THP-1_BR1_LPS","THP-1_BR2_LPS","THP-1_BR1_PMA+LPS","THP-1_BR2_PMA+LPS","SANQUIN_mono_11_monocyte - RPMI_LPS_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_LPS_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_LPS_T=4hrs","SANQUIN_mono_38_monocyte - RPMI_LPS_T=24hrs_RPMI_T=5days","SANQUIN_mono_61_monocyte - RPMI_LPS_T=24hrs_RPMI_T=5days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
-      sample_condition = c("THP-1 Baseline","THP-1 Baseline","THP-1 LPS","THP-1 LPS","THP-1 PMA + LPS","THP-1 PMA + LPS","Novakovic 24hrs LPS","Novakovic 24hrs LPS","Novakovic 4hrs LPS","Novakovic 5 days LPS","Novakovic 5 days LPS","Novakovic 0 days LPS","Novakovic 0 days LPS"),
-      sample_donor = NA
-    )
-  ),
-  comp_4 = list( # primary time-course
-    sample_comp = c("4hrs_Naive","24hrs_Naive","6days_Naive"),
-    sample_dat = data.frame(
-      sample_name = c("SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr","SANQUIN_mono_11_monocyte - RPMI_T=4hrs","SANQUIN_mono_36_monocyte - RPMI_T=4hrs","SANQUIN_mono_11_monocyte - RPMI_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_T=24hrs","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days"),
-      sample_condition = c("Novakovic 0 days","Novakovic 0 days","Novakovic 4hrs","Novakovic 4hrs","Novakovic 24hrs","Novakovic 24hrs","Novakovic 6 days","Novakovic 6 days"),
-      sample_donor = NA
-    )
-  ),
-  comp_5 = list( # u937 vs. primary
-    sample_comp = c("U937_PMA","6days_Naive"),
-    sample_dat = data.frame(
-      sample_name = c("U937_BR1_PMA","U937_BR2_PMA","U937_BR1_Baseline","U937_BR2_Baseline","SANQUIN_mono_38_monocyte - RPMI_T=6days","SANQUIN_mono_61_monocyte - RPMI_T=6days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
-      sample_condition = c("U937 PMA","U937 PMA","U937 Baseline","U937 Baseline","Novakovic Macrophage","Novakovic Macrophage","Novakovic Monocyte","Novakovic Monocyte"),
-      sample_donor = c(1,2,1,2,1,2,3,2)
-    )
-  ),
-  comp_6 = list( # lps u937
-    sample_comp = c("U937_LPS","U937_PMA+LPS","4hrs_LPS","24hrs_LPS","5days_LPS"),
-    sample_dat = data.frame(
-      sample_name = c("U937_BR1_Baseline","U937_BR2_Baseline","U937_BR1_LPS","U937_BR2_LPS","U937_BR1_PMA+LPS","U937_BR2_PMA+LPS","SANQUIN_mono_11_monocyte - RPMI_LPS_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_LPS_T=24hrs","SANQUIN_mono_36_monocyte - RPMI_LPS_T=4hrs","SANQUIN_mono_38_monocyte - RPMI_LPS_T=24hrs_RPMI_T=5days","SANQUIN_mono_61_monocyte - RPMI_LPS_T=24hrs_RPMI_T=5days","SANQUIN_mono_11_monocyte - Attached_T=1hr","SANQUIN_mono_38_monocyte - Attached_T=1hr"),
-      sample_condition = c("U937 Baseline","U937 Baseline","U937 LPS","U937 LPS","U937 PMA + LPS","U937 PMA + LPS","Novakovic 24hrs LPS","Novakovic 24hrs LPS","Novakovic 4hrs LPS","Novakovic 5 days LPS","Novakovic 5 days LPS","Novakovic 0 days LPS","Novakovic 0 days LPS"),
+      sample_name = c("THP-1_BR1_Baseline","THP-1_BR2_Baseline",
+                      "THP-1_BR1_PMA","THP-1_BR2_PMA",
+                      "THP-1_BR1_PMA+LPS","THP-1_BR2_PMA+LPS",
+                      "U937_BR1_Baseline","U937_BR2_Baseline",
+                      "U937_BR1_LPS","U937_BR2_LPS",
+                      "U937_BR1_PMA+LPS","U937_BR2_PMA+LPS",
+                      "C000S5_CD14-positive, CD16-negative classical monocyte","C0010K_CD14-positive, CD16-negative classical monocyte","C0011I_CD14-positive, CD16-negative classical monocyte","C001UY_CD14-positive, CD16-negative classical monocyte","C00408_CD14-positive, CD16-negative classical monocyte","C004SQ_CD14-positive, CD16-negative classical monocyte",
+                      "S0022I_macrophage","S001S7_macrophage","S00390_macrophage",
+                      "S001MJ_inflammatory macrophage","S001S7_inflammatory macrophage","S0022I_inflammatory macrophage"
+      ),
+      sample_condition = c(
+        "THP-1 Baseline","THP-1 Baseline",
+        "THP-1 PMA","THP-1 PMA",
+        "THP-1 PMA + LPS","THP-1 PMA + LPS",
+        "U937 Baseline","U937 Baseline",
+        "U937 PMA","U937 PMA",
+        "U937 PMA + LPS","U937 PMA + LPS",
+        "Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte",
+        "Macrophage","Macrophage","Macrophage",
+        "Inflammatory Macrophage","Inflammatory Macrophage","Inflammatory Macrophage"
+      ),
       sample_donor = NA
     )
   )
@@ -176,9 +128,9 @@ for(i in 1:length(comps)) {
   dynamic_genes = vector("list",length(comps[[i]]$sample_comp))
   names(dynamic_genes) = comps[[i]]$sample_comp
   
-  # get any genes with fc > 2 across all the comparisons for each plot
+  # get any genes with fc > 1.5 across all the comparisons for each plot
   for(j in 1:length(comps[[i]]$sample_comp)) {
-    dynamic_genes[[j]] = fc_res_long %>% filter(p <= 0.05, fc >= 2, trmt==comps[[i]]$sample_comp[j]) %>% dplyr::select(gene) %>% unlist() %>% as.character()
+    dynamic_genes[[j]] = fc_res_long %>% filter(p <= 0.05, abs(fc) >= 1.5, trmt==comps[[i]]$sample_comp[j]) %>% dplyr::select(gene) %>% unlist() %>% as.character()
   }
   
   # plot the venn diagram
@@ -239,13 +191,15 @@ for(i in 1:length(comps)) {
   # make the df from the granges object
   
   gene_list_df = tbl_df(as.data.frame(gene_list_tiled))
-  names(gene_list_df)[7:(dim(gene_list_df)[2]-1)] = comps[[i]]$sample_dat$sample_name # correct name
+  names(gene_list_df)[7:(dim(gene_list_df)[2]-1)] = as.character(comps[[i]]$sample_dat$sample_name) # correct name
   
   # change to long format
+  
   gene_list_df_long = gene_list_df %>% gather("sample","score",7:(dim(gene_list_df)[2]-1))
   gene_list_df_long$comp = names(comps)[i]
   
   # collapse replicates
+  
   gene_list_df_long$sample_condition = comps[[i]]$sample_dat$sample_condition[match(gene_list_df_long$sample, comps[[i]]$sample_dat$sample_name)]
   gene_list_df_long_summ = gene_list_df_long %>% group_by(seqnames,start,end,width,strand,gene,coord_ix,sample_condition,comp) %>% summarise(score_mean=mean(score))
   
