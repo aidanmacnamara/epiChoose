@@ -66,6 +66,11 @@ fc_res_long$gene = rep(roi_tss$hgnc_symbol, length(unlist(trts)))
 fc_res_long$trmt = as.character(fc_res_long$trmt)
 fc_res_long = tbl_df(fc_res_long)
 
+fc_res_long_filt = fc_res_long %>% filter(abs(fc) >= 1.5, p <= 0.05)
+table(fc_res_long_filt$trmt)
+
+write_csv(fc_res_long_filt, "~/Dropbox/OTAR020/figures_dat/fc_res_long_filt.csv")
+
 
 # PILE-UP PLOT ------------------------------------------------------------
 
@@ -81,8 +86,39 @@ round_up <- function(x, to=10) {
 options(stringsAsFactors=FALSE)
 
 comps = list(
+  
   comp_1 = list( # everything
     sample_comp = c("THP-1_PMA","THP-1_PMA+LPS","U937_PMA","U937_PMA+LPS","primary_macrophage","primary_macrophage_inflamm"),
+    fc = 1.5,
+    sample_dat = data.frame(
+      sample_name = c("THP-1_BR1_Baseline","THP-1_BR2_Baseline",
+                      "THP-1_BR1_PMA","THP-1_BR2_PMA",
+                      "THP-1_BR1_PMA+LPS","THP-1_BR2_PMA+LPS",
+                      "U937_BR1_Baseline","U937_BR2_Baseline",
+                      "U937_BR1_LPS","U937_BR2_LPS",
+                      "U937_BR1_PMA+LPS","U937_BR2_PMA+LPS",
+                      "C000S5_CD14-positive, CD16-negative classical monocyte","C0010K_CD14-positive, CD16-negative classical monocyte","C0011I_CD14-positive, CD16-negative classical monocyte","C001UY_CD14-positive, CD16-negative classical monocyte","C00408_CD14-positive, CD16-negative classical monocyte","C004SQ_CD14-positive, CD16-negative classical monocyte",
+                      "S0022I_macrophage","S001S7_macrophage","S00390_macrophage",
+                      "S001MJ_inflammatory macrophage","S001S7_inflammatory macrophage","S0022I_inflammatory macrophage"
+      ),
+      sample_condition = c(
+        "THP-1 Baseline","THP-1 Baseline",
+        "THP-1 PMA","THP-1 PMA",
+        "THP-1 PMA + LPS","THP-1 PMA + LPS",
+        "U937 Baseline","U937 Baseline",
+        "U937 PMA","U937 PMA",
+        "U937 PMA + LPS","U937 PMA + LPS",
+        "Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte",
+        "Macrophage","Macrophage","Macrophage",
+        "Inflammatory Macrophage","Inflammatory Macrophage","Inflammatory Macrophage"
+      ),
+      sample_donor = NA
+    )
+  ),
+  
+  comp_2 = list( # everything
+    sample_comp = c("THP-1_PMA","THP-1_PMA+LPS","U937_PMA","U937_PMA+LPS","primary_macrophage","primary_macrophage_inflamm"),
+    fc = -1.5,
     sample_dat = data.frame(
       sample_name = c("THP-1_BR1_Baseline","THP-1_BR2_Baseline",
                       "THP-1_BR1_PMA","THP-1_BR2_PMA",
@@ -108,6 +144,7 @@ comps = list(
       sample_donor = NA
     )
   )
+  
 )
 
 # store the results of all the comparisons in these objects
@@ -130,7 +167,11 @@ for(i in 1:length(comps)) {
   
   # get any genes with fc > 1.5 across all the comparisons for each plot
   for(j in 1:length(comps[[i]]$sample_comp)) {
-    dynamic_genes[[j]] = fc_res_long %>% filter(p <= 0.05, abs(fc) >= 1.5, trmt==comps[[i]]$sample_comp[j]) %>% dplyr::select(gene) %>% unlist() %>% as.character()
+    if(comps[[i]]$fc > 0) {
+      dynamic_genes[[j]] = fc_res_long %>% filter(p <= 0.05, fc >= comps[[i]]$fc, trmt==comps[[i]]$sample_comp[j]) %>% dplyr::select(gene) %>% unlist() %>% as.character()
+    } else {
+      dynamic_genes[[j]] = fc_res_long %>% filter(p <= 0.05, fc <= comps[[i]]$fc, trmt==comps[[i]]$sample_comp[j]) %>% dplyr::select(gene) %>% unlist() %>% as.character()
+    }
   }
   
   # plot the venn diagram
@@ -158,7 +199,7 @@ for(i in 1:length(comps)) {
   
   # grab the signal values
   y = bplapply(1:length(files), function(x) rtracklayer::import(con=files[x], which=gene_list))
-  names(y) = paste(comps[[i]]$sample_dat$sample_name, comps[[i]]$sample_dat$sample_donor, sep="_")
+  names(y) = comps[[i]]$sample_dat$sample_name
   
   # tile each gene
   gene_list_tiled = tile(gene_list, n=n_tiles)
@@ -209,9 +250,9 @@ for(i in 1:length(comps)) {
   
 }
 
-save(total_signal, file="~/Dropbox/OTAR020/figures_dat/total_signal.RData") # savepoint
-save(total_diff, file="~/Dropbox/OTAR020/figures_dat/total_diff.RData") # savepoint
-save(total_gene_orders, file="~/Dropbox/OTAR020/figures_dat/total_gene_orders.RData") # savepoint
+save(total_signal, file="tmp/total_signal.RData") # savepoint
+save(total_diff, file="tmp/total_diff.RData") # savepoint
+save(total_gene_orders, file="tmp/total_gene_orders.RData") # savepoint
 
 
 # GENE ENRICHMENT ---------------------------------------------------------
