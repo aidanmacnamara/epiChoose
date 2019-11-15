@@ -97,9 +97,9 @@ comps = list(
                       "U937_BR1_Baseline","U937_BR2_Baseline",
                       "U937_BR1_LPS","U937_BR2_LPS",
                       "U937_BR1_PMA+LPS","U937_BR2_PMA+LPS",
-                      "C000S5_CD14-positive, CD16-negative classical monocyte","C0010K_CD14-positive, CD16-negative classical monocyte","C0011I_CD14-positive, CD16-negative classical monocyte","C001UY_CD14-positive, CD16-negative classical monocyte","C00408_CD14-positive, CD16-negative classical monocyte","C004SQ_CD14-positive, CD16-negative classical monocyte",
-                      "S0022I_macrophage","S001S7_macrophage","S00390_macrophage",
-                      "S001MJ_inflammatory macrophage","S001S7_inflammatory macrophage","S0022I_inflammatory macrophage"
+                      "C000S5_CD14-positive, CD16-negative classical monocyte","C0010K_CD14-positive, CD16-negative classical monocyte","C0011I_CD14-positive, CD16-negative classical monocyte","C00408_CD14-positive, CD16-negative classical monocyte","C004SQ_CD14-positive, CD16-negative classical monocyte",
+                      "S0022I_macrophage","S00390_macrophage",
+                      "S001MJ_inflammatory macrophage","S0022I_inflammatory macrophage"
       ),
       sample_condition = c(
         "THP-1 Baseline","THP-1 Baseline",
@@ -108,9 +108,9 @@ comps = list(
         "U937 Baseline","U937 Baseline",
         "U937 PMA","U937 PMA",
         "U937 PMA + LPS","U937 PMA + LPS",
-        "Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte",
-        "Macrophage","Macrophage","Macrophage",
-        "Inflammatory Macrophage","Inflammatory Macrophage","Inflammatory Macrophage"
+        "Monocyte","Monocyte","Monocyte","Monocyte","Monocyte",
+        "Macrophage","Macrophage",
+        "Inflammatory Macrophage","Inflammatory Macrophage"
       ),
       sample_donor = NA
     )
@@ -126,9 +126,9 @@ comps = list(
                       "U937_BR1_Baseline","U937_BR2_Baseline",
                       "U937_BR1_LPS","U937_BR2_LPS",
                       "U937_BR1_PMA+LPS","U937_BR2_PMA+LPS",
-                      "C000S5_CD14-positive, CD16-negative classical monocyte","C0010K_CD14-positive, CD16-negative classical monocyte","C0011I_CD14-positive, CD16-negative classical monocyte","C001UY_CD14-positive, CD16-negative classical monocyte","C00408_CD14-positive, CD16-negative classical monocyte","C004SQ_CD14-positive, CD16-negative classical monocyte",
-                      "S0022I_macrophage","S001S7_macrophage","S00390_macrophage",
-                      "S001MJ_inflammatory macrophage","S001S7_inflammatory macrophage","S0022I_inflammatory macrophage"
+                      "C000S5_CD14-positive, CD16-negative classical monocyte","C0010K_CD14-positive, CD16-negative classical monocyte","C0011I_CD14-positive, CD16-negative classical monocyte","C00408_CD14-positive, CD16-negative classical monocyte","C004SQ_CD14-positive, CD16-negative classical monocyte",
+                      "S0022I_macrophage","S00390_macrophage",
+                      "S001MJ_inflammatory macrophage","S0022I_inflammatory macrophage"
       ),
       sample_condition = c(
         "THP-1 Baseline","THP-1 Baseline",
@@ -137,9 +137,9 @@ comps = list(
         "U937 Baseline","U937 Baseline",
         "U937 PMA","U937 PMA",
         "U937 PMA + LPS","U937 PMA + LPS",
-        "Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte",
-        "Macrophage","Macrophage","Macrophage",
-        "Inflammatory Macrophage","Inflammatory Macrophage","Inflammatory Macrophage"
+        "Monocyte","Monocyte","Monocyte","Monocyte","Monocyte",
+        "Macrophage","Macrophage",
+        "Inflammatory Macrophage","Inflammatory Macrophage"
       ),
       sample_donor = NA
     )
@@ -366,16 +366,29 @@ for(i in 1:length(my_groups)) {
     to_plot = rbind(to_plot, to_plot_sample)
   }
   
-  to_plot_gene = to_plot %>% group_by(gene) %>% summarise(high = all(class=="High"))
-  to_plot_gene = to_plot_gene %>% filter(high==TRUE) %>% select(gene) %>% unlist() %>% as.character()
-  to_plot_gene = to_plot_gene[to_plot_gene!=""]
+  high_group = to_plot %>% group_by(gene) %>% summarise(high = all(class=="High"))
+  high_group = high_group %>% filter(high==TRUE) %>% select(gene) %>% unlist() %>% as.character()
+  high_group = high_group[high_group!=""]
   
-  my_groups_data[[i]] = list(total=to_plot, genes=to_plot_gene)
+  low_group = to_plot %>% group_by(gene) %>% summarise(low = all(class=="Low"))
+  low_group = low_group %>% filter(low==TRUE) %>% select(gene) %>% unlist() %>% as.character()
+  low_group = low_group[low_group!=""]
+  
+  my_groups_data[[i]] = list(total=to_plot, high_group=high_group, low_group=low_group)
   
 }
 
-lapply(my_groups_data, function(x) length(x[[2]]))
-plot(euler(lapply(my_groups_data, function(x) x[[2]])))
+# how many high signal per sample
+lapply(my_groups_data, function(x) x[[1]] %>% filter(class=="High") %>% group_by(sample) %>% summarise(N=n()))
+
+# how many high signal per group
+lapply(my_groups_data, function(x) length(x$high_group))
+
+# how many low signal per group
+lapply(my_groups_data, function(x) length(x$low_group))
+
+# plot above
+plot(euler(lapply(my_groups_data, function(x) x$high_group)))
 
 # check enrichment of primary groups
 
@@ -385,11 +398,47 @@ enrich_process <- function(x) {
   # res = lapply(res, function(x) tbl_df(head(x)))
 }
 
-enrich_res <- lapply(lapply(my_groups_data[7:9], function(x) x[[2]]), enrich_process)
-
+enrich_res <- lapply(lapply(my_groups_data[7:9], function(x) x$high_group), enrich_process)
 
 # send list to team
 
+gene_intersects = data.frame()
+
+primary_high = Reduce(intersect, lapply(my_groups_data[7:9], function(x) x$high_group))
+primary_low = Reduce(intersect, lapply(my_groups_data[7:9], function(x) x$low_group))
+thp_high = Reduce(intersect, lapply(my_groups_data[1:3], function(x) x$high_group))
+thp_low = Reduce(intersect, lapply(my_groups_data[1:3], function(x) x$low_group))
+
+overlaps_1 = list(
+  pma_up = fc_res_long_filt %>% filter(trmt=="THP-1_PMA", fc>0) %>% select(gene) %>% unlist %>% as.character(),
+  primary_high = primary_high
+)
+plot(euler(overlaps_1))
+gene_intersects = rbind(gene_intersects, data.frame(comp="pma_up_vs_primary_high", genes=Reduce(intersect, overlaps_1)))
+
+overlaps_2 = list(
+  pma_down = fc_res_long_filt %>% filter(trmt=="THP-1_PMA", fc<0) %>% select(gene) %>% unlist %>% as.character(),
+  primary_low = primary_low
+)
+plot(euler(overlaps_2))
+gene_intersects = rbind(gene_intersects, data.frame(comp="pma_down_vs_primary_low", genes=Reduce(intersect, overlaps_2)))
+
+overlaps_3 = list(
+  primary_up = fc_res_long_filt %>% filter(trmt=="primary_macrophage", fc>0) %>% select(gene) %>% unlist %>% as.character(),
+  thp_high = thp_high
+)
+plot(euler(overlaps_3))
+gene_intersects = rbind(gene_intersects, data.frame(comp="primary_up_vs_thp_high", genes=Reduce(intersect, overlaps_3)))
+
+overlaps_4 = list(
+  primary_down = fc_res_long_filt %>% filter(trmt=="primary_macrophage", fc<0) %>% select(gene) %>% unlist %>% as.character(),
+  thp_low = thp_low
+)
+plot(euler(overlaps_4))
+gene_intersects = rbind(gene_intersects, data.frame(comp="primary_down_vs_thp_low", genes=Reduce(intersect, overlaps_4)))
+
+table(gene_intersects$comp)
+write_csv(gene_intersects, "~/Dropbox/OTAR020/figures_dat/gene_intersects.csv")
 
 
 # CHECK AGAINST PAPER -----------------------------------------------------
