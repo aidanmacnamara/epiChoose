@@ -69,8 +69,8 @@ fc_res_long = tbl_df(fc_res_long)
 fc_res_long_filt = fc_res_long %>% filter(abs(fc) >= 1.5, p <= 0.05)
 table(fc_res_long_filt$trmt)
 
-write_csv(fc_res_long_filt, "~/Dropbox/OTAR020/figures_dat/fc_res_long_filt.csv")
-
+# write_csv(fc_res_long_filt, "~/Dropbox/OTAR020/figures_dat/fc_res_long_filt.csv")
+save(fc_res_long_filt, file="tmp/fc_res_long_filt.RData")
 
 # PILE-UP PLOT ------------------------------------------------------------
 
@@ -253,18 +253,22 @@ for(i in 1:length(comps)) {
 save(total_signal, file="tmp/total_signal.RData") # savepoint
 save(total_diff, file="tmp/total_diff.RData") # savepoint
 save(total_gene_orders, file="tmp/total_gene_orders.RData") # savepoint
+save(comps, file="tmp/comps.RData")
 
 
 # GENE ENRICHMENT ---------------------------------------------------------
 
-load("~/Dropbox/OTAR020/figures_dat/total_diff.RData")
-load("~/Dropbox/OTAR020/figures_dat/total_signal.RData")
-load("~/Dropbox/OTAR020/figures_dat/total_gene_orders.RData")
+load("tmp/total_diff.RData")
+load("tmp/total_signal.RData")
+load("tmp/total_gene_orders.RData")
+load("tmp/fc_res_long_filt.RData")
 
-fc_res_long_filt = fc_res_long %>% filter(fc >= 2, p <= 0.05)
 table(fc_res_long_filt$trmt)
+fc_res_long_filt$dir = ifelse(fc_res_long_filt$fc > 0, "up", "down")
+fc_res_long_filt$trmt_dir = paste(fc_res_long_filt$trmt, fc_res_long_filt$dir, sep="_")
 
-gene_sets = sapply(unique(fc_res_long_filt$trmt), function(x) fc_res_long_filt$gene[fc_res_long_filt$trmt==x])
+gene_sets = sapply(unique(fc_res_long_filt$trmt_dir), function(x) fc_res_long_filt$gene[fc_res_long_filt$trmt_dir==x])
+lapply(gene_sets, length)
 
 # enrichment
 
@@ -280,17 +284,112 @@ enrich_res <- lapply(gene_sets, enrich_process)
 
 # gene set enrichment analysis
 
-gsea_res = vector("list", length(my_res))
-names(gsea_res) = names(my_res)
+gsea_res = vector("list", length(gene_sets))
+names(gsea_res) = names(gene_sets)
 
-for(i in 1:length(my_res)) {
+for(i in 1:length(gene_sets)) {
   
-  gsea_in = my_res_sig[[i]]$log2FoldChange
-  names(gsea_in) = my_res_sig[[i]]$gene
+  gsea_dat = fc_res_long_filt %>% filter(trmt_dir==names(gene_sets)[i]) %>% select(gene, fc) %>% mutate(fc=abs(fc)) %>% arrange(desc(fc))
+  
+  gsea_in = gsea_dat$fc
+  names(gsea_in) = gsea_dat$gene
+  
+  if(length(gsea_in) < 2) next
+  
   res_gsea <- lapply(my_p, function(x) fgsea(x, stats=gsea_in, nperm=1000))
   gsea_res[[i]] = lapply(res_gsea, function(x) x %>% as_tibble() %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj))
   
 }
+
+
+# BIMODAL SELECTION -------------------------------------------------------
+
+require(mclust)
+require(cowplot) 
+
+# poc
+
+my_sample = "THP-1_BR1_Baseline"
+dat = dat_all$tss$H3K27ac$res
+
+to_plot = data.frame(
+  gene = roi_tss$hgnc_symbol,
+  signal = log(dat[which(rownames(dat)==my_sample),]),
+  expression = log(unlist(dat_all$tss$RNA$res[which(rownames(dat_all$tss$RNA$res)==my_sample),]))
+)
+
+to_plot = to_plot[!is.infinite(to_plot$signal),]
+
+gmm = Mclust(to_plot$signal, G=2)
+to_plot$class = factor(gmm$classification, labels=c("High","Low"))
+
+# main plot if primary (no rna)
+
+ggplot() + geom_density(data=to_plot, aes(x=signal, fill=class), alpha=0.2, size=0.2) + ggpubr::fill_palette("jco")
+
+# main plot if cell line
+
+p_main = ggplot(to_plot, aes(x=signal, y=expression, color=class)) + geom_point(alpha=0.2) + theme_thesis(20) + ggpubr::color_palette("jco")
+x_dens = axis_canvas(p_main, axis="x") + geom_density(data=to_plot, aes(x=signal, fill=class), alpha=0.2, size=0.2) + ggpubr::fill_palette("jco") # marginal densities along x-axis
+y_dens <- axis_canvas(p_main, axis="y", coord_flip=TRUE) + geom_density(data=to_plot, aes(x=expression, fill=class), alpha=0.2, size=0.2) + coord_flip() + ggpubr::fill_palette("jco") # marginal densities along y-axis
+p_1 = insert_xaxis_grob(p_main, x_dens, grid::unit(.2, "null"), position="top")
+p_2 = insert_yaxis_grob(p_1, y_dens, grid::unit(.2, "null"), position="right")
+ggdraw(p_2)
+
+# across the different groups - define on/off genes
+
+my_groups = unique(as.character(comps$comp_1$sample_dat$sample_condition))
+my_groups_data = vector("list", length(my_groups))
+names(my_groups_data) = my_groups
+
+dat = dat_all$tss$H3K27ac$res
+
+for(i in 1:length(my_groups)) {
+  
+  samples = comps$comp_1$sample_dat$sample_name[comps$comp_1$sample_dat$sample_condition==my_groups[i]]
+  to_plot = data.frame()
+  
+  for(j in 1:length(samples)) {
+    
+    to_plot_sample = data.frame(
+      gene = roi_tss$hgnc_symbol,
+      signal = log(dat[which(rownames(dat)==samples[j]),]),
+      expression = log(unlist(dat_all$tss$RNA$res[which(rownames(dat_all$tss$RNA$res)==samples[j]),])),
+      sample = samples[j]
+    )
+    
+    to_plot_sample = tbl_df(to_plot_sample[!is.infinite(to_plot_sample$signal),])
+    
+    gmm = Mclust(to_plot_sample$signal, G=2)
+    to_plot_sample$class = factor(gmm$classification, labels=c("High","Low"))
+    
+    to_plot = rbind(to_plot, to_plot_sample)
+  }
+  
+  to_plot_gene = to_plot %>% group_by(gene) %>% summarise(high = all(class=="High"))
+  to_plot_gene = to_plot_gene %>% filter(high==TRUE) %>% select(gene) %>% unlist() %>% as.character()
+  to_plot_gene = to_plot_gene[to_plot_gene!=""]
+  
+  my_groups_data[[i]] = list(total=to_plot, genes=to_plot_gene)
+  
+}
+
+lapply(my_groups_data, function(x) length(x[[2]]))
+plot(euler(lapply(my_groups_data, function(x) x[[2]])))
+
+# check enrichment of primary groups
+
+enrich_process <- function(x) {
+  res = enrichr(unique(x), dbs)
+  res = lapply(res, function(x) tbl_df(filter(x, `Adjusted.P.value` <= 0.05)))
+  # res = lapply(res, function(x) tbl_df(head(x)))
+}
+
+enrich_res <- lapply(lapply(my_groups_data[7:9], function(x) x[[2]]), enrich_process)
+
+
+# send list to team
+
 
 
 # CHECK AGAINST PAPER -----------------------------------------------------
