@@ -344,9 +344,9 @@ pca_and_plot(rld_cell_lines_rna, annot_1=rld_cell_lines$condition, annot_2=rld_c
 # PICK SAMPLES ------------------------------------------------------------
 
 donors = list(
-  monocyte = c("C0010K","C00408","C000S5","C001UY","C0011I","C004SQ"),
-  macrophage = c("S001S7","S0022I","S00390"),
-  inflamm = c("S001S7","S0022I","S001MJ")
+  monocyte = c("C0010K","C00408","C000S5","C0011I","C004SQ"), # C001UY removed
+  macrophage = c("S0022I","S00390"), # S001S7 removed
+  inflamm = c("S0022I","S001MJ") # S001S7 removed
 )
 
 table(unlist(donors) %in% dat_all$tss$H3K27ac$annot$Donor)
@@ -361,13 +361,13 @@ col_data = data.frame(dplyr::select(col_data, Label))
 col_data$rep = str_extract(col_data$Label, "BR[12]")
 col_data$condition = str_extract(col_data$Label, "[[:alnum:]+]+$")
 col_data$cell_type = str_extract(col_data$Label, "^[[:alnum:]-]+")
-primary_ix = c(1:12,37)
+primary_ix = c(1:9,34)
 col_data$rep[primary_ix] = "BR1"
 col_data$cell_type[primary_ix] = "primary"
-col_data$condition[c(1:6,37)] = "primary_monocyte"
-col_data$condition[c(9,11,12)] = "primary_macrophage"
-col_data$condition[c(7,8,10)] = "primary_macrophage_inflamm"
-col_data$source = c(rep("External",12), rep("GSK",24), "External")
+col_data$condition[c(1:5,34)] = "primary_monocyte"
+col_data$condition[c(8,9)] = "primary_macrophage"
+col_data$condition[c(6,7)] = "primary_macrophage_inflamm"
+col_data$source = c(rep("External",9), rep("GSK",24), "External")
 col_data$group = paste(col_data$cell_type, col_data$condition, sep="_")
 col_data$group[primary_ix] = col_data$condition[primary_ix]
 col_data[,2:6] = lapply(col_data[,2:6], factor)

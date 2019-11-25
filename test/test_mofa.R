@@ -1,4 +1,10 @@
 
+require(tidyverse)
+require(MOFA)
+require(vsn)
+require(BiocParallel)
+require(MultiAssayExperiment)
+
 load("data/dat_all.RData")
 
 
@@ -6,32 +12,47 @@ load("data/dat_all.RData")
 
 # list of matrices: features as rows, samples as columns
 
-mofa_input = vector("list", length(dat_all$max))
-names(mofa_input) = names(dat_all$max)
-mofa_input$H3K27ac = t(as.matrix(dat_all$max$H3K27ac$res))
-mofa_input$H3K4me3 = t(as.matrix(dat_all$max$H3K4me3$res))
-mofa_input$H3K27me3 = t(as.matrix(dat_all$max$H3K27me3$res))
-mofa_input$ATAC = t(as.matrix(dat_all$closest$ATAC$res))
-mofa_input$CTCF = t(as.matrix(dat_all$closest$CTCF$res))
-mofa_input$RNA = t(as.matrix(dat_all$max$RNA$res))
+inputs = list(
+  t(as.matrix(dat_all$max$H3K27ac$res)),
+  t(as.matrix(dat_all$max$H3K4me3$res)),
+  t(as.matrix(dat_all$max$H3K27me3$res))
+  # t(as.matrix(dat_all$closest$ATAC$res)),
+  # t(as.matrix(dat_all$closest$CTCF$res))
+  # t(as.matrix(dat_all$max$RNA$res))
+)
+names(inputs) = names(dat_all$max)[1:3]
 
-# remove features with all na
-for(i in 1:length(mofa_input)) {
-  mofa_input[[i]] = mofa_input[[i]][apply(mofa_input[[i]], 1, function(x) !all(is.na(x))),]
+for(i in 1:length(inputs)) {
+  rownames(inputs[[i]]) = paste(names(inputs)[i], rownames(inputs[[i]]), sep="_")
 }
 
-mofa = createMOFAobject(mofa_input)
+lapply(inputs, dim)
+lapply(inputs, function(x) x[1:5,c(1,100,200)])
+
+vsn_norm <- function(x) {
+  sample_na_ix = which(apply(x, 2, function(y) all(is.na(y))))
+  res_trans = x[,-sample_na_ix]
+  res_trans = justvsn(res_trans)
+  x[,-sample_na_ix] = res_trans
+  return(x)
+}
+
+inputs_vst = bplapply(inputs, vsn_norm)
+lapply(inputs_vst, function(x) x[1:5,c(1,100,200)])
+lapply(inputs_vst[1:3], limma::plotMA)
+
+annot = data.frame(dat_all$max$H3K27ac$annot)
+rownames(annot) = colnames(inputs_vst[[1]])
+mae = MultiAssayExperiment(experiments=inputs_vst, colData=annot)
+
+# which features have no information across all assays
+features_na = sapply(1:18246, function(x) all(is.na(unlist(assays(mae[x,,])))))
+mae_filt = mae[!features_na,,]
+mae_filt
+
+mofa = createMOFAobject(mae_filt)
 mofa
-
-plotTilesData(mofa)
-
-# options
-# data are centred (0 mean)
-# unscaled (not unit variance)
-# 25 factors default
-# likelihood models for each view guessed - how to check?
-mofa_model@ModelOptions$likelihoods
-# sparsity is used (default)
+plotDataOverview(mofa)
 
 # training options
 getDefaultTrainOptions()
