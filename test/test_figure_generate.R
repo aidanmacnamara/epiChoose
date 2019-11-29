@@ -343,6 +343,10 @@ pca_and_plot(rld_cell_lines_rna, annot_1=rld_cell_lines$condition, annot_2=rld_c
 
 # PICK SAMPLES ------------------------------------------------------------
 
+# export to igv to check signal noise
+signal_check_ix = c(5,6,20,31,33,55,70,150,164)
+dat_all$tss$H3K27ac$annot[signal_check_ix,] %>% select(`Sub-group`)
+
 donors = list(
   monocyte = c("C0010K","C00408","C000S5","C0011I","C004SQ"), # C001UY removed
   macrophage = c("S0022I","S00390"), # S001S7 removed
@@ -355,6 +359,17 @@ row_ix = which(
   grepl("thp-1|u937", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) | (dat_all$tss$H3K27ac$annot$Donor %in% unlist(donors))
 )
 row_ix = c(row_ix, which(rownames(dat_all$tss$H3K27ac$res)=="Monocytes-CD14+_Broad"))
+
+# check sample correlations
+samp_corr = dat_all$tss$H3K27ac$res[(dat_all$tss$H3K27ac$annot$Donor %in% unlist(donors)), sample(1:dim(dat_all$tss$H3K27ac$res)[2], size=1e3)]
+samp_corr[1:5,1:5]
+rownames(samp_corr) = str_extract(rownames(samp_corr), "monocyte|macrophage|inflammatory")
+samp_corr = log(samp_corr, base=2)
+samp_corr[1:5,1:5]
+samp_corr_df = data.frame(t(samp_corr))
+ggpairs(samp_corr_df)
+cor_res = cor(t(samp_corr))
+corrplot(cor_res)
 
 col_data = dat_all$tss$H3K27ac$annot[row_ix,]
 col_data = data.frame(dplyr::select(col_data, Label))

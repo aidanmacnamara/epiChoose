@@ -5,6 +5,7 @@ require(vsn)
 require(BiocParallel)
 require(MultiAssayExperiment)
 
+use_condaenv("general", required=TRUE)
 load("data/dat_all.RData")
 
 

@@ -5,7 +5,7 @@
 #' @param rld DESeq2 rld object
 #' @return TO ADD
 
-pca_and_plot <- function(rld, annot_1, annot_2) {
+pca_and_plot <- function(rld, annot_label="none", annot_color="none", annot_shape="none") {
   
   if(class(rld)=="matrix") {
     y = rld
@@ -21,14 +21,11 @@ pca_and_plot <- function(rld, annot_1, annot_2) {
   pca_res_summary = summary(pca_res)
   yy = data.frame(pca_res$x[,1:2])
   names(yy) = c("x","y")
-  yy$annot_1 = annot_1
-  yy$annot_2 = annot_2
+  yy$annot_label = factor(annot_label)
+  yy$annot_color = factor(annot_color)
+  yy$annot_shape = factor(annot_shape)
   
-  if(is.na(annot_2)) {
-    my_plot = ggplot(yy, aes(x=x, y=y)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=5, force=0.5) + theme(legend.position="none")
-  } else {
-    my_plot = ggplot(yy, aes(x=x, y=y, color=annot_2)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=5, force=0.5) + theme(legend.position="none")
-  }
+  my_plot = ggplot(yy, aes(x=x, y=y, color=annot_color)) + geom_point(size=5, aes(shape=annot_shape)) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_label), fontface="bold", size=5, force=0.5) # + theme(legend.position="none")
   
   return(my_plot)
   
