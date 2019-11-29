@@ -36,6 +36,7 @@ trts = list(
   primary = c("primary_macrophage","primary_macrophage_inflamm"),
   cell_lines = c("THP-1_LPS","THP-1_PMA","THP-1_PMA+LPS","THP-1_VD3","THP-1_VD3+LPS","U937_LPS","U937_PMA","U937_PMA+LPS","U937_VD3","U937_VD3+LPS")
 )
+trts$cell_lines = str_replace_all(trts$cell_lines, "[-+]" ,"_")
 
 fc_res = data.frame(genes=roi_tss$hgnc_symbol)
 fc_res_long = data.frame(trmt=NULL, fc=NULL, p=NULL, group=NULL)
@@ -44,18 +45,27 @@ for(i in 1:length(trts)) {
   for(j in 1:length(trts[[i]])) {
     
     if(i==1) {
-      res = results(dds_all, contrast=c("group",trts[[i]][j],"primary_monocyte"))
+      contr_list = paste0("group", c(trts[[i]][j],"primary_monocyte"))
     }
     if(i==2) {
-      if(grepl("THP-1", trts[[i]][j])) {
-        res = results(dds_all, contrast=c("group",trts[[i]][j],"THP-1_Baseline"))
+      if(grepl("THP_1", trts[[i]][j])) {
+        contr_list = paste0("group", c(trts[[i]][j],"THP_1_Baseline"))
       } else {
-        res = results(dds_all, contrast=c("group",trts[[i]][j],"U937_Baseline"))
+        contr_list = paste0("group", c(trts[[i]][j],"U937_Baseline"))
       }
     }
     
-    fc_res = cbind(fc_res, res$log2FoldChange, res$padj)
-    fc_res_long = rbind(fc_res_long, data.frame(trmt=trts[[i]][j], fc=res$log2FoldChange, p=res$padj, group=names(trts)[i]))
+    my_args = list(
+      paste(contr_list[1], contr_list[2], sep=" - "),
+      levels=colnames(coefficients(dds_all))
+    )
+    contr = do.call(makeContrasts, my_args)
+    contr_fit = contrasts.fit(dds_all, contr)
+    contr_fit = eBayes(contr_fit)
+    # contr_fit = topTable(contr_fit, n=Inf)
+    
+    fc_res = cbind(fc_res, contr_fit$coefficients[,1], contr_fit$F.p.value)
+    fc_res_long = rbind(fc_res_long, data.frame(trmt=trts[[i]][j], fc=contr_fit$coefficients[,1], p=contr_fit$F.p.value, group=names(trts)[i]))
   }
 }
 
@@ -69,7 +79,7 @@ fc_res_long = tbl_df(fc_res_long)
 fc_res_long_filt = fc_res_long %>% filter(abs(fc) >= 1.5, p <= 0.05)
 table(fc_res_long_filt$trmt)
 
-# write_csv(fc_res_long_filt, "~/Dropbox/OTAR020/figures_dat/fc_res_long_filt.csv")
+write_csv(fc_res_long_filt, "~/Downloads/fc_res_long_filt.csv")
 save(fc_res_long_filt, file="tmp/fc_res_long_filt.RData")
 
 
