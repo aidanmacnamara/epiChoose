@@ -76,7 +76,7 @@ fc_res_long$gene = rep(roi_tss$hgnc_symbol, length(unlist(trts)))
 fc_res_long$trmt = as.character(fc_res_long$trmt)
 fc_res_long = tbl_df(fc_res_long)
 
-fc_res_long_filt = fc_res_long %>% filter(abs(fc) >= 1.5, p <= 0.05)
+fc_res_long_filt = fc_res_long %>% filter(abs(fc) >= 2, p <= 0.05)
 table(fc_res_long_filt$trmt)
 
 write_csv(fc_res_long_filt, "~/Downloads/fc_res_long_filt.csv")

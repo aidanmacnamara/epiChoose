@@ -280,6 +280,17 @@ save(total_tss, file="data/total_tss.RData") # savepoint
 
 # REG TO GENE COLLAPSES ---------------------------------------------------
 
+# add variance stabilisation
+
+vsn_norm <- function(x) {
+  x = t(x)
+  sample_na_ix = which(apply(x, 2, function(y) all(is.na(y))))
+  res_trans = x[,-sample_na_ix]
+  res_trans = justvsn(res_trans)
+  x[,-sample_na_ix] = res_trans
+  return(t(x))
+}
+
 dat_max_gb = total_reg # max across gene body
 loc_max_gb = vector("list", length(total_reg))
 names(loc_max_gb) = names(total_reg)

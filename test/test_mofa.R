@@ -64,7 +64,7 @@ mofa_model
 
 # VISUALISATION -----------------------------------------------------------
 
-plotVarianceExplained(mofa_model)
+plotVarianceExplained(mofa_model, )
 
 plotWeightsHeatmap(
   mofa_model, 
@@ -88,7 +88,7 @@ y$project = dat_all$max$H3K27ac$annot$Project[match(y$annot_1, dat_all$max$H3K27
 
 # ggplot(y, aes(x=x, y=y)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=2, force=0.5)
 
-ggplot(filter(y, (project!="DEEP")), aes(x=x, y=y, color=project)) + geom_point(size=5, shape=17) + xlab("") + ylab("") + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=3, force=0.5)
+ggplot(y, aes(x=x, y=y, color=project)) + geom_point(size=5, shape=17) + xlab("") + ylab("") + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=3, force=0.5)
 
 clusters <- clusterSamples(mofa_model, k=2, factors=1)
 plotFactorScatter(mofa_model, factors=1:2, color_by=clusters)
