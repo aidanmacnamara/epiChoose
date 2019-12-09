@@ -63,18 +63,7 @@ col_data[,2:6] = lapply(col_data[,2:6], factor)
 
 # NORMALISATION -----------------------------------------------------------
 
-dat_add = dat_all$tss$H3K27ac$res[row_ix,]
-dat_add[is.na(dat_add)] = 1
-# dat_add = apply(dat_add, 2, as.integer)
-dim(dat_add)
-dat_add = t(dat_add)
-dat_add[1:5,1:5]
-
-# dat_add_voomed = voom(dat_add, plot=TRUE)
-# dat_add_voomed$E[1:5,1:5]
-
-dat_add_vsn = justvsn(dat_add)
-limma::plotMA(dat_add)
+dat_add_vsn = t(dat_all$tss$H3K27ac$res[row_ix,])
 limma::plotMA(dat_add_vsn)
 dat_add_vsn[1:5,1:5]
 

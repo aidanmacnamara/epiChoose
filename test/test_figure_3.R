@@ -79,7 +79,7 @@ fc_res_long = tbl_df(fc_res_long)
 fc_res_long_filt = fc_res_long %>% filter(abs(fc) >= 2, p <= 0.05)
 table(fc_res_long_filt$trmt)
 
-write_csv(fc_res_long_filt, "~/Downloads/fc_res_long_filt.csv")
+write_csv(fc_res_long_filt, "~/Dropbox/OTAR020/figures_dat/fc_res_long_filt.csv")
 save(fc_res_long_filt, file="tmp/fc_res_long_filt.RData")
 
 

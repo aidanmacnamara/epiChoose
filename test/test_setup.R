@@ -10,7 +10,7 @@ require(TxDb.Hsapiens.UCSC.hg38.knownGene) # for peak to gene
 require(ChIPseeker) # for peak to gene
 require(org.Hs.eg.db) # for peak to gene
 require(vsn)
-load_all()
+require(epiChoose)
 
 
 # GENERATE ENSEMBL DATA ---------------------------------------------------
@@ -179,7 +179,7 @@ total_reg = vector("list", length(marks)) # number of data types
 for(i in 1:length(total_reg)) {
   total_reg[[i]]$res = rbind(blueprint_chip_filtered[[i]]$res, gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res, deep_chip_filtered[[i]]$res)
   # renormalize as we are multiple sources
-  total_reg[[i]]$res = quantile_norm(total_reg[[i]]$res)
+  # total_reg[[i]]$res = quantile_norm(total_reg[[i]]$res)
   if(length(deep_chip_filtered[[i]]$annot$Size)) { # for error with data type conversion
     deep_chip_filtered[[i]]$annot$Size = as.character(deep_chip_filtered[[i]]$annot$Size)
   }
@@ -191,7 +191,7 @@ total_tss = vector("list", length(marks)) # number of data types
 for(i in 1:length(total_tss)) {
   total_tss[[i]]$res = rbind(blueprint_tsss_filtered[[i]]$res, gsk_tsss_filtered[[i]]$res, encode_tsss_filtered[[i]]$res, deep_tsss_filtered[[i]]$res)
   # renormalize as we are multiple sources
-  total_tss[[i]]$res = quantile_norm(total_tss[[i]]$res)
+  # total_tss[[i]]$res = quantile_norm(total_tss[[i]]$res)
   if(length(deep_tsss_filtered[[i]]$annot$Size)) { # for error with data type conversion
     deep_tsss_filtered[[i]]$annot$Size = as.character(deep_tsss_filtered[[i]]$annot$Size)
   }
@@ -258,7 +258,7 @@ rownames_symbol = mapping$hgnc_symbol[match(rna_dat[[1]]$`Gene ID`, mapping$ense
 rna_dat_merge = tbl_df(cbind(rownames_symbol, rna_dat_merge))
 names(rna_dat_merge)[1] = "Gene Name"
 
-rna_add = prep_rna(fpkm_table=rna_dat_merge, gene_list=gene_list_all$hgnc_symbol, chip_labels=single_labels, rna_labels=names(rna_dat_merge)[-c(1,2)], quantile_norm=TRUE)
+rna_add = prep_rna(fpkm_table=rna_dat_merge, gene_list=gene_list_all$hgnc_symbol, chip_labels=single_labels, rna_labels=names(rna_dat_merge)[-c(1,2)], quantile_norm=FALSE)
 
 
 # EDIT NAMES --------------------------------------------------------------
@@ -286,9 +286,13 @@ save(total_tss, file="data/total_tss.RData") # savepoint
 vsn_norm <- function(x) {
   x = t(x)
   sample_na_ix = which(apply(x, 2, function(y) all(is.na(y))))
-  res_trans = x[,-sample_na_ix]
-  res_trans = justvsn(res_trans)
-  x[,-sample_na_ix] = res_trans
+  if(is_empty(sample_na_ix)) {
+    x = justvsn(x)
+  } else {
+    res_trans = x[,-sample_na_ix]
+    res_trans = justvsn(res_trans)
+    x[,-sample_na_ix] = res_trans
+  }
   return(t(x))
 }
 
@@ -311,7 +315,7 @@ for(i in 1:length(dat_tss[1:5])) {
   print(paste("Processing data type", names(dat_tss)[i]))
   my_data = total_tss[[i]]$res
   my_data = vsn_norm(my_data)
-  dat_tss[[i]]$res = total_tss[[i]]$res
+  dat_tss[[i]]$res = my_data
 }
 
 dat_sum_gb = total_reg # normalised sum of aucs across gene body (h3k27me3 relevant)
