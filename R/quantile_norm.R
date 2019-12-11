@@ -8,9 +8,17 @@
 quantile_norm <- function(x) {
   
   r_ix = which(rowSums(x, na.rm=TRUE)==0)
-  res_trans = t(x[-r_ix,])
-  res_trans = normalizeQuantiles(res_trans)
-  x[-r_ix,] = t(res_trans)
+  
+  if(is_empty(r_ix)) {
+    res_trans = t(x)
+    res_trans = normalizeQuantiles(res_trans)
+    x = t(res_trans)
+  } else {
+    res_trans = t(x[-r_ix,])
+    res_trans = normalizeQuantiles(res_trans)
+    x[-r_ix,] = t(res_trans)
+  }
+  
   return(x)
   
 }

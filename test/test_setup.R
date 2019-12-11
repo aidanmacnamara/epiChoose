@@ -303,7 +303,6 @@ names(loc_max_gb) = names(total_reg)
 for(i in 1:length(dat_max_gb[1:5])) {
   print(paste("Processing data type", names(dat_max_gb)[i]))
   my_data = convert_reg_matrix(dat_max_gb[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="max")
-  my_data$data = vsn_norm(my_data$data)
   dat_max_gb[[i]]$res = my_data$data
   loc_max_gb[[i]] = my_data$locations
 }
@@ -314,7 +313,6 @@ dat_tss = total_reg # tss sites only
 for(i in 1:length(dat_tss[1:5])) {
   print(paste("Processing data type", names(dat_tss)[i]))
   my_data = total_tss[[i]]$res
-  my_data = vsn_norm(my_data)
   dat_tss[[i]]$res = my_data
 }
 
@@ -325,7 +323,6 @@ names(loc_sum_gb) = names(total_reg)
 for(i in 1:length(dat_sum_gb[1:5])) {
   print(paste("Processing data type", names(dat_sum_gb)[i]))
   my_data = convert_reg_matrix(dat_sum_gb[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="sum")
-  my_data$data = vsn_norm(my_data$data)
   dat_sum_gb[[i]]$res = my_data$data
   loc_sum_gb[[i]] = my_data$locations 
 }
@@ -337,14 +334,33 @@ names(loc_max_10) = names(total_reg)
 for(i in 1:length(dat_max_10[1:5])) {
   print(paste("Processing data type", names(dat_max_10)[i]))
   my_data = convert_reg_matrix(dat_max_10[[i]]$res, roi_reg, gene_list_all, reg_window=2e3, summ_method="closest")
-  my_data$data = vsn_norm(my_data$data)
   dat_max_10[[i]]$res = my_data$data
   loc_max_10[[i]] = my_data$locations
 }
 
-dat_all = list(dat_max_gb, dat_tss, dat_sum_gb, dat_max_10)
-names(dat_all) = c("max", "tss", "sum", "closest")
+dat_all_raw = list(dat_max_gb, dat_tss, dat_sum_gb, dat_max_10)
+names(dat_all_raw) = c("max", "tss", "sum", "closest")
 
+# variance stabilisation
+dat_all_vsn = dat_all_raw
+for(i in 1:length(dat_all_vsn)) {
+  for(j in 1:length(dat_all_vsn[[i]])) {
+    print(paste("Method:", names(dat_all_raw)[i], "Data Type:", names(dat_all_raw[[i]][j])))
+    dat_all_vsn[[i]][[j]]$res = vsn_norm(dat_all_raw[[i]][[j]]$res)
+  }
+}
+
+# quantile normalisation
+dat_all = dat_all_vsn
+for(i in 1:length(dat_all)) {
+  for(j in 1:length(dat_all[[i]])) {
+    print(paste("Method:", names(dat_all)[i], "Data Type:", names(dat_all[[i]][j])))
+    dat_all[[i]][[j]]$res = quantile_norm(dat_all_vsn[[i]][[j]]$res)
+  }
+}
+
+save(dat_all_raw, file="data/dat_all_raw.RData") # savepoint
+save(dat_all_vsn, file="data/dat_all_vsn.RData") # savepoint
 save(dat_all, file="data/dat_all.RData") # savepoint
 
 
