@@ -4,18 +4,17 @@
 
 load("tmp/rld_all.RData")
 
-y = t(assays(rld_all)[[1]])
-
+y = t(rld_all)
 dim(y)
-y = y[,!apply(y, 2, function(x) sd(x)==0)] # remove regions with no variance
+y = y[,!apply(y, 2, function(x) all(x==0, na.rm=TRUE))] # remove regions with no variance
 dim(y)
 
 pca_res <- prcomp(y, scale=TRUE, center=TRUE)
 pca_res_summary = summary(pca_res)
 figure_1_pca = data.frame(pca_res$x[,1:2])
 names(figure_1_pca) = c("x","y")
-figure_1_pca$annot_1 = factor(rld_all$cell_type)
-figure_1_pca$annot_2 = factor(paste(rld_all$cell_type, rld_all$treatment, sep="_"))
+figure_1_pca$annot_1 = factor(col_data$cell_type)
+figure_1_pca$annot_2 = col_data$condition
 
 save(figure_1_pca, file="~/Dropbox/OTAR020/figures_dat/figure_1_pca.RData") # savepoint
 # load("~/Dropbox/OTAR020/figures_dat/figure_1_pca.RData")

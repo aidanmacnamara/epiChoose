@@ -62,7 +62,6 @@ for(i in 1:length(trts)) {
     contr = do.call(makeContrasts, my_args)
     contr_fit = contrasts.fit(dds_all, contr)
     contr_fit = eBayes(contr_fit)
-    # contr_fit = topTable(contr_fit, n=Inf)
     
     fc_res = cbind(fc_res, contr_fit$coefficients[,1], contr_fit$F.p.value)
     fc_res_long = rbind(fc_res_long, data.frame(trmt=trts[[i]][j], fc=contr_fit$coefficients[,1], p=contr_fit$F.p.value, group=names(trts)[i]))
@@ -76,7 +75,7 @@ fc_res_long$gene = rep(roi_tss$hgnc_symbol, length(unlist(trts)))
 fc_res_long$trmt = as.character(fc_res_long$trmt)
 fc_res_long = tbl_df(fc_res_long)
 
-fc_res_long_filt = fc_res_long %>% filter(abs(fc) >= 2, p <= 0.05)
+fc_res_long_filt = fc_res_long %>% filter(abs(fc) >= 3, p <= 0.05)
 table(fc_res_long_filt$trmt)
 
 write_csv(fc_res_long_filt, "~/Dropbox/OTAR020/figures_dat/fc_res_long_filt.csv")
