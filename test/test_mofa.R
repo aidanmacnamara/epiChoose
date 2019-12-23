@@ -4,19 +4,22 @@ require(MOFA)
 require(vsn)
 require(BiocParallel)
 require(MultiAssayExperiment)
+require(reticulate)
 
-use_condaenv("general", required=TRUE)
+# use_condaenv("general", required=TRUE)
+use_python(python="/usr/local/bin/python3", required=TRUE)
 load("data/dat_all.RData")
 
 
 # DATA PREP ---------------------------------------------------------------
 
+# use row_ix and col_data from 'test/test_figure_generate.r'
 # list of matrices: features as rows, samples as columns
 
 inputs = list(
-  t(as.matrix(dat_all$max$H3K27ac$res)),
-  t(as.matrix(dat_all$max$H3K4me3$res)),
-  t(as.matrix(dat_all$max$H3K27me3$res))
+  t(as.matrix(dat_all$max$H3K27ac$res[row_ix,])),
+  t(as.matrix(dat_all$max$H3K4me3$res[row_ix,])),
+  t(as.matrix(dat_all$max$H3K27me3$res[row_ix,]))
   # t(as.matrix(dat_all$closest$ATAC$res)),
   # t(as.matrix(dat_all$closest$CTCF$res))
   # t(as.matrix(dat_all$max$RNA$res))
@@ -28,26 +31,16 @@ for(i in 1:length(inputs)) {
 }
 
 lapply(inputs, dim)
-lapply(inputs, function(x) x[1:5,c(1,100,200)])
+lapply(inputs, function(x) x[1:5,])
+lapply(inputs, limma::plotMA)
 
-vsn_norm <- function(x) {
-  sample_na_ix = which(apply(x, 2, function(y) all(is.na(y))))
-  res_trans = x[,-sample_na_ix]
-  res_trans = justvsn(res_trans)
-  x[,-sample_na_ix] = res_trans
-  return(x)
-}
-
-inputs_vst = bplapply(inputs, vsn_norm)
-lapply(inputs_vst, function(x) x[1:5,c(1,100,200)])
-lapply(inputs_vst[1:3], limma::plotMA)
-
-annot = data.frame(dat_all$max$H3K27ac$annot)
-rownames(annot) = colnames(inputs_vst[[1]])
-mae = MultiAssayExperiment(experiments=inputs_vst, colData=annot)
+annot = data.frame(col_data)
+rownames(annot) = colnames(inputs[[1]])
+mae = MultiAssayExperiment(experiments=inputs, colData=annot)
 
 # which features have no information across all assays
 features_na = sapply(1:18246, function(x) all(is.na(unlist(assays(mae[x,,])))))
+table(features_na)
 mae_filt = mae[!features_na,,]
 mae_filt
 
@@ -58,6 +51,8 @@ plotDataOverview(mofa)
 # training options
 getDefaultTrainOptions()
 mofa_train = prepareMOFA(mofa)
+mofa_train@ModelOptions$numFactors = 10
+mofa_train@ModelOptions
 mofa_model = runMOFA(mofa_train, outfile=tempfile())
 mofa_model
 
