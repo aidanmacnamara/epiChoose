@@ -75,6 +75,10 @@ fc_res_long$gene = rep(roi_tss$hgnc_symbol, length(unlist(trts)))
 fc_res_long$trmt = as.character(fc_res_long$trmt)
 fc_res_long = tbl_df(fc_res_long)
 
+volc_plot = data.frame(filter(fc_res_long,  trmt=="primary_macrophage"))
+rownames(volc_plot) = volc_plot$gene
+EnhancedVolcano(volc_plot, lab=rownames(volc_plot), x="fc", y="p", FCcutoff=3, legendLabels=c("","","","FC > 3"))
+
 fc_res_long_filt = fc_res_long %>% filter(abs(fc) >= 3, p <= 0.05)
 table(fc_res_long_filt$trmt)
 

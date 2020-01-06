@@ -78,7 +78,7 @@ data.frame(
 row_ix = which(
   grepl("thp-1|u937", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE) | (dat_all$tss$H3K27ac$annot$Donor %in% unlist(donors))
 )
-# row_ix = c(row_ix, which(rownames(dat_all$tss$H3K27ac$res)=="Monocytes-CD14+_Broad"))
+row_ix = c(row_ix, which(rownames(dat_all$tss$H3K27ac$res)=="Monocytes-CD14+_Broad"))
 
 # check sample correlations
 samp_corr = dat_all$tss$H3K27ac$res[(dat_all$tss$H3K27ac$annot$Donor %in% unlist(donors)), sample(1:dim(dat_all$tss$H3K27ac$res)[2], size=1e3)]
@@ -96,13 +96,13 @@ col_data = data.frame(dplyr::select(col_data, Label))
 col_data$rep = str_extract(col_data$Label, "BR[12]")
 col_data$condition = str_extract(col_data$Label, "[[:alnum:]+]+$")
 col_data$cell_type = str_extract(col_data$Label, "^[[:alnum:]-]+")
-primary_ix = c(1:12)
+primary_ix = c(1:12,37)
 col_data$rep[primary_ix] = "BR1"
 col_data$cell_type[primary_ix] = "primary"
-col_data$condition[c(1:6)] = "primary_monocyte"
+col_data$condition[c(1:6,37)] = "primary_monocyte"
 col_data$condition[c(9,11,12)] = "primary_macrophage"
 col_data$condition[c(7,8,10)] = "primary_macrophage_inflamm"
-col_data$source = c(rep("External",12), rep("GSK",24))
+col_data$source = c(rep("Blueprint",12), rep("GSK",24),"Encode")
 col_data$group = paste(col_data$cell_type, col_data$condition, sep="_")
 col_data$group[primary_ix] = col_data$condition[primary_ix]
 col_data[,2:6] = lapply(col_data[,2:6], factor)
