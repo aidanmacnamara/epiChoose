@@ -185,6 +185,10 @@ wang_chip_filtered = prep_across_datatypes(wang_chip)
 wang_tsss = bplapply(seq(along=marks), function(x) make_auc_matrix(wang_input, roi_tss, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
 wang_tsss_filtered = prep_across_datatypes(wang_tsss)
 
+# for combining with other data sets
+wang_chip_filtered[[i]]$annot$Donor = as.character(wang_chip_filtered[[i]]$annot$Donor)
+wang_tsss_filtered[[i]]$annot$Donor = as.character(wang_tsss_filtered[[i]]$annot$Donor)
+
 save(wang_chip_filtered, file="data/wang_chip_filtered.RData") # savepoint
 save(wang_tsss_filtered, file="data/wang_tsss_filtered.RData") # savepoint
 

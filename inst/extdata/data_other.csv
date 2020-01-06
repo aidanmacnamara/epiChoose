@@ -1,9 +1,9 @@
 Bigwig,Cell,Mark,Source,Donor,Label
-/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942921_H3K27ac_Mo_DMSO_bc11.lo.bw,Monocyte,H3K27ac,Wang,11,Monocyte_H3K27ac_11
-/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942922_H3K27ac_Mo_DMSO_bc12.lo.bw,Monocyte,H3K27ac,Wang,12,Monocyte_H3K27ac_12
-/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942925_H3K27ac_Mf_DMSO_bc11.lo.bw,Macrophage,H3K27ac,Wang,11,Macrophage_H3K27ac_11
-/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942926_H3K27ac_Mf_DMSO_bc16.lo.bw,Macrophage,H3K27ac,Wang,16,Macrophage_H3K27ac_16
-/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942929_H3K4me3_Mo_DMSO_bc10.lo.bw,Monocyte,H3K4me3,Wang,10,Monocyte_H3K4me3_10
-/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942930_H3K4me3_Mo_DMSO_bc19.lo.bw,Monocyte,H3K4me3,Wang,19,Monocyte_H3K4me3_19
-/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942933_H3K4me3_Mf_DMSO_bc10.lo.bw,Macrophage,H3K4me3,Wang,10,Macrophage_H3K4me3_10
-/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942934_H3K4me3_Mf_DMSO_bc19.lo.bw,Macrophage,H3K4me3,Wang,19,Macrophage_H3K4me3_19
+/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942921_H3K27ac_Mo_DMSO_bc11.lo.bw,Monocyte,H3K27ac,Wang,11,Monocyte_11
+/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942922_H3K27ac_Mo_DMSO_bc12.lo.bw,Monocyte,H3K27ac,Wang,12,Monocyte_12
+/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942925_H3K27ac_Mf_DMSO_bc11.lo.bw,Macrophage,H3K27ac,Wang,11,Macrophage_11
+/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942926_H3K27ac_Mf_DMSO_bc16.lo.bw,Macrophage,H3K27ac,Wang,16,Macrophage_16
+/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942929_H3K4me3_Mo_DMSO_bc10.lo.bw,Monocyte,H3K4me3,Wang,10,Monocyte_10
+/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942930_H3K4me3_Mo_DMSO_bc19.lo.bw,Monocyte,H3K4me3,Wang,19,Monocyte_19
+/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942933_H3K4me3_Mf_DMSO_bc10.lo.bw,Macrophage,H3K4me3,Wang,10,Macrophage_10
+/GWD/bioinfo/projects/RD-Epigenetics-NetworkData/otar_020/OTHER/GSM2942934_H3K4me3_Mf_DMSO_bc19.lo.bw,Macrophage,H3K4me3,Wang,19,Macrophage_19
