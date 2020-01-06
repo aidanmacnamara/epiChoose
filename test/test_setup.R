@@ -173,29 +173,45 @@ save(deep_chip_filtered, file="data/deep_chip_filtered.RData") # savepoint
 save(deep_tsss_filtered, file="data/deep_tsss_filtered.RData") # savepoint
 
 
+# WANG DATA ---------------------------------------------------------------
+
+# baseline monocyte/macrophage data from https://www.ncbi.nlm.nih.gov/pubmed/30809020
+
+wang_input = "inst/extdata/data_other.csv"
+
+wang_chip = bplapply(seq(along=marks), function(x) make_auc_matrix(wang_input, roi_reg, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
+wang_chip_filtered = prep_across_datatypes(wang_chip)
+
+wang_tsss = bplapply(seq(along=marks), function(x) make_auc_matrix(wang_input, roi_tss, marks[x], "tmp/", quantile_norm=FALSE), BPPARAM=MulticoreParam(workers=3))
+wang_tsss_filtered = prep_across_datatypes(wang_tsss)
+
+save(wang_chip_filtered, file="data/wang_chip_filtered.RData") # savepoint
+save(wang_tsss_filtered, file="data/wang_tsss_filtered.RData") # savepoint
+
+
 # COMBINE -----------------------------------------------------------------
 
 total_reg = vector("list", length(marks)) # number of data types
 for(i in 1:length(total_reg)) {
-  total_reg[[i]]$res = rbind(blueprint_chip_filtered[[i]]$res, gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res, deep_chip_filtered[[i]]$res)
+  total_reg[[i]]$res = rbind(blueprint_chip_filtered[[i]]$res, gsk_chip_filtered[[i]]$res, encode_chip_filtered[[i]]$res, deep_chip_filtered[[i]]$res, wang_chip_filtered[[i]]$res)
   # renormalize as we are multiple sources
   # total_reg[[i]]$res = quantile_norm(total_reg[[i]]$res)
   if(length(deep_chip_filtered[[i]]$annot$Size)) { # for error with data type conversion
     deep_chip_filtered[[i]]$annot$Size = as.character(deep_chip_filtered[[i]]$annot$Size)
   }
-  total_reg[[i]]$annot = bind_rows(blueprint_chip_filtered[[i]]$annot, gsk_chip_filtered[[i]]$annot, encode_chip_filtered[[i]]$annot, deep_chip_filtered[[i]]$annot)
+  total_reg[[i]]$annot = bind_rows(blueprint_chip_filtered[[i]]$annot, gsk_chip_filtered[[i]]$annot, encode_chip_filtered[[i]]$annot, deep_chip_filtered[[i]]$annot, wang_chip_filtered[[i]]$annot)
 }
 names(total_reg) = marks
 
 total_tss = vector("list", length(marks)) # number of data types
 for(i in 1:length(total_tss)) {
-  total_tss[[i]]$res = rbind(blueprint_tsss_filtered[[i]]$res, gsk_tsss_filtered[[i]]$res, encode_tsss_filtered[[i]]$res, deep_tsss_filtered[[i]]$res)
+  total_tss[[i]]$res = rbind(blueprint_tsss_filtered[[i]]$res, gsk_tsss_filtered[[i]]$res, encode_tsss_filtered[[i]]$res, deep_tsss_filtered[[i]]$res, wang_tsss_filtered[[i]]$res)
   # renormalize as we are multiple sources
   # total_tss[[i]]$res = quantile_norm(total_tss[[i]]$res)
   if(length(deep_tsss_filtered[[i]]$annot$Size)) { # for error with data type conversion
     deep_tsss_filtered[[i]]$annot$Size = as.character(deep_tsss_filtered[[i]]$annot$Size)
   }
-  total_tss[[i]]$annot = bind_rows(blueprint_tsss_filtered[[i]]$annot, gsk_tsss_filtered[[i]]$annot, encode_tsss_filtered[[i]]$annot, deep_tsss_filtered[[i]]$annot)
+  total_tss[[i]]$annot = bind_rows(blueprint_tsss_filtered[[i]]$annot, gsk_tsss_filtered[[i]]$annot, encode_tsss_filtered[[i]]$annot, deep_tsss_filtered[[i]]$annot, wang_tsss_filtered[[i]]$annot)
 }
 names(total_tss) = marks
 
@@ -207,7 +223,8 @@ group_labels = c(
   rep("BLUEPRINT", dim(blueprint_chip_filtered[[1]]$res)[1]),
   rep("GSK", dim(gsk_chip_filtered[[1]]$res)[1]),
   rep("ENCODE", dim(encode_chip_filtered[[1]]$res)[1]),
-  rep("DEEP", dim(deep_chip_filtered[[1]]$res)[1])
+  rep("DEEP", dim(deep_chip_filtered[[1]]$res)[1]),
+  rep("WANG", dim(wang_chip_filtered[[1]]$res)[1])
 )
 
 # total_reg_edit = total_tss
@@ -266,6 +283,7 @@ rna_add = prep_rna(fpkm_table=rna_dat_merge, gene_list=gene_list_all$hgnc_symbol
 total_reg[[1]]$annot$Project[which(group_labels=="BLUEPRINT")] = "BLUEPRINT"
 total_reg[[1]]$annot$Project[which(group_labels=="ENCODE")] = "ENCODE"
 total_reg[[1]]$annot$Project[which(group_labels=="DEEP")] = "DEEP"
+total_reg[[1]]$annot$Project[which(group_labels=="WANG")] = "WANG"
 
 total_reg[[6]] = rna_add
 names(total_reg)[6] = "RNA"
@@ -275,6 +293,7 @@ save(total_reg, file="data/total_reg.RData") # savepoint
 total_tss[[1]]$annot$Project[which(group_labels=="BLUEPRINT")] = "BLUEPRINT"
 total_tss[[1]]$annot$Project[which(group_labels=="ENCODE")] = "ENCODE"
 total_tss[[1]]$annot$Project[which(group_labels=="DEEP")] = "DEEP"
+total_tss[[1]]$annot$Project[which(group_labels=="WANG")] = "WANG"
 
 save(total_tss, file="data/total_tss.RData") # savepoint
 
