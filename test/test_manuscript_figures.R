@@ -11,7 +11,7 @@ dim(y)
 
 pca_res <- prcomp(y, scale=TRUE, center=TRUE)
 pca_res_summary = summary(pca_res)
-figure_1_pca = data.frame(pca_res$x[,1:2])
+figure_1_pca = data.frame(pca_res$x[,3:4])
 names(figure_1_pca) = c("x","y")
 figure_1_pca$annot_1 = factor(col_data$source)
 figure_1_pca$annot_2 = col_data$condition
@@ -19,7 +19,7 @@ figure_1_pca$annot_2 = col_data$condition
 save(figure_1_pca, file="~/Dropbox/OTAR020/figures_dat/figure_1_pca.RData") # savepoint
 # load("~/Dropbox/OTAR020/figures_dat/figure_1_pca.RData")
 
-ggplot(figure_1_pca, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,1]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,2]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=4, force=0.5)
+ggplot(figure_1_pca, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,3]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,4]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=4, force=0.5)
 
 
 # FIGURE 1 PILEUP ---------------------------------------------------------
