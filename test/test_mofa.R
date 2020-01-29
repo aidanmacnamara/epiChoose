@@ -55,6 +55,7 @@ mofa_train@ModelOptions$numFactors = 10
 mofa_train@ModelOptions
 mofa_model = runMOFA(mofa_train, outfile=tempfile())
 mofa_model
+save(mofa_model, file="tmp/mofa_model.RData")
 
 
 # VISUALISATION -----------------------------------------------------------

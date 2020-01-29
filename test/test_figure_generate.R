@@ -110,6 +110,8 @@ col_data[,2:6] = lapply(col_data[,2:6], factor)
 col_data = tbl_df(col_data)
 col_data
 
+save(col_data, file="tmp/col_data.RData")
+
 
 # NORMALISATION -----------------------------------------------------------
 

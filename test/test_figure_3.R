@@ -16,6 +16,7 @@ require(UpSetR)
 require(eulerr)
 require(fgsea)
 require(enrichR)
+require(EnhancedVolcano)
 
 load("data/dat_all.RData")
 load("tmp/dds_all.RData")
@@ -102,7 +103,7 @@ options(stringsAsFactors=FALSE)
 comps = list(
   
   comp_1 = list( # everything
-    sample_comp = c("THP-1_PMA","THP-1_PMA+LPS","U937_PMA","U937_PMA+LPS","primary_macrophage","primary_macrophage_inflamm"),
+    sample_comp = c("THP_1_PMA","THP_1_PMA_LPS","U937_PMA","U937_PMA_LPS","primary_macrophage","primary_macrophage_inflamm"),
     fc = 1.5,
     sample_dat = data.frame(
       sample_name = c("THP-1_BR1_Baseline","THP-1_BR2_Baseline",
@@ -111,8 +112,8 @@ comps = list(
                       "U937_BR1_Baseline","U937_BR2_Baseline",
                       "U937_BR1_LPS","U937_BR2_LPS",
                       "U937_BR1_PMA+LPS","U937_BR2_PMA+LPS",
-                      "C000S5_CD14-positive, CD16-negative classical monocyte","C0010K_CD14-positive, CD16-negative classical monocyte","C0011I_CD14-positive, CD16-negative classical monocyte","C00408_CD14-positive, CD16-negative classical monocyte","C004SQ_CD14-positive, CD16-negative classical monocyte",
-                      "S0022I_macrophage","S00390_macrophage",
+                      "C000S5_CD14-positive, CD16-negative classical monocyte","C0010K_CD14-positive, CD16-negative classical monocyte","C0011I_CD14-positive, CD16-negative classical monocyte","C00408_CD14-positive, CD16-negative classical monocyte","C004SQ_CD14-positive, CD16-negative classical monocyte","Monocyte_11","Monocyte_12",
+                      "S0022I_macrophage","S00390_macrophage","Macrophage_11","Macrophage_16",
                       "S001MJ_inflammatory macrophage","S0022I_inflammatory macrophage"
       ),
       sample_condition = c(
@@ -122,8 +123,8 @@ comps = list(
         "U937 Baseline","U937 Baseline",
         "U937 PMA","U937 PMA",
         "U937 PMA + LPS","U937 PMA + LPS",
-        "Monocyte","Monocyte","Monocyte","Monocyte","Monocyte",
-        "Macrophage","Macrophage",
+        "Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte",
+        "Macrophage","Macrophage","Macrophage","Macrophage",
         "Inflammatory Macrophage","Inflammatory Macrophage"
       ),
       sample_donor = NA
@@ -131,7 +132,7 @@ comps = list(
   ),
   
   comp_2 = list( # everything
-    sample_comp = c("THP-1_PMA","THP-1_PMA+LPS","U937_PMA","U937_PMA+LPS","primary_macrophage","primary_macrophage_inflamm"),
+    sample_comp = c("THP_1_PMA","THP_1_PMA_LPS","U937_PMA","U937_PMA_LPS","primary_macrophage","primary_macrophage_inflamm"),
     fc = -1.5,
     sample_dat = data.frame(
       sample_name = c("THP-1_BR1_Baseline","THP-1_BR2_Baseline",
@@ -140,8 +141,8 @@ comps = list(
                       "U937_BR1_Baseline","U937_BR2_Baseline",
                       "U937_BR1_LPS","U937_BR2_LPS",
                       "U937_BR1_PMA+LPS","U937_BR2_PMA+LPS",
-                      "C000S5_CD14-positive, CD16-negative classical monocyte","C0010K_CD14-positive, CD16-negative classical monocyte","C0011I_CD14-positive, CD16-negative classical monocyte","C00408_CD14-positive, CD16-negative classical monocyte","C004SQ_CD14-positive, CD16-negative classical monocyte",
-                      "S0022I_macrophage","S00390_macrophage",
+                      "C000S5_CD14-positive, CD16-negative classical monocyte","C0010K_CD14-positive, CD16-negative classical monocyte","C0011I_CD14-positive, CD16-negative classical monocyte","C00408_CD14-positive, CD16-negative classical monocyte","C004SQ_CD14-positive, CD16-negative classical monocyte","Monocyte_11","Monocyte_12",
+                      "S0022I_macrophage","S00390_macrophage","Macrophage_11","Macrophage_16",
                       "S001MJ_inflammatory macrophage","S0022I_inflammatory macrophage"
       ),
       sample_condition = c(
@@ -151,8 +152,8 @@ comps = list(
         "U937 Baseline","U937 Baseline",
         "U937 PMA","U937 PMA",
         "U937 PMA + LPS","U937 PMA + LPS",
-        "Monocyte","Monocyte","Monocyte","Monocyte","Monocyte",
-        "Macrophage","Macrophage",
+        "Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte","Monocyte",
+        "Macrophage","Macrophage","Macrophage","Macrophage",
         "Inflammatory Macrophage","Inflammatory Macrophage"
       ),
       sample_donor = NA
@@ -253,7 +254,7 @@ for(i in 1:length(comps)) {
   gene_list_df = tbl_df(as.data.frame(gene_list_tiled))
   names(gene_list_df)[7:(dim(gene_list_df)[2]-1)] = as.character(comps[[i]]$sample_dat$sample_name) # correct name
   
-  q_norm = TRUE
+  q_norm = FALSE
   if(q_norm) {
     require(limma)
     dat_to_m = as.matrix(gene_list_df[,7:(dim(gene_list_df)[2]-1)])
