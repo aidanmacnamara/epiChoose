@@ -16,19 +16,22 @@ names(figure_1_pca) = c("x","y")
 figure_1_pca$annot_1 = factor(col_data$source)
 figure_1_pca$annot_2 = col_data$condition
 
-save(figure_1_pca, file="~/Dropbox/OTAR020/figures_dat/figure_1_pca.RData") # savepoint
-# load("~/Dropbox/OTAR020/figures_dat/figure_1_pca.RData")
+save(figure_1_pca, file="tmp/figure_1_pca.RData") # savepoint
+# load("tmp/figure_1_pca.RData")
 
 ggplot(figure_1_pca, aes(x=x, y=y, color=annot_1)) + geom_point(size=5, shape=17) + xlab(paste0("PC", 1, ": ", pca_res_summary$importance[2,3]*100, "%")) + ylab(paste0("PC", 2, ": ", pca_res_summary$importance[2,4]*100, "%")) + theme_thesis() + geom_text_repel(aes(label=annot_2), fontface="bold", size=4, force=0.5)
 
 
 # FIGURE 1 PILEUP ---------------------------------------------------------
 
+load("tmp/comps.RData")
 load("tmp/total_signal.RData")
 load("tmp/total_diff.RData")
 load("tmp/total_gene_orders.RData")
 load("tmp/coord_labels.RData")
 n_tiles = 21
+
+total_signal$sample_condition = factor(total_signal$sample_condition, levels=c("Monocyte","Inflammatory Macrophage","Macrophage","THP-1 Baseline","THP-1 PMA","THP-1 PMA + LPS","U937 Baseline","U937 PMA","U937 PMA + LPS"))
 
 for(i in 1:length(comps)) {
   

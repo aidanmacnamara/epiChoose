@@ -178,56 +178,6 @@ to_plot = gather(for_heatmap[,17:22], "Group", "AUC", c(3,5)) # check this
 ggplot(to_plot, aes(x=Group,y=AUC,group=Gene)) + geom_point(shape=17) + geom_line(alpha=0.1) + facet_wrap(~Cluster) + theme_thesis(10)
 
 
-# MOTIF SEARCH ------------------------------------------------------------
-
-require(RcisTarget)
-
-# take the gene lists from novakovic
-# gene_lists <- list(dg=dg_genes, dl=dl_genes)
-
-# take the clusters from top n genes analysis
-gene_lists = vector("list", length(unique(fit$cluster)))
-names(gene_lists) = 1:length(gene_lists)
-for(i in 1:length(gene_lists)) {
-  gene_lists[[i]] = genes_top[fit$cluster==i]
-}
-lapply(gene_lists, head)
-
-# import motif-gene rankings
-# how is this ranking performed?
-# how much do the results change varying the tss window?
-motif_rankings <- importRankings("c:/Downloads/hg19-tss-centered-5kb-7species.mc9nr.feather")
-
-# import motif-tf annotations
-data(motifAnnotations_hgnc)
-
-# run enrichment
-# question: what motifs are enriched in each cluster?
-motif_enrichment <- cisTarget(gene_lists, motif_rankings, motifAnnot=motifAnnotations_hgnc)
-
-for(j in 1:length(gene_lists)) { # visualise
-  
-  # get the significant motifs
-  # can also apply motif-tf  mapping threshold here
-  sig_motifs = filter(motif_enrichment, geneSet==j, NES>=4) %>% select(motif) %>% unlist()
-  
-  # get all interactions between significant tfs and regulated genes
-  inc_mat <- getSignificantGenes(gene_lists[[j]], motif_rankings, signifRankingNames=sig_motifs, plotCurve=TRUE, maxRank=5000-20, genesFormat="incidMatrix", method="aprox")$incidMatrix
-
-  # construct network  
-  edges <- melt(inc_mat)
-  edges <- edges[which(edges[,3]==1),1:2]
-  colnames(edges) <- c("from","to")
-  motifs <- unique(as.character(edges[,1]))
-  genes <- unique(as.character(edges[,2]))
-  nodes <- data.frame(id=c(motifs, genes), label=c(motifs, genes), title=c(motifs, genes), shape=c(rep("diamond", length(motifs)), rep("elypse", length(genes))), color=c(rep("purple", length(motifs)), rep("skyblue", length(genes))))
-  
-  # visualise
-  visNetwork(nodes, edges) %>% visOptions(highlightNearest=TRUE, nodesIdSelection=TRUE)
-
-}
-
-
 # COUNT AUC COMPARISON ----------------------------------------------------
 
 # regions
@@ -260,46 +210,29 @@ rld = rlog(dds, blind=FALSE)
 
 res = results(dds, contrast=c("Stimulus","PMA","Baseline"))
 res$hgnc_symbol = gene_list_all$hgnc_symbol
-res = tbl_df(res)
-res_filt = filter(res, padj < 0.05, abs(log2FoldChange) > 1.2) %>% arrange(desc(abs(log2FoldChange)))
+res_count = tbl_df(res)
+save(res_count, file="tmp/res_count.RData")
 
-# auc
+# auc with limma
 
-# 1. start off with h3k27ac matrix
-dat_add = dat_all$tss$H3K27ac$res[grep("thp-1", rownames(dat_all$tss$H3K27ac$res), ignore.case=TRUE),]
-dat_add[is.na(dat_add)] = 0
-dat_add = apply(dat_add, 2, as.integer)
+load("tmp/fc_res_long.RData")
+res_auc = filter(fc_res_long, trmt=="THP_1_PMA")
 
-col_data_auc = col_data
-rownames(col_data_auc) = rownames(dat_add)
-dds_auc = DESeqDataSetFromMatrix(countData=t(dat_add), colData=col_data_auc, design=~Stimulus)
-
-dds_auc = DESeq(dds_auc)
-rld_auc = rlog(dds_auc, blind=FALSE) 
-
-res_auc = results(dds_auc, contrast=c("Stimulus","PMA","Baseline"))
-res_auc$hgnc_symbol = gene_list_all$hgnc_symbol
-res_auc = tbl_df(res_auc)
-res_auc_filt = filter(res_auc, padj < 0.05, abs(log2FoldChange) > 1.2) %>% arrange(desc(abs(log2FoldChange)))
-
-res_filt$auc_diff = res_auc$log2FoldChange[match(res_filt$hgnc_symbol,res_auc$hgnc_symbol)]
-qplot(res_filt$log2FoldChange, res_auc_filt$log2FoldChange[match(res_filt$hgnc_symbol, res_auc_filt$hgnc_symbol)]) + theme_thesis() + xlab("LogFC Count") + ylab("LogFC AUC")
-plot(euler(list(AUC=res_auc_filt$hgnc_symbol, Counts=res_filt$hgnc_symbol)), quantities=TRUE)
-
-all_genes = unique(c(res_filt$hgnc_symbol, res_auc_filt$hgnc_symbol))
-
-to_plot = data.frame(
-  genes = all_genes,
-  `LogFC Count` = res$log2FoldChange[match(all_genes, res$hgnc_symbol)],
-  `LogFC AUC` = res_auc$log2FoldChange[match(all_genes, res_auc$hgnc_symbol)],
+to_plot_comparison = data.frame(
+  genes = gene_list_all$hgnc_symbol,
+  `LogFC Count` = res_count$log2FoldChange[match(gene_list_all$hgnc_symbol, res_count$hgnc_symbol)],
+  `LogFC AUC` = res_auc$fc[match(gene_list_all$hgnc_symbol, res_auc$gene)],
   Group = NA, check.names=FALSE
 )
 
-to_plot$Group[to_plot$genes %in% intersect(res_filt$hgnc_symbol, res_auc_filt$hgnc_symbol)] = "Both"
-to_plot$Group[to_plot$genes %in% setdiff(res_filt$hgnc_symbol, res_auc_filt$hgnc_symbol)] = "Count"
-to_plot$Group[to_plot$genes %in% setdiff(res_auc_filt$hgnc_symbol, res_filt$hgnc_symbol)] = "AUC"
+cutoff = 1
+to_plot_comparison$Group[to_plot_comparison$genes %in% intersect(res_auc$gene[abs(res_auc$fc)>=cutoff & res_auc$p<=0.05], res_count$hgnc_symbol[abs(res_count$log2FoldChange)>=cutoff & res_count$padj<=0.05])] = "Both"
+to_plot_comparison$Group[to_plot_comparison$genes %in% setdiff(res_auc$gene[abs(res_auc$fc)>=cutoff & res_auc$p<=0.05], res_count$hgnc_symbol[abs(res_count$log2FoldChange)>=cutoff & res_count$padj<=0.05])] = "AUC"
+to_plot_comparison$Group[to_plot_comparison$genes %in% setdiff(res_count$hgnc_symbol[abs(res_count$log2FoldChange)>=cutoff & res_count$padj<=0.05], res_auc$gene[abs(res_auc$fc)>=cutoff & res_auc$p<=0.05])] = "Count"
+to_plot_comparison$Group[is.na(to_plot_comparison$Group)] = "Not Significant"
+to_plot_comparison$size = ifelse(to_plot_comparison$Group=="Not Significant", 0.1, 1)
 
-ggplot(to_plot, aes(x=`LogFC Count`, y=`LogFC AUC`, color=factor(Group))) + geom_point() + theme_thesis()
-
+ggplot(to_plot_comparison, aes(x=`LogFC Count`, y=`LogFC AUC`, color=factor(Group))) + geom_point(aes(size=factor(size)), shape=17, alpha=0.5) + theme_thesis() + scale_size_discrete(guide=FALSE)
+save(to_plot_comparison, file="tmp/to_plot_comparison.RData")
 
 

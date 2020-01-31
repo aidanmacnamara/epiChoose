@@ -75,6 +75,7 @@ fc_res = tbl_df(fc_res)
 fc_res_long$gene = rep(roi_tss$hgnc_symbol, length(unlist(trts)))
 fc_res_long$trmt = as.character(fc_res_long$trmt)
 fc_res_long = tbl_df(fc_res_long)
+save(fc_res_long, file="tmp/fc_res_long.RData")
 
 volc_plot = data.frame(filter(fc_res_long,  trmt=="primary_macrophage"))
 rownames(volc_plot) = volc_plot$gene
@@ -303,7 +304,7 @@ lapply(gene_sets, length)
 # enrichment
 
 dbs = tbl_df(listEnrichrDbs())
-dbs = c("GO_Biological_Process_2017","Reactome_2016")
+dbs = c("GO_Biological_Process_2017")
 
 enrich_process <- function(x) {
   res = enrichr(unique(x), dbs)
@@ -311,25 +312,68 @@ enrich_process <- function(x) {
 }
 
 enrich_res <- lapply(gene_sets, enrich_process)
+save(enrich_res, file="tmp/enrich_res.RData")
 
-# gene set enrichment analysis
 
-gsea_res = vector("list", length(gene_sets))
-names(gsea_res) = names(gene_sets)
+# MOTIF SEARCH ------------------------------------------------------------
 
-for(i in 1:length(gene_sets)) {
+require(RcisTarget)
+
+gene_sets_merged = sapply(unique(fc_res_long_filt$trmt), function(x) fc_res_long_filt$gene[fc_res_long_filt$trmt==x])
+lapply(gene_sets_merged, length)
+
+# import motif-gene rankings
+# how is this ranking performed?
+# how much do the results change varying the tss window?
+motif_rankings <- importRankings("~/Downloads/hg19-tss-centered-5kb-7species.mc9nr.feather")
+
+# import motif-tf annotations
+data(motifAnnotations_hgnc)
+
+# run enrichment
+# question: what motifs are enriched in each cluster?
+motif_enrichment <- cisTarget(gene_sets_merged, motif_rankings, motifAnnot=motifAnnotations_hgnc)
+tf_networks = vector("list", length(gene_sets_merged))
+names(tf_networks) = names(gene_sets_merged)
+
+for(j in 1:length(gene_sets_merged)) { # visualise
+
+  print(j)  
   
-  gsea_dat = fc_res_long_filt %>% filter(trmt_dir==names(gene_sets)[i]) %>% select(gene, fc) %>% mutate(fc=abs(fc)) %>% arrange(desc(fc))
+  # get the significant motifs
+  # can also apply motif-tf  mapping threshold here
+  sig_motifs = filter(motif_enrichment, geneSet==names(gene_sets_merged)[j], NES>=4) %>% select(motif) %>% unlist()
   
-  gsea_in = gsea_dat$fc
-  names(gsea_in) = gsea_dat$gene
+  # get all interactions between significant tfs and regulated genes
+  inc_mat <- getSignificantGenes(gene_sets_merged[[j]], motif_rankings, signifRankingNames=sig_motifs, plotCurve=TRUE, maxRank=5000-20, genesFormat="incidMatrix", method="aprox")$incidMatrix
+  motif_mapping = motifAnnotations_hgnc$TF[match(sig_motifs, motifAnnotations_hgnc$motif)]
+  rownames(inc_mat) = motif_mapping
+  inc_mat = inc_mat[!is.na(rownames(inc_mat)),]
   
-  if(length(gsea_in) < 2) next
-  
-  res_gsea <- lapply(my_p, function(x) fgsea(x, stats=gsea_in, nperm=1000))
-  gsea_res[[i]] = lapply(res_gsea, function(x) x %>% as_tibble() %>% dplyr::select(-leadingEdge, -ES, -nMoreExtreme) %>% arrange(padj))
+  tf_networks[[j]] = list(net=inc_mat, tfs=unique(motif_mapping[!is.na(motif_mapping)]))
   
 }
+
+tfs = lapply(tf_networks, function(x) x[[2]])
+tfs_table = as.data.frame.matrix((table(stack(tfs))))
+tfs_table = cbind(rownames(tfs_table), tfs_table)
+rownames(tfs_table) = NULL
+upset(tfs_table, order.by="freq", sets=c("primary_macrophage","primary_macrophage_inflamm","THP_1_PMA_LPS","U937_PMA_LPS"))
+
+# construct network 
+inc_mat = tf_networks[[which(names(tf_networks)=="THP_1_PMA_LPS")]]$net
+edges <- melt(inc_mat)
+edges <- edges[which(edges[,3]==1),1:2]
+edges = distinct(edges)
+colnames(edges) <- c("from","to")
+motifs <- unique(as.character(edges[,1]))
+genes <- unique(as.character(edges[,2]))
+nodes <- data.frame(id=c(motifs, genes), label=c(motifs, genes), title=c(motifs, genes), shape=c(rep("diamond", length(motifs)), rep("elypse", length(genes))), color=c(rep("purple", length(motifs)), rep("skyblue", length(genes))))
+nodes = distinct(nodes)
+nodes = nodes[!duplicated(nodes$id),]
+
+# visualise
+visNetwork(nodes, edges) %>% visOptions(highlightNearest=TRUE, nodesIdSelection=TRUE)
 
 
 # BIMODAL SELECTION -------------------------------------------------------
