@@ -333,8 +333,11 @@ data(motifAnnotations_hgnc)
 # run enrichment
 # question: what motifs are enriched in each cluster?
 motif_enrichment <- cisTarget(gene_sets_merged, motif_rankings, motifAnnot=motifAnnotations_hgnc)
+table(motif_enrichment$geneSet)
+
 tf_networks = vector("list", length(gene_sets_merged))
 names(tf_networks) = names(gene_sets_merged)
+tf_df = data.frame()
 
 for(j in 1:length(gene_sets_merged)) { # visualise
 
@@ -352,8 +355,19 @@ for(j in 1:length(gene_sets_merged)) { # visualise
   
   tf_networks[[j]] = list(net=inc_mat, tfs=unique(motif_mapping[!is.na(motif_mapping)]))
   
+  edges <- melt(inc_mat)
+  edges <- edges[which(edges[,3]==1),1:2]
+  edges = distinct(edges)
+  names(edges) = c("TF","Gene")
+  edges$trmt = names(gene_sets_merged)[j]
+  tf_df = rbind(tf_df, edges)
 }
 
+# export results
+tf_df = tbl_df(left_join(tf_df, fc_res_long_filt, by=c("Gene"="gene","trmt"="trmt")))
+write_csv(tf_df, "~/Dropbox/OTAR020/figures_dat/tf_dat.csv")
+
+# upset table
 tfs = lapply(tf_networks, function(x) x[[2]])
 tfs_table = as.data.frame.matrix((table(stack(tfs))))
 tfs_table = cbind(rownames(tfs_table), tfs_table)
