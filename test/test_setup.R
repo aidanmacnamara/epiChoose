@@ -366,16 +366,21 @@ for(i in 1:length(dat_max_10[1:5])) {
 dat_all_raw = list(dat_max_gb, dat_tss, dat_sum_gb, dat_max_10)
 names(dat_all_raw) = c("max", "tss", "sum", "closest")
 
-# variance stabilisation
+# variance stabilisation, rna is log(fpkm+1, base=2)
+
 dat_all_vsn = dat_all_raw
 for(i in 1:length(dat_all_vsn)) {
-  for(j in 1:length(dat_all_vsn[[i]])) {
+  for(j in 1:(length(dat_all_vsn[[i]])-1)) {
     print(paste("Method:", names(dat_all_raw)[i], "Data Type:", names(dat_all_raw[[i]][j])))
     dat_all_vsn[[i]][[j]]$res = vsn_norm(dat_all_raw[[i]][[j]]$res)
   }
+  
+  dat_all_vsn[[i]]$RNA$res = log(dat_all_vsn[[i]]$RNA$res+1, base=2)
+  
 }
 
 # quantile normalisation
+
 dat_all = dat_all_vsn
 for(i in 1:length(dat_all)) {
   for(j in 1:length(dat_all[[i]])) {
@@ -391,9 +396,11 @@ save(dat_all, file="data/dat_all.RData") # savepoint
 
 # SAVE DATA TO EPIVIEW ----------------------------------------------------
 
-save(dat_all, file="../epiView/data/dat_all.RData") # savepoint
-save(gene_list_all, file="../epiView/data/gene_list_all.RData") # savepoint
+# version 2 as open targets server is r 3.3
+
+save(dat_all, file="../epiView/data/dat_all.RData", version=2) # savepoint
+save(gene_list_all, file="../epiView/data/gene_list_all.RData", version=2) # savepoint
 roi_reg_df = as.data.frame(roi_reg)[,1:3]
-save(roi_reg_df, file="../epiView/data/roi_reg_df.RData") # savepoint
+save(roi_reg_df, file="../epiView/data/roi_reg_df.RData", version=2) # savepoint
 
 
