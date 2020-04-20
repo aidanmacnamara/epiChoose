@@ -26,8 +26,8 @@ load("data/roi_tss.RData")
 # GENE SETS ---------------------------------------------------------------
 
 my_p = list(
-  go_bp = gmtPathways("tmp/c5.bp.v6.2.symbols.gmt"), # go biological processes,
-  reactome = gmtPathways("tmp/c2.cp.reactome.v6.2.symbols.gmt") # reactome
+  go_bp = gmtPathways("tmp/gene_sets/c5.bp.v6.2.symbols.gmt"), # go biological processes,
+  reactome = gmtPathways("tmp/gene_sets/c2.cp.reactome.v6.2.symbols.gmt") # reactome
 )
 
 
@@ -298,7 +298,13 @@ table(fc_res_long_filt$trmt)
 fc_res_long_filt$dir = ifelse(fc_res_long_filt$fc > 0, "up", "down")
 fc_res_long_filt$trmt_dir = paste(fc_res_long_filt$trmt, fc_res_long_filt$dir, sep="_")
 
-gene_sets = sapply(unique(fc_res_long_filt$trmt_dir), function(x) fc_res_long_filt$gene[fc_res_long_filt$trmt_dir==x])
+# up and down separate
+# gene_sets = sapply(unique(fc_res_long_filt$trmt_dir), function(x) fc_res_long_filt$gene[fc_res_long_filt$trmt_dir==x])
+
+# up and down together
+gene_sets = lapply(unique(fc_res_long_filt$trmt), function(x) unlist(fc_res_long_filt[fc_res_long_filt$trmt==x,'gene']))
+names(gene_sets) = unique(fc_res_long_filt$trmt)
+
 lapply(gene_sets, length)
 
 # enrichment
@@ -307,12 +313,14 @@ dbs = tbl_df(listEnrichrDbs())
 dbs = c("GO_Biological_Process_2017")
 
 enrich_process <- function(x) {
-  res = enrichr(unique(x), dbs)
-  res = lapply(res, function(x) tbl_df(filter(x, `Adjusted.P.value` <= 0.05)))
+  res = enrichr(unique(x), dbs)[[1]]
+  res = tbl_df(filter(res, `Adjusted.P.value` <= 0.05))
 }
 
 enrich_res <- lapply(gene_sets, enrich_process)
+enrich_res_df = bind_rows(enrich_res, .id = "Trmt")
 save(enrich_res, file="tmp/enrich_res.RData")
+write_csv(enrich_res_df, "tmp/enrich_res_df.csv")
 
 
 # MOTIF SEARCH ------------------------------------------------------------
