@@ -1,18 +1,18 @@
 
 require(tidyverse)
-require(MOFA)
-require(MOFAdata)
-require(vsn)
-require(BiocParallel)
-require(MultiAssayExperiment)
+require(MOFA2)
 require(reticulate)
 require(epiChoose)
+require(MultiAssayExperiment)
+require(vsn)
+require(BiocParallel)
 require(ggrepel)
 require(cowplot)
 require(readxl)
 require(pheatmap)
+require(fgsea)
 
-use_condaenv("base", required=TRUE)
+use_condaenv("general", required=TRUE)
 # use_python(python="/usr/local/bin/python3", required=TRUE)
 load("data/dat_all.RData")
 
@@ -101,7 +101,8 @@ col_data$group = paste(col_data$cell_type, col_data$condition, sep="_")
 
 col_data[,2:8] = lapply(col_data[,2:8], factor)
 col_data = tbl_df(col_data)
-col_data
+col_data$short_label = make.names(col_data$source, unique=TRUE)
+table(str_length(col_data$short_label) > 50)
 col_data_filt = col_data[-d_ix,]
 
 # manuscript data
@@ -113,17 +114,18 @@ dat_ix = c(dat_ix, which(col_data_filt$source=="wang"))
 col_data_filt[dat_ix,]
 
 inputs = list(
-  t(as.matrix(dat_all$max$H3K27ac$res[match(col_data_filt$Label, rownames(dat_all$max$H3K27ac$res)),])),
-  t(as.matrix(dat_all$max$H3K4me3$res[match(col_data_filt$Label, rownames(dat_all$max$H3K27ac$res)),])),
-  t(as.matrix(dat_all$max$H3K27me3$res[match(col_data_filt$Label, rownames(dat_all$max$H3K27ac$res)),]))
+  t(as.matrix(dat_all$tss$H3K27ac$res[match(col_data_filt$Label, rownames(dat_all$tss$H3K27ac$res)),])),
+  t(as.matrix(dat_all$tss$H3K4me3$res[match(col_data_filt$Label, rownames(dat_all$tss$H3K27ac$res)),])),
+  t(as.matrix(dat_all$tss$H3K27me3$res[match(col_data_filt$Label, rownames(dat_all$tss$H3K27ac$res)),]))
   # t(as.matrix(dat_all$closest$ATAC$res)),
   # t(as.matrix(dat_all$closest$CTCF$res))
   # t(as.matrix(dat_all$max$RNA$res))
 )
-names(inputs) = names(dat_all$max)[1:3]
+names(inputs) = names(dat_all$tss)[1:3]
 
 for(i in 1:length(inputs)) {
-  rownames(inputs[[i]]) = paste(names(inputs)[i], rownames(inputs[[i]]), sep="_")
+  rownames(inputs[[i]]) = paste(names(inputs)[i], gene_list_all$hgnc_symbol, sep="_")
+  colnames(inputs[[i]]) = col_data_filt$short_label
 }
 
 lapply(inputs, dim)
@@ -132,27 +134,27 @@ lapply(inputs, limma::plotMA)
 
 # finish column data
 annot = data.frame(col_data_filt)
+annot = annot %>% dplyr::select(short_label, everything())
 rownames(annot) = colnames(inputs[[1]])
 mae = MultiAssayExperiment(experiments=inputs, colData=annot)
 
 # which features have no information across all assays
-features_na = sapply(1:18246, function(x) all(is.na(unlist(assays(mae[x,,])))))
-table(features_na)
-mae_filt = mae[!features_na,,]
-mae_filt
+# features_na = sapply(1:18246, function(x) all(is.na(unlist(assays(mae[x,,])))))
+# table(features_na)
+# mae_filt = mae[!features_na,,]
+# mae_filt
 
-mofa = createMOFAobject(mae_filt)
+mofa = create_mofa(mae)
 mofa
-# plotDataOverview(mofa)
+plot_data_overview(mofa)
 
 # training options
-getDefaultTrainOptions()
-mofa_train = prepareMOFA(mofa)
-mofa_train@ModelOptions$numFactors = 15
-mofa_train@ModelOptions
-mofa_model = runMOFA(mofa_train, outfile=tempfile())
+get_default_data_options(mofa)
+mofa_train = prepare_mofa(mofa)
+mofa_train@model_options
+mofa_model = run_mofa(mofa_train, outfile="tmp/mofa_model_5.hdf5")
 mofa_model
-save(mofa_model, file="tmp/mofa_model.RData")
+save(mofa_model, file="tmp/mofa_model_5.RData")
 
 
 # MOFA SLICE --------------------------------------------------------------
@@ -167,6 +169,23 @@ inputs = list(
   # t(as.matrix(dat_all$closest$CTCF$res))
   # t(as.matrix(dat_all$max$RNA$res))
 )
+
+for(i in 1:length(inputs)) {
+  
+  dat = inputs[[i]]
+  dim(dat)
+  features_na = apply(dat, 1, function(x) all(is.na(x)))
+  table(features_na)
+  dat = dat[!features_na,]
+  dim(dat)
+  
+  features_sd = apply(dat, 1, function(x) sd(x)==0)
+  table(features_sd)
+  dat = dat[!features_sd,]
+  dim(dat)
+  inputs[[i]] = dat
+}
+
 names(inputs) = names(dat_all$max)[1:3]
 
 for(i in 1:length(inputs)) {
@@ -182,13 +201,7 @@ annot = data.frame(col_data_filt[t_ix,])
 rownames(annot) = colnames(inputs[[1]])
 mae = MultiAssayExperiment(experiments=inputs, colData=annot)
 
-# which features have no information across all assays
-features_na = sapply(1:18246, function(x) all(is.na(unlist(assays(mae[x,,])))))
-table(features_na)
-mae_filt = mae[!features_na,,]
-mae_filt
-
-mofa = createMOFAobject(mae_filt)
+mofa = createMOFAobject(mae)
 mofa
 plotDataOverview(mofa)
 
@@ -204,34 +217,48 @@ save(mofa_model, file="tmp/mofa_model_slice.RData")
 
 # VISUALISATION -----------------------------------------------------------
 
-plotVarianceExplained(mofa_model)
+plot_variance_explained(mofa_model)
 
-plotWeightsHeatmap(
+plot_weights_heatmap(
   mofa_model, 
   view = "H3K27ac", 
   factors = 1:4,
   show_colnames = FALSE
 )
 
-mofa_factors = getFactors(mofa_model, factors=1:5, as.data.frame=FALSE)
+mofa_factors = get_factors(mofa_model, factors=1:5, as.data.frame=FALSE)
 head(mofa_factors)
 
 # pca_res = prcomp(mofa_factors, scale=TRUE, center=TRUE)
 # pca_res_summary = summary(pca_res)
 # y = data.frame(pca_res$x[,1:2])
 
-y = data.frame(mofa_factors[,1:2])
+y = data.frame(mofa_factors$group1[,1:2])
+dim(y)
 
 names(y) = c("x","y")
 y$annot_1 = col_data_filt$group
 y$project = col_data_filt$source
 
-ggplot(y[dat_ix,], aes(x=x, y=y, color=project)) + geom_point(size=5, shape=17) + xlab("") + ylab("") + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=3, force=0.5)
-
 ggplot(y, aes(x=x, y=y, color=project)) + geom_point(size=5, shape=17) + xlab("") + ylab("") + theme_thesis() + geom_text_repel(aes(label=annot_1), fontface="bold", size=3, force=0.5)
 
-clusters = clusterSamples(mofa_model, k=3, factors=1)
-plotFactorScatter(mofa_model, factors=1:2, color_by=clusters)
+plot_factors(mofa_model, color_by=col_data_filt$source, shape_by=col_data_filt$group)
+
+plot_data_heatmap(mofa_model, view="H3K27ac", factor=1, features=20, cluster_rows=TRUE, cluster_cols=TRUE, show_rownames= TRUE, show_colnames=TRUE, labels_col=col_data_filt$Label, fontsize_col=5, angle_col=315)
+
+
+# EXTRACT DATA ------------------------------------------------------------
+
+factors = get_factors(mofa_model, factors="all")
+lapply(factors,dim)
+
+mweights = get_weights(mofa_model, as.data.frame=TRUE)
+mweights$feature = str_replace(mweights$feature, "^[[:alnum:]]+_", "")
+mweights_wide = pivot_wider(mweights, values_from="value", names_from=c("view"))
+
+mweights_wide %>% filter(factor %in% paste("Factor", 1:5, sep="")) %>% ggplot(aes(x=H3K27ac, y=H3K4me3)) + geom_point() + theme_thesis(10) + facet_wrap(~factor)
+
+mweights_wide %>% filter(factor %in% paste("Factor", 1:5, sep="")) %>% ggplot(aes(x=H3K27ac, y=H3K27me3)) + geom_point() + theme_thesis(10) + facet_wrap(~factor)
 
 
 # MOFA EXPLORATION --------------------------------------------------------
@@ -266,7 +293,7 @@ for(i in 1:length(viewNames(mofa_model))) {
   
   interesting_factors = 1:2
   fsea_plots <- lapply(interesting_factors, function(factor) {
-    plotEnrichment(
+    MOFA::plotEnrichment(
       mofa_model,
       gsea,
       factor = factor,
@@ -276,6 +303,5 @@ for(i in 1:length(viewNames(mofa_model))) {
   })
   print(cowplot::plot_grid(fsea_plots[[1]], fsea_plots[[2]], ncol=1, labels=paste("Factor", interesting_factors)))
   
-  
-  
 }
+

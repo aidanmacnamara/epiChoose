@@ -23,6 +23,35 @@ load("tmp/dds_all.RData")
 load("data/roi_tss.RData")
 
 
+# CYTOKINE HEATMAP --------------------------------------------------------
+
+dat = dat_all$tss
+cytokines = c(
+  "IFNG",
+  "IL10",
+  "IL12A",
+  "IL23A",
+  "IL1B",
+  "IL2",
+  "IL4",
+  "IL6",
+  "CXCL8",
+  "TNF"
+)
+
+samples = grep("(THP-1)|(U937)", rownames(dat$H3K27ac$res), value=TRUE)
+
+chm = lapply(dat, function(x) x$res[match(samples, rownames(x$res)),match(cytokines, gene_list_all$hgnc_symbol)])
+for(i in 1:length(chm)) {
+  x = chm[[i]]
+  colnames(x) = cytokines
+  x = x[apply(x, 1, function(y) !all(is.na(y))),]
+  pdf(file=paste0("out_", i, ".pdf"), height=6, width=8)
+  print(pheatmap::pheatmap(x, main=names(chm)[i]))
+  dev.off()
+}
+
+
 # GENE SETS ---------------------------------------------------------------
 
 my_p = list(
@@ -77,7 +106,7 @@ fc_res_long$trmt = as.character(fc_res_long$trmt)
 fc_res_long = tbl_df(fc_res_long)
 save(fc_res_long, file="tmp/fc_res_long.RData")
 
-volc_plot = data.frame(filter(fc_res_long,  trmt=="primary_macrophage"))
+volc_plot = data.frame(filter(fc_res_long, trmt=="primary_macrophage"))
 rownames(volc_plot) = volc_plot$gene
 EnhancedVolcano(volc_plot, lab=rownames(volc_plot), x="fc", y="p", FCcutoff=3, legendLabels=c("","","","FC > 3"))
 
@@ -195,6 +224,25 @@ for(i in 1:length(comps)) {
   
   # get these genes into long format 'gene_tbl_long'
   gene_tbl = as.data.frame.matrix((table(stack(dynamic_genes))))
+  
+  # get the intersections
+  gene_tbl = cbind(rownames(gene_tbl), gene_tbl)
+  colnames(gene_tbl)[1] = "gene"
+  gene_tbl[1:5,1:5]
+  # rownames(gene_tbl) = NULL
+  upset(gene_tbl, order.by="freq", sets=c("primary_macrophage","primary_macrophage_inflamm","U937_PMA_LPS","U937_PMA"))
+  
+  source("R/get_intersect_members.R")
+  
+  my_intersect = c("U937_PMA","primary_macrophage")
+  my_background = c("U937_PMA","primary_macrophage")
+  # my_intersect = c("U937_PMA_LPS","primary_macrophage_inflamm")
+  # my_background = c("U937_PMA","primary_macrophage","U937_PMA_LPS","primary_macrophage_inflamm")
+  
+  data.frame(
+    gene = rownames(get_intersect_members(gene_tbl[,colnames(gene_tbl) %in% my_background], my_intersect))
+  ) %>% write_csv("~/Downloads/out.csv")
+  
   gene_tbl$gene = rownames(gene_tbl); gene_tbl = tbl_df(gene_tbl)
   gene_tbl_long = gene_tbl %>% gather("sample","deregulated",1:length(comps[[i]]$sample_comp))
   gene_tbl_long$comp = names(comps)[i]
@@ -303,14 +351,14 @@ fc_res_long_filt$trmt_dir = paste(fc_res_long_filt$trmt, fc_res_long_filt$dir, s
 
 # up and down together
 gene_sets = lapply(unique(fc_res_long_filt$trmt), function(x) unlist(fc_res_long_filt[fc_res_long_filt$trmt==x,'gene']))
-names(gene_sets) = unique(fc_res_long_filt$trmt)
 
+names(gene_sets) = unique(fc_res_long_filt$trmt)
 lapply(gene_sets, length)
 
 # enrichment
 
 dbs = tbl_df(listEnrichrDbs())
-dbs = c("GO_Biological_Process_2017")
+dbs = c("Reactome_2016")
 
 enrich_process <- function(x) {
   res = enrichr(unique(x), dbs)[[1]]
@@ -333,7 +381,7 @@ lapply(gene_sets_merged, length)
 # import motif-gene rankings
 # how is this ranking performed?
 # how much do the results change varying the tss window?
-motif_rankings <- importRankings("~/Downloads/hg19-tss-centered-5kb-7species.mc9nr.feather")
+motif_rankings <- importRankings("tmp/hg19-tss-centered-5kb-7species.mc9nr.feather")
 
 # import motif-tf annotations
 data(motifAnnotations_hgnc)
@@ -347,12 +395,12 @@ tf_networks = vector("list", length(gene_sets_merged))
 names(tf_networks) = names(gene_sets_merged)
 tf_df = data.frame()
 
-for(j in 1:length(gene_sets_merged)) { # visualise
-
+for(j in 1:length(gene_sets_merged)) { # visualize
+  
   print(j)  
   
   # get the significant motifs
-  # can also apply motif-tf  mapping threshold here
+  # can also apply motif-tf mapping threshold here
   sig_motifs = filter(motif_enrichment, geneSet==names(gene_sets_merged)[j], NES>=4) %>% select(motif) %>% unlist()
   
   # get all interactions between significant tfs and regulated genes
@@ -383,7 +431,8 @@ rownames(tfs_table) = NULL
 upset(tfs_table, order.by="freq", sets=c("primary_macrophage","primary_macrophage_inflamm","THP_1_PMA_LPS","U937_PMA_LPS"))
 
 # construct network 
-inc_mat = tf_networks[[which(names(tf_networks)=="THP_1_PMA_LPS")]]$net
+which_net = "U937_PMA"
+inc_mat = tf_networks[[which(names(tf_networks)==which_net)]]$net
 edges <- melt(inc_mat)
 edges <- edges[which(edges[,3]==1),1:2]
 edges = distinct(edges)
@@ -394,8 +443,8 @@ nodes <- data.frame(id=c(motifs, genes), label=c(motifs, genes), title=c(motifs,
 nodes = distinct(nodes)
 nodes = nodes[!duplicated(nodes$id),]
 
-# visualise
-visNetwork(nodes, edges) %>% visOptions(highlightNearest=TRUE, nodesIdSelection=TRUE)
+# visualize
+visNetwork(nodes, edges) %>% visOptions(highlightNearest=TRUE, nodesIdSelection=TRUE) %>% visInteraction(dragNodes=FALSE, dragView=FALSE, zoomView=FALSE)
 
 
 # BIMODAL SELECTION -------------------------------------------------------
